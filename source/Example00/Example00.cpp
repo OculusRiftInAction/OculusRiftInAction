@@ -37,22 +37,22 @@
 
 #ifdef WIN32
 
-	long millis() {
-		static long start = GetTickCount();
-		return GetTickCount() - start;
-	}
+    long millis() {
+        static long start = GetTickCount();
+        return GetTickCount() - start;
+    }
 
 #else
 
-	#include <sys/time.h>
+    #include <sys/time.h>
 
-	long millis() {
-		timeval time;
-		gettimeofday(&time, NULL);
-		long millis = (time.tv_sec * 1000) + (time.tv_usec / 1000);
-		static long start = millis;
-		return millis - start;
-	}
+    long millis() {
+        timeval time;
+        gettimeofday(&time, NULL);
+        long millis = (time.tv_sec * 1000) + (time.tv_usec / 1000);
+        static long start = millis;
+        return millis - start;
+    }
 
 #endif
 
@@ -149,33 +149,33 @@ const GLuint QUAD_INDICES[] = {
 #ifdef WIN32
 
     static string loadResource(const string& in) {
-		static HMODULE module = GetModuleHandle(NULL);
-		HRSRC res = FindResourceA(module, in.c_str(), "TEXTFILE");
-		HGLOBAL mem = LoadResource(module, res);
-		DWORD size = SizeofResource(module, res);
-		LPVOID data = LockResource(mem);
-		string result((const char*)data, size);
-		FreeResource(mem);
-		return result;
+        static HMODULE module = GetModuleHandle(NULL);
+        HRSRC res = FindResourceA(module, in.c_str(), "TEXTFILE");
+        HGLOBAL mem = LoadResource(module, res);
+        DWORD size = SizeofResource(module, res);
+        LPVOID data = LockResource(mem);
+        string result((const char*)data, size);
+        FreeResource(mem);
+        return result;
     }
 
 #else
 
-	static string slurp(ifstream& in) {
-		stringstream sstr;
-		sstr << in.rdbuf();
-		string result = sstr.str();
-		assert(!result.empty());
-		return result;
-	}
+    static string slurp(ifstream& in) {
+        stringstream sstr;
+        sstr << in.rdbuf();
+        string result = sstr.str();
+        assert(!result.empty());
+        return result;
+    }
 
-	static string slurpFile(const string & in) {
-		ifstream ins(in.c_str());
-		assert(ins);
-		return slurp(ins);
-	}
+    static string slurpFile(const string & in) {
+        ifstream ins(in.c_str());
+        assert(ins);
+        return slurp(ins);
+    }
 
-	#ifdef __APPLE__
+    #ifdef __APPLE__
         static string loadResource(const string& in) {
             static CFBundleRef mainBundle = CFBundleGetMainBundle();
             assert(mainBundle);
@@ -197,7 +197,7 @@ const GLuint QUAD_INDICES[] = {
             return slurpFile(executableDirectory + "/" + in);
         }
 
-	#endif // __APPLE__
+    #endif // __APPLE__
 
 #endif // WIN32
 
@@ -243,7 +243,7 @@ class GLprogram {
         GLint compiled;
         glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
         if (compiled == 0) {
-			string errorLog = getShaderLog(shader);
+            string errorLog = getShaderLog(shader);
             cerr << errorLog << endl;
         }
         assert(compiled != 0);
@@ -275,7 +275,7 @@ class GLprogram {
     Map uniforms;
 
 public:
-	GLprogram() : vertexShader(0), fragmentShader(0), program(0) { }
+    GLprogram() : vertexShader(0), fragmentShader(0), program(0) { }
 
     void use() {
         glUseProgram(program);
@@ -341,7 +341,7 @@ public:
     }
 
     GLint getAttributeLocation(const string & attribute) const {
-		Map::const_iterator itr = attributes.find(attribute);
+        Map::const_iterator itr = attributes.find(attribute);
         if (attributes.end() != itr) {
             return itr->second;
         }
@@ -382,7 +382,7 @@ void checkGlError() {
 class glfwApp {
     GLFWwindow * window;
 public:
-    glfwApp() : window(	) {
+    glfwApp() : window(    ) {
         // Initialize the GLFW system for creating and positioning windows
         if( !glfwInit() ) {
             cerr << "Failed to initialize GLFW" << endl;
@@ -400,15 +400,15 @@ public:
         glfwSetKeyCallback(window, glfwKeyCallback);
         glfwMakeContextCurrent(window);
 
-		// Initialize the OpenGL 3.x bindings
+        // Initialize the OpenGL 3.x bindings
 #ifdef WIN32
-		if (0 != gl3wInit()) {
-			cerr << "Failed to initialize GLEW" << endl;
-			exit( EXIT_FAILURE );
-		}
+        if (0 != gl3wInit()) {
+            cerr << "Failed to initialize GLEW" << endl;
+            exit( EXIT_FAILURE );
+        }
 #endif
 
-		checkGlError();
+        checkGlError();
     }
 
     virtual ~glfwApp() {
@@ -456,15 +456,15 @@ protected:
     SensorFusion sensorFusion;
     StereoConfig stereoConfig;
 
-	// Provides the resolution and location of the Rift
-	HMDInfo hmdInfo;
-	// Calculated width and height of the per-eye rendering area used
+    // Provides the resolution and location of the Rift
+    HMDInfo hmdInfo;
+    // Calculated width and height of the per-eye rendering area used
     int eyeWidth, eyeHeight;
-	// Calculated width and height of the frame buffer object used to contain
-	// intermediate results for the multipass render
-	int fboWidth, fboHeight;
+    // Calculated width and height of the frame buffer object used to contain
+    // intermediate results for the multipass render
+    int fboWidth, fboHeight;
 
-	Mode renderMode;
+    Mode renderMode;
     bool useTracker;
     long elapsed;
 
@@ -486,23 +486,23 @@ protected:
 public:
 
     Example00() :  renderMode(MONO), useTracker(false), elapsed(0),
-		cubeVertexBuffer(0), cubeIndexBuffer(0), cubeWireIndexBuffer(0), quadVertexBuffer(0), quadIndexBuffer(0),
-		frameBuffer(0), frameBufferTexture(0), depthBuffer(0)
-		{
+        cubeVertexBuffer(0), cubeIndexBuffer(0), cubeWireIndexBuffer(0), quadVertexBuffer(0), quadIndexBuffer(0),
+        frameBuffer(0), frameBufferTexture(0), depthBuffer(0)
+        {
 
-		// do the master initialization for the Oculus VR SDK
-		OVR::System::Init();
+        // do the master initialization for the Oculus VR SDK
+        OVR::System::Init();
 
-		sensorFusion.SetGravityEnabled(false);
-		sensorFusion.SetPredictionEnabled(false);
-		sensorFusion.SetYawCorrectionEnabled(false);
+        sensorFusion.SetGravityEnabled(false);
+        sensorFusion.SetPredictionEnabled(false);
+        sensorFusion.SetYawCorrectionEnabled(false);
 
         hmdInfo.HResolution = 1280;
         hmdInfo.VResolution = 800;
         hmdInfo.HScreenSize = 0.149759993f;
         hmdInfo.VScreenSize = 0.0935999975f;
         hmdInfo.VScreenCenter = 0.0467999987f;
-        hmdInfo.EyeToScreenDistance	= 0.0410000011f;
+        hmdInfo.EyeToScreenDistance    = 0.0410000011f;
         hmdInfo.LensSeparationDistance = 0.0635000020f;
         hmdInfo.InterpupillaryDistance = 0.0640000030f;
         hmdInfo.DistortionK[0] = 1.00000000f;
@@ -516,7 +516,7 @@ public:
         hmdInfo.DesktopX = 0;
         hmdInfo.DesktopY = 0;
 
-		///////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
         // Initialize Oculus VR SDK and hardware
         Ptr<DeviceManager> ovrManager = *DeviceManager::Create();
         if (ovrManager) {
@@ -610,11 +610,11 @@ public:
         checkGlError();
         modelview = glm::lookAt(CAMERA, ORIGIN, UP);
         projection = glm::perspective(60.0f, (float)hmdInfo.HResolution / (float)hmdInfo.VResolution, 0.1f, 100.f);
-	}
+    }
 
-	virtual ~Example00() {
-		OVR::System::Destroy();
-	}
+    virtual ~Example00() {
+        OVR::System::Destroy();
+    }
 
     virtual void onKey(int key, int scancode, int action, int mods) {
         if (GLFW_PRESS != action) {
@@ -622,8 +622,8 @@ public:
         }
         switch (key) {
         case GLFW_KEY_R:
-			sensorFusion.Reset();
-			break;
+            sensorFusion.Reset();
+            break;
 
         case GLFW_KEY_T:
             useTracker = !useTracker;
@@ -648,38 +648,38 @@ public:
     virtual void update() {
         long now = millis();
         if (useTracker) {
-			// For some reason building the quaternion directly from the OVR
-			// x,y,z,w values does not work.  So instead we convert it into
-			// euler angles and construct our glm::quaternion from those
+            // For some reason building the quaternion directly from the OVR
+            // x,y,z,w values does not work.  So instead we convert it into
+            // euler angles and construct our glm::quaternion from those
 
-			// Fetch the pitch roll and yaw out of the sensorFusion device
-			glm::vec3 eulerAngles;
-			sensorFusion.GetOrientation().GetEulerAngles<Axis_X, Axis_Y, Axis_Z, Rotate_CW, Handed_R>(
-				&eulerAngles.x, &eulerAngles.y, &eulerAngles.z);
+            // Fetch the pitch roll and yaw out of the sensorFusion device
+            glm::vec3 eulerAngles;
+            sensorFusion.GetOrientation().GetEulerAngles<Axis_X, Axis_Y, Axis_Z, Rotate_CW, Handed_R>(
+                &eulerAngles.x, &eulerAngles.y, &eulerAngles.z);
 
-			// Not convert it into a GLM quaternion.
-			glm::quat orientation = glm::quat(eulerAngles);
+            // Not convert it into a GLM quaternion.
+            glm::quat orientation = glm::quat(eulerAngles);
 
-			// Most applications want take a basic camera postion and apply the
-			// orientation transform to it in this way:
-			// modelview = glm::mat4_cast(orientation) * glm::lookAt(CAMERA, ORIGIN, UP);
+            // Most applications want take a basic camera postion and apply the
+            // orientation transform to it in this way:
+            // modelview = glm::mat4_cast(orientation) * glm::lookAt(CAMERA, ORIGIN, UP);
 
-			// However for this demonstration we want the cube to remain
-			// centered in the viewport, and orbit our view around it.  This
-			// serves two purposes.
-			//
-			// First, it's not possible to see a blank screen in the event
-			// the HMD is oriented to point away from the origin of the scene.
-			//
-			// Second, a scene that has no points of reference other than a
-			// single small object can be disorienting, leaving the user
-			// feeling lost in a void.  Having a fixed object in the center
-			// of the screen that you appear to be moving around should
-			// provide less immersion, which in this instance is better
-			modelview = glm::lookAt(CAMERA, ORIGIN, UP) * glm::mat4_cast(orientation);
+            // However for this demonstration we want the cube to remain
+            // centered in the viewport, and orbit our view around it.  This
+            // serves two purposes.
+            //
+            // First, it's not possible to see a blank screen in the event
+            // the HMD is oriented to point away from the origin of the scene.
+            //
+            // Second, a scene that has no points of reference other than a
+            // single small object can be disorienting, leaving the user
+            // feeling lost in a void.  Having a fixed object in the center
+            // of the screen that you appear to be moving around should
+            // provide less immersion, which in this instance is better
+            modelview = glm::lookAt(CAMERA, ORIGIN, UP) * glm::mat4_cast(orientation);
         } else {
-			// In the absence of head tracker information, we want to slowly
-			// rotate the cube so that the animation of the scene is apparent
+            // In the absence of head tracker information, we want to slowly
+            // rotate the cube so that the animation of the scene is apparent
             static const float Y_ROTATION_RATE = 0.01f;
             static const float Z_ROTATION_RATE = 0.05f;
             modelview = glm::lookAt(CAMERA, ORIGIN, UP);
@@ -737,36 +737,36 @@ public:
 
                 float texL = 0, texR = 1, texT = 1, texB = 0;
                 if (renderMode == STEREO_DISTORT) {
-					// Pysical width of the viewport
-					static float eyeScreenWidth = hmdInfo.HScreenSize / 2.0f;
-					// The viewport goes from -1,1.  We want to get the offset
-					// of the lens from the center of the viewport, so we only
-					// want to look at the distance from 0, 1, so we divide in
-					// half again
-					static float halfEyeScreenWidth = eyeScreenWidth / 2.0f;
+                    // Pysical width of the viewport
+                    static float eyeScreenWidth = hmdInfo.HScreenSize / 2.0f;
+                    // The viewport goes from -1,1.  We want to get the offset
+                    // of the lens from the center of the viewport, so we only
+                    // want to look at the distance from 0, 1, so we divide in
+                    // half again
+                    static float halfEyeScreenWidth = eyeScreenWidth / 2.0f;
 
-					// The distance from the center of the display panel (NOT
-					// the center of the viewport) to the lens axis
-					static float lensDistanceFromScreenCenter = hmdInfo.LensSeparationDistance / 2.0f;
+                    // The distance from the center of the display panel (NOT
+                    // the center of the viewport) to the lens axis
+                    static float lensDistanceFromScreenCenter = hmdInfo.LensSeparationDistance / 2.0f;
 
-					// Now we we want to turn the measurement from
-					// millimeters into the range 0, 1
-					static float lensDistanceFromViewportEdge = lensDistanceFromScreenCenter / halfEyeScreenWidth;
+                    // Now we we want to turn the measurement from
+                    // millimeters into the range 0, 1
+                    static float lensDistanceFromViewportEdge = lensDistanceFromScreenCenter / halfEyeScreenWidth;
 
-					// Finally, we want the distnace from the center, not the
-					// distance from the edge, so subtract the value from 1
-					static float lensOffset = 1.0f - lensDistanceFromViewportEdge;
-					static glm::vec2 aspect(1.0, (float)eyeWidth / (float)eyeHeight);
+                    // Finally, we want the distnace from the center, not the
+                    // distance from the edge, so subtract the value from 1
+                    static float lensOffset = 1.0f - lensDistanceFromViewportEdge;
+                    static glm::vec2 aspect(1.0, (float)eyeWidth / (float)eyeHeight);
 
                     glm::vec2 lensCenter(lensOffset, 0);
 
-					// Texture coordinates need to be in lens-space for the
-					// distort shader
+                    // Texture coordinates need to be in lens-space for the
+                    // distort shader
                     texL = -1 - lensOffset;
                     texR = 1 - lensOffset;
                     texT = 1 / aspect.y;
                     texB = -1 / aspect.y;
-					// Flip the values for the right eye
+                    // Flip the values for the right eye
                     if (eye != StereoEye_Left) {
                         swap(texL, texR);
                         texL *= -1;
@@ -774,11 +774,11 @@ public:
                         lensCenter *= -1;
                     }
 
-					static glm::vec2 distortionScale(1.0f / stereoConfig.GetDistortionScale(),
-						1.0f / stereoConfig.GetDistortionScale());
+                    static glm::vec2 distortionScale(1.0f / stereoConfig.GetDistortionScale(),
+                        1.0f / stereoConfig.GetDistortionScale());
                     program.uniform2f("LensCenter", lensCenter);
                     program.uniform2f("Aspect", aspect);
-					program.uniform2f("DistortionScale", distortionScale);
+                    program.uniform2f("DistortionScale", distortionScale);
                     program.uniform4f("K", hmdInfo.DistortionK);
                 }
 
