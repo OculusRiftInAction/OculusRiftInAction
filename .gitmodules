@@ -1,0 +1,9 @@
+[submodule "libraries/OculusSDK"]
+	path = libraries/OculusSDK
+	url = https://github.com/jherico/OculusSDK.git
+[submodule "libraries/glfw"]
+	path = libraries/glfw
+	url = https://github.com/jherico/glfw.git
+[submodule "libraries/glm"]
+	path = libraries/glm
+	url = https://github.com/jherico/glm.git
