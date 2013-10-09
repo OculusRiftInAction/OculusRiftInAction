@@ -34,4 +34,4 @@ else()
 
 endif()
 
-target_link_libraries(Example00 OculusVR gl3w glfw ${GLFW_LIBRARIES})
+target_link_libraries(Example00 OculusVR glew glfw ${GLFW_LIBRARIES})

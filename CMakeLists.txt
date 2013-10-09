@@ -53,11 +53,10 @@ add_subdirectory(libraries/glfw)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
 
 # Cross platform access to shader functionality
-add_subdirectory(libraries/gl3w)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/gl3w)
+add_subdirectory(libraries/glew)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 
 # OpenGL vector / matrix header only math library
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
 add_subdirectory(source/Example00)
-

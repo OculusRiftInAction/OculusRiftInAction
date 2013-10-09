@@ -1,23 +1,7 @@
-#if defined(WIN32)
 
-    #include <GL/gl3w.h>
-
-#else
-
-    #include <sstream>
-    #include <fstream>
-    #define GL_GLEXT_PROTOTYPES
-
-    #ifdef __APPLE__
-        #include "CoreFoundation/CFBundle.h"
-        #include <OpenGL/gl.h>
-        #include <OpenGL/glext.h>
-    #else
-        #include <GL/gl.h>
-        #include <GL/glext.h>
-    #endif
-
-#endif // WIN32
+#include <GL/glew.h>
+#include <sstream>
+#include <fstream>
 
 #include <GLFW/glfw3.h>
 
@@ -401,12 +385,10 @@ public:
         glfwMakeContextCurrent(window);
 
         // Initialize the OpenGL 3.x bindings
-#ifdef WIN32
-        if (0 != gl3wInit()) {
+        if (0 != glewInit()) {
             cerr << "Failed to initialize GLEW" << endl;
             exit( EXIT_FAILURE );
         }
-#endif
 
         checkGlError();
     }
@@ -694,7 +676,7 @@ public:
             // If we're not working stereo, we're just going to render the
             // scene once, from a single position, directly to the back buffer
             glViewport(0, 0, hmdInfo.HResolution, hmdInfo.VResolution);
-            renderScene(projection, modelview);
+            renderScene(glm::vec3(), glm::vec3());
         } else {
             // If we get here, we're rendering in stereo, so we have to render our output twice
 
@@ -705,29 +687,26 @@ public:
             for (int i = 0; i < 2; ++i) {
                 StereoEye eye = EYES[i];
                 glBindTexture(GL_TEXTURE_2D, 0);
-                glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
-                glViewport(0, 0, fboWidth, fboHeight);
 
                 // Compute the modelview and projection matrices for the rendered scene based on the eye and
                 // whether or not we're doing side by side or rift rendering
-                glm::vec3 eyeProjectionOffset(-stereoConfig.GetProjectionCenterOffset() / 2.0f, 0, 0);
+                glm::vec3 eyeProjectionOffset;
+                if (renderMode == STEREO_DISTORT) {
+                	eyeProjectionOffset = glm::vec3(-stereoConfig.GetProjectionCenterOffset() / 2.0f, 0, 0);
+                }
                 glm::vec3 eyeModelviewOffset = glm::vec3(-stereoConfig.GetIPD() / 2.0f, 0, 0);
                 if (eye == StereoEye_Left) {
                     eyeModelviewOffset *= -1;
                     eyeProjectionOffset *= -1;
                 }
 
-                glm::mat4 eyeModelview = glm::translate(glm::mat4(), eyeModelviewOffset) * modelview;
-                glm::mat4 eyeProjection = projection;
-                if (renderMode == STEREO_DISTORT) {
-                    eyeProjection = glm::translate(eyeProjection, eyeProjectionOffset);
-                }
-                renderScene(eyeProjection, eyeModelview);
+                glViewport(0, 0, fboWidth, fboHeight);
+                glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+                renderScene(eyeProjectionOffset, eyeModelviewOffset);
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
                 // Setup the viewport for the eye to which we're rendering
                 glViewport(1 + (eye == StereoEye_Left ? 0 : eyeWidth), 1, eyeWidth - 2, eyeHeight - 2);
-
                 GLprogram & program = (renderMode == STEREO_DISTORT) ? distortProgram : textureProgram;
                 program.use();
                 GLint positionLocation = program.getAttributeLocation("Position");
@@ -809,8 +788,12 @@ public:
         } // if
     }
 
-    virtual void renderScene(const glm::mat4 & projection, const glm::mat4 & modelview) {
-        // Clear the buffer
+
+    virtual void renderScene(const glm::vec3 & projectionOffset, const glm::vec3 & modelviewOffset) {
+    	glm::mat4 sceneProjection = glm::translate(projection, projectionOffset);
+        glm::mat4 sceneModelview = glm::translate(glm::mat4(), modelviewOffset) * modelview;
+
+    	// Clear the buffer
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -818,8 +801,8 @@ public:
         renderProgram.use();
 
         // Load the projection and modelview matrices into the program
-        renderProgram.uniformMat4("Projection", projection);
-        renderProgram.uniformMat4("ModelView", modelview);
+        renderProgram.uniformMat4("Projection", sceneProjection);
+        renderProgram.uniformMat4("ModelView", sceneModelview);
 
         // Load up our cube geometry (vertices and indices)
         glBindBuffer(GL_ARRAY_BUFFER, cubeVertexBuffer);
@@ -839,7 +822,7 @@ public:
         }
 
         // Now scale the modelview matrix slightly, so we can draw the cube outline
-        glm::mat4 scaledCamera = glm::scale(modelview, glm::vec3(1.01f));
+        glm::mat4 scaledCamera = glm::scale(sceneModelview, glm::vec3(1.01f));
         renderProgram.uniformMat4("ModelView", scaledCamera);
 
         // Drawing a white wireframe around the cube
