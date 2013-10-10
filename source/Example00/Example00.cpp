@@ -16,6 +16,10 @@
 #include <map>
 #include <stdint.h>
 
+#ifdef __APPLE__
+    #include "CoreFoundation/CFBundle.h"
+#endif
+
 #include "OVR.h"
 #undef new
 
@@ -595,6 +599,8 @@ public:
     }
 
     virtual ~Example00() {
+        sensorFusion.AttachToSensor(nullptr);
+        ovrSensor.Clear();
         OVR::System::Destroy();
     }
 
