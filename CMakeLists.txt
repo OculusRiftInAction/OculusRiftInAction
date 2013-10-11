@@ -53,6 +53,7 @@ add_subdirectory(libraries/glfw)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
 
 # Cross platform access to shader functionality
+add_definitions( -DGLEW_STATIC )
 add_subdirectory(libraries/glew)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 
