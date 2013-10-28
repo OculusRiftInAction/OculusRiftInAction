@@ -1,0 +1,23 @@
+#include <${CMAKE_CURRENT_SOURCE_DIR}/Common.h>
+#include "ExampleResources.h"
+
+#include <string>
+#include <map>
+
+using namespace std;
+
+namespace RiftExamples {
+
+const string & Platform::getResourcePath(Resource res) {
+	static map<Resource, string> fileMap;
+	static bool init = true;
+	if (init) {
+		init = false;
+${RESOURCE_MAP}
+	}
+	return fileMap[res];
+	
+}
+
+}
+

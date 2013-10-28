@@ -1,0 +1,9 @@
+#pragma once
+
+namespace RiftExamples {
+
+enum Resource {
+${RESOURCE_HEADER}	NONE
+};
+
+}

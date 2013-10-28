@@ -7,3 +7,9 @@
 [submodule "libraries/glm"]
 	path = libraries/glm
 	url = https://github.com/jherico/glm.git
+[submodule "libraries/libpng"]
+	path = libraries/libpng
+	url = https://github.com/jherico/libpng.git
+[submodule "libraries/zlib"]
+	path = libraries/zlib
+	url = https://github.com/jherico/zlib.git
