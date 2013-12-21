@@ -101,7 +101,7 @@ class CTMimporter {
     }
 
 
-    static CTMuint StreamLoaderFn(void * aBuf, CTMuint aCount, void * aUserData);
+    static CTMuint CTMCALL StreamLoaderFn(void * aBuf, CTMuint aCount, void * aUserData);
 
   public:
     /// Constructor

@@ -1,0 +1,13 @@
+#pragma once
+
+enum ShaderResource {
+${SHADER_ENUM}	NO_SHADER
+};
+
+struct ShaderResources {
+  static ShaderResource VERTEX_SHADERS[];
+  static ShaderResource FRAGMENT_SHADERS[];
+  static ShaderResource LIB_SHADERS[];
+};
+
+const std::string & getShaderPath(ShaderResource shader);

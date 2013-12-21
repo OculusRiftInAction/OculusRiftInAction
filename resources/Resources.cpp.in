@@ -1,0 +1,15 @@
+#include <string>
+#include <map>
+#include "Resources.h"
+
+using namespace std;
+
+const string & getResourcePath(Resource res) {
+  static map<Resource, string> fileMap;
+  static bool init = true;
+  if (init) {
+    init = false;
+${RESOURCE_MAP}
+  }
+  return fileMap[res];
+}

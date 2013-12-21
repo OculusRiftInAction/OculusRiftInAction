@@ -1,0 +1,7 @@
+#pragma once
+
+enum Resource {
+${RESOURCE_ENUM}  NO_RESOURCE
+};
+
+const std::string & getResourcePath(Resource resource);
