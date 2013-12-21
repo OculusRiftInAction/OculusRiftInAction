@@ -45,10 +45,6 @@ public:
 
   static gl::TextureCubeMapPtr getCubemapTextures(Resource resource);
 
-//  static void loadImageToBoundTexture(
-//    const std::string & file,
-//    glm::ivec2 & outSize,
-//    GLenum target);
   static void getImageData(
     const std::string & file,
     glm::ivec2 & outSize,
@@ -63,26 +59,11 @@ public:
   ) {
     const std::string & path = Platform::getResourcePath(resource);
     getImageData(path, outSize, outData);
-//    loadImageToBoundTexture(path , outSize, target);
   }
-
-//  template<GLenum TextureType>
-//  static std::shared_ptr<gl::Texture<TextureType> > getImageAsTexture(
-//    const std::string & file,
-//    glm::ivec2 & outSize,
-//    GLenum target = TextureType) {
-//    typedef gl::Texture<TextureType> Texture;
-//    typename Texture::Ptr result(new Texture());
-//    result->bind();
-//    loadImageToBoundTexture(file, outSize, target);
-//    result->generateMipmap();
-//    Texture::unbind();
-//    return result;
-//  }
 
   template<GLenum TextureType>
   static void getImageAsTexture(
-    std::shared_ptr<gl::Texture<TextureType> > texture,
+    std::shared_ptr<gl::Texture<TextureType> > & texture,
     const std::string & file,
     glm::ivec2 & outSize,
     GLenum target = TextureType)
@@ -95,23 +76,13 @@ public:
     std::vector<unsigned char> data;
     getImageData(file, outSize, data);
     texture->image2d(target, outSize, &data[0]);
-//    loadImageToBoundTexture(file, outSize, target);
     texture->generateMipmap();
     Texture::unbind();
   }
 
-//  template<GLenum TextureType>
-//  static std::shared_ptr<gl::Texture<TextureType> > getImageAsTexture(
-//    Resource resource,
-//    glm::ivec2 & outSize,
-//    GLenum target = TextureType) {
-//    const std::string & path = Platform::getResourcePath(resource);
-//    return getImageAsTexture<TextureType>(path, outSize, target);
-//  }
-
   template<GLenum TextureType>
   static void getImageAsTexture(
-    std::shared_ptr<gl::Texture<TextureType> > texture,
+    std::shared_ptr<gl::Texture<TextureType> > & texture,
     Resource resource,
     glm::ivec2 & outSize,
     GLenum target = TextureType)

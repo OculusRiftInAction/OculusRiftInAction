@@ -989,8 +989,6 @@ gl::TextureCubeMapPtr GlUtils::getCubemapTextures(Resource firstResource) {
     std::vector<unsigned char> data;
     GlUtils::getImageData(image, size, data);
     texture->image2d(RESOURCE_ORDER[i], size, &data[0]);
-
-//    GlUtils::loadImageToBoundTexture( image, size, RESOURCE_ORDER[i]);
     GL_CHECK_ERROR;
   }
   TextureCubeMap::unbind();
