@@ -2,39 +2,33 @@
 
 const float Rift::MONO_FOV = 65.0;
 const float Rift::FRAMEBUFFER_OBJECT_SCALE = 1;;
-const float DISPLACEMENT_MAP_SCALE = 0.1f;
-const float Rift::ZFAR = 100.f;
+const float DISPLACEMENT_MAP_SCALE = 0.02f;
+const float Rift::ZFAR = 10000.0f;
 const float Rift::ZNEAR = 0.01f;
-//const ShaderResource RiftApp::DISTORTION_VERTEX_SHADER =
-//    ShaderResource::SHADERS_VERTEXTOTEXTURE_VS;
-//const ShaderResource RiftApp::DISTORTION_FRAGMENT_SHADER =
-//   ShaderResource::SHADERS_DISPLACEMENTMAPDISTORT_FS;
 
-const ShaderResource RiftApp::DISTORTION_VERTEX_SHADER =
-    ShaderResource::SHADERS_VERTEXTORIFT_VS;
-const ShaderResource RiftApp::DISTORTION_FRAGMENT_SHADER =
-    ShaderResource::SHADERS_DIRECTDISTORT_FS;
+//#define DISPLACEMENT_MAP_DISTORT 1
+//#define DISTORTION_TIMING 1
+
+#ifdef DISPLACEMENT_MAP_DISTORT
+const Resource RiftApp::DISTORTION_VERTEX_SHADER =
+    Resource::SHADERS_VERTEXTOTEXTURE_VS;
+const Resource RiftApp::DISTORTION_FRAGMENT_SHADER =
+   Resource::SHADERS_DISPLACEMENTMAPDISTORT_FS;
+#else
+const Resource RiftApp::DISTORTION_VERTEX_SHADER =
+    Resource::SHADERS_VERTEXTORIFT_VS;
+const Resource RiftApp::DISTORTION_FRAGMENT_SHADER =
+    Resource::SHADERS_DIRECTDISTORT_FS;
+#endif
 
 using namespace OVR;
 
-
-RiftRenderApp::RiftRenderApp() {
-}
-
-void RiftRenderApp::createRenderingTarget() {
-  glfwWindowHint(GLFW_DECORATED, 0);
-  createWindow(renderArgs.size, renderArgs.position);
-  if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-    FAIL("Unable to create undecorated window");
-  }
-}
 
 RiftApp::RiftApp()
     /// : renderMode(OVR::Util::Render::Stereo_None) {
     : renderMode(OVR::Util::Render::Stereo_LeftRight_Multipass) {
   ///////////////////////////////////////////////////////////////////////////
   // Initialize Oculus VR SDK and hardware
-  ovrManager = *OVR::DeviceManager::Create();
   bool attached = false;
   if (ovrManager) {
     ovrSensor =
@@ -74,7 +68,7 @@ void RiftApp::initGl() {
 
   // Allocate the frameBuffer that will hold the scene, and then be
   // re-rendered to the screen with distortion
-  glm::ivec2 frameBufferSize = glm::ivec2(glm::vec2(renderArgs.eyeSize) *
+  glm::ivec2 frameBufferSize = glm::ivec2(glm::vec2(eyeSize) *
       Rift::FRAMEBUFFER_OBJECT_SCALE);
   frameBuffer.init(frameBufferSize);
   GL_CHECK_ERROR;
@@ -82,9 +76,11 @@ void RiftApp::initGl() {
   // Create the buffers for the texture quad we will draw
   quadGeometry = GlUtils::getQuadGeometry();
 
+#ifdef DISPLACEMENT_MAP_DISTORT
   // Create the rendering displacement map
-  renderArgs.generateDisplacementTexture(offsetTexture, DISPLACEMENT_MAP_SCALE);
+  generateDisplacementTexture(offsetTexture, DISPLACEMENT_MAP_SCALE);
   GL_CHECK_ERROR;
+#endif
 
   // Create the rendering shaders
   distortProgram = GlUtils::getProgram(
@@ -93,8 +89,10 @@ void RiftApp::initGl() {
   GL_CHECK_ERROR;
   distortProgram->use();
   GL_CHECK_ERROR;
-  renderArgs.bindUniforms(distortProgram);
+  bindUniforms(distortProgram);
+#ifdef DISPLACEMENT_MAP_DISTORT
   distortProgram->setUniform1i("OffsetMap", 1);
+#endif
   distortProgram->setUniform1i("Scene", 0);
   GL_CHECK_ERROR;
   gl::Program::clear();
@@ -109,7 +107,7 @@ void RiftApp::onKey(int key, int scancode, int action, int mods) {
   switch (key) {
   case GLFW_KEY_R:
     sensorFusion.Reset();
-    break;
+    return;
 
   case GLFW_KEY_P:
     if (renderMode == OVR::Util::Render::Stereo_None) {
@@ -117,8 +115,9 @@ void RiftApp::onKey(int key, int scancode, int action, int mods) {
     } else {
       renderMode = OVR::Util::Render::Stereo_None;
     }
-    break;
+    return;
   }
+  RiftRenderApp::onKey(key, scancode, action, mods);
 }
 
 
@@ -126,11 +125,11 @@ void RiftApp::draw() {
   GL_CHECK_ERROR;
   if (renderMode == OVR::Util::Render::Stereo_None) {
     gl::Stacks::projection().top() = glm::perspective(
-        60.0f, glm::aspect(renderArgs.size),
+        60.0f, glm::aspect(hmdSize),
         Rift::ZNEAR, Rift::ZFAR);
     // If we're not working stereo, we're just going to render the
     // scene once, from a single position, directly to the back buffer
-    gl::viewport(renderArgs.size);
+    gl::viewport(hmdSize);
     renderScene();
     GL_CHECK_ERROR;
   } else {
@@ -138,19 +137,18 @@ void RiftApp::draw() {
 
     // We have to explicitly clear the screen here.  the Clear command doesn't object the viewport
     // and the clear command inside renderScene will only target the active framebuffer object.
-    glClearColor(0, 1, 0, 1);
+    glClearColor(1, 1, 1, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     GL_CHECK_ERROR;
     using namespace OVR::Util::Render;
     for (int i = 0; i < 2; ++i) {
-      const RiftRenderArgs::PerEyeArgs & eyeArgs = renderArgs.eye[i];
+      const PerEyeArgs & eyeArgs = eye[i];
       // Compute the modelview and projection offsets for the rendered scene based on the eye and
       // whether or not we're doing side by side or rift rendering
       frameBuffer.activate();
       GL_CHECK_ERROR;
 
-      gl::Stacks::projection().top() = eyeArgs.getProjection();
-      renderScene(eyeArgs.modelviewOffset);
+      renderScene(eyeArgs);
       GL_CHECK_ERROR;
       frameBuffer.deactivate();
       GL_CHECK_ERROR;
@@ -158,7 +156,6 @@ void RiftApp::draw() {
       eyeArgs.viewport();
       static long accumulator = 0;
       static long count = 0;
-#define DISTORTION_TIMING 1
 #ifdef DISTORTION_TIMING
       query->begin();
 #endif
@@ -166,10 +163,12 @@ void RiftApp::draw() {
           DISTORTION_VERTEX_SHADER,
           DISTORTION_FRAGMENT_SHADER);
       distortProgram->use();
-      renderArgs.bindUniforms(distortProgram);
+      bindUniforms(distortProgram);
       eyeArgs.bindUniforms(distortProgram);
       glActiveTexture(GL_TEXTURE1);
+#ifdef DISPLACEMENT_MAP_DISTORT
       offsetTexture->bind();
+#endif
       glActiveTexture(GL_TEXTURE0);
       frameBuffer.color->bind();
 //      frameBuffer.color->generateMipmap();

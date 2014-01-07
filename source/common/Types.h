@@ -25,10 +25,8 @@
 #include <glm/glm.hpp>
 
 template<typename T, typename vec> struct bound {
-protected:
-  vec vmin, vmax;
-
 public:
+  vec vmin, vmax;
 
   bound() {
   }

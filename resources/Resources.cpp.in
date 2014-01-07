@@ -4,7 +4,21 @@
 
 using namespace std;
 
-const string & getResourcePath(Resource res) {
+
+const Resource Resources::VERTEX_SHADERS[] = {
+${VERTEX_SHADER_ENUM}  NO_RESOURCE
+};
+
+const Resource Resources::FRAGMENT_SHADERS[] = {
+${FRAGMENT_SHADER_ENUM}  NO_RESOURCE
+};
+
+const Resource Resources::LIB_SHADERS[] = {
+${COMMON_SHADER_ENUM}  NO_RESOURCE
+};
+
+
+const string & Resources::getResourcePath(Resource res) {
   static map<Resource, string> fileMap;
   static bool init = true;
   if (init) {

@@ -40,14 +40,19 @@ public:
 public:
   // stores the font metrics for a single character
   struct Metrics {
-    float x1;  // x - top left of character in texture
-    float y1;  // y - top left of character in texture
-    float x2;  // x - bottom right of character in texture
-    float y2;  // y - bottom right of character in texture
-    float w;  // w - width of character
-    float h;  // h - height of character
-    float dx;  // xoffset - adjusts character positioning
-    float dy;  // yoffset - adjusts character positioning
+//    rectf imageCoords;
+    glm::vec2 ul;
+    glm::vec2 lr;
+//    float x1;  // x - top left of character in texture
+//    float y1;  // y - top left of character in texture
+//    float x2;  // x - bottom right of character in texture
+//    float y2;  // y - bottom right of character in texture
+    glm::vec2 size;
+//    float w;  // w - width of character
+//    float h;  // h - height of character
+    glm::vec2 offset;
+//    float dx;  // xoffset - adjusts character positioning
+//    float dy;  // yoffset - adjusts character positioning
     float d;  // xadvance - adjusts character positioning
     size_t indexOffset;
   };
@@ -95,11 +100,22 @@ public:
   rectf measure(const std::string &text, float fontSize = 12.0f) const;
   //!
   rectf measure(const std::wstring &text, float fontSize = 12.0f) const;
+
   //!
   float measureWidth(const std::string &text, float fontSize = 12.0f,
       bool precise = true) const;
+
   //!
-  float measureWidth(const std::wstring &text, float fontSize = 12.0f,
+  float measureWidth(
+      const std::wstring &text,
+      float fontSize = 12.0f,
+      bool precise = true) const;
+
+  float measureWidth(
+      const std::wstring &text,
+      size_t start,
+      size_t end,
+      float fontSize = 12.0f,
       bool precise = true) const;
 
 public:
@@ -113,6 +129,20 @@ public:
       float fontSize = 12.0f) const;
   //!
   Metrics getMetrics(uint16_t charcode) const;
+
+  rectf getDimensions(const std::wstring & str, float fontSize);
+
+  void renderString(
+      const std::string & str,
+      glm::vec2 & cursor,
+      float fontSize = 12.0f,
+      float maxWidth = NAN);
+
+  void renderString(
+      const std::wstring & str,
+      glm::vec2 & cursor,
+      float fontSize = 12.0f,
+      float maxWidth = NAN);
 
 public:
   std::string mFamily;

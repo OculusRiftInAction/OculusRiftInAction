@@ -42,60 +42,138 @@ GlfwApp::GlfwApp()
   glfwSetErrorCallback(glfwErrorCallback);
 }
 
-void compileAllShaders(ShaderResource * shaders,
+void compileAllShaders(const Resource * shaders,
     GLenum shaderType) {
   int i = 0;
-  while (shaders[i] != ShaderResource::NO_SHADER) {
-    std::string shaderFile = getShaderPath(shaders[i]);
-    SAY("Compiling %s", shaderFile.c_str());
-    std::string shaderSource = Files::read(shaderFile);
+  while (shaders[i] != Resource::NO_RESOURCE) {
+//    SAY("Compiling %s", shaderFile.c_str());
+    std::string shaderSource = Platform::getResourceData(shaders[i]);
     gl::Shader s(shaderType, shaderSource);
     ++i;
   }
 }
 
+void APIENTRY debugCallback(
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar * message,
+    void * userParam) {
+  const char * typeStr = "?";
+  switch (type) {
+  case GL_DEBUG_TYPE_ERROR:
+    typeStr = "ERROR";
+    break;
+  case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+    typeStr = "DEPRECATED_BEHAVIOR";
+    break;
+  case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+    typeStr = "UNDEFINED_BEHAVIOR";
+    break;
+  case GL_DEBUG_TYPE_PORTABILITY:
+    typeStr = "PORTABILITY";
+    break;
+  case GL_DEBUG_TYPE_PERFORMANCE:
+    typeStr = "PERFORMANCE";
+    break;
+  case GL_DEBUG_TYPE_OTHER:
+    typeStr = "OTHER";
+    break;
+  }
+
+  const char * severityStr = "?";
+  switch (severity) {
+  case GL_DEBUG_SEVERITY_LOW:
+    severityStr = "LOW";
+    break;
+  case GL_DEBUG_SEVERITY_MEDIUM:
+    severityStr = "MEDIUM";
+    break;
+  case GL_DEBUG_SEVERITY_HIGH:
+    severityStr = "HIGH";
+    break;
+  }
+  SAY("--- OpenGL Callback Message ---");
+  SAY("type: %s\nseverity: %-8s\nid: %d\nmsg: %s", typeStr, severityStr, id,
+      message);
+  SAY("--- OpenGL Callback Message ---");
+}
+
 void GlfwApp::onCreate() {
+  windowAspect = glm::aspect(windowSize);
+  windowAspectInverse = 1.0f / windowAspect;
   glfwSetWindowUserPointer(window, this);
   glfwSetKeyCallback(window, glfwKeyCallback);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
-  GL_CHECK_ERROR;
-#ifndef __APPLE__
-  // Initialize the OpenGL bindings
+
+// Initialize the OpenGL bindings
+// For some reason we have to set this experminetal flag to properly
+// init GLEW if we use a core context.
+  glewExperimental = GL_TRUE;
   if (0 != glewInit()) {
     FAIL("Failed to initialize GL3W");
   }
   glGetError();
+#ifdef RIFT_DEBUG
   GL_CHECK_ERROR;
+  glEnable (GL_DEBUG_OUTPUT_SYNCHRONOUS);
+  GL_CHECK_ERROR;
+  GLuint unusedIds = 0;
+  if (glDebugMessageCallback) {
+    glDebugMessageCallback(debugCallback, this);
+    GL_CHECK_ERROR;
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
+        0, &unusedIds, true);
+    GL_CHECK_ERROR;
+
+  } else if (glDebugMessageCallbackARB) {
+    glDebugMessageCallbackARB(debugCallback, this);
+    GL_CHECK_ERROR;
+    glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
+        0, &unusedIds, true);
+    GL_CHECK_ERROR;
+  }
 #endif
+  GL_CHECK_ERROR;
+/*
   if (glNamedStringARB) {
-    for (int i = 0; ShaderResources::LIB_SHADERS[i] != ShaderResource::NO_SHADER; ++i) {
-      std::string shaderFile = getShaderPath(ShaderResources::LIB_SHADERS[i]);
+    for (int i = 0;
+        Resources::LIB_SHADERS[i] != Resource::NO_SHADER; ++i) {
+
+      std::string shaderFile = getShaderPath(
+          Resources::LIB_SHADERS[i]);
       std::string shaderSrc = Files::read(shaderFile);
       size_t lastSlash = shaderFile.rfind('/');
       std::string name = shaderFile.substr(lastSlash);
-//      glNamedStringARB(GL_SHADER_INCLUDE_ARB,
-//          name.length(), name.c_str(),
-//          shaderSrc.length(), shaderSrc.c_str());
+      glNamedStringARB(GL_SHADER_INCLUDE_ARB,
+          name.length(), name.c_str(),
+          shaderSrc.length(), shaderSrc.c_str());
       GL_CHECK_ERROR;
     }
   }
-
-  compileAllShaders(ShaderResources::VERTEX_SHADERS, GL_VERTEX_SHADER);
-  compileAllShaders(ShaderResources::FRAGMENT_SHADERS, GL_FRAGMENT_SHADER);
+*/
+  compileAllShaders(Resources::VERTEX_SHADERS, GL_VERTEX_SHADER);
+  compileAllShaders(Resources::FRAGMENT_SHADERS, GL_FRAGMENT_SHADER);
 }
 
-void GlfwApp::createWindow(const glm::ivec2 & size, const glm::ivec2 & position) {
-  this->size = size;
+void GlfwApp::preCreate() {
   glfwWindowHint(GLFW_DEPTH_BITS, 16);
-
-#ifdef __APPLE__
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+//  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+//  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef RIFT_DEBUG
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 #endif
+}
 
+void GlfwApp::createWindow(const glm::ivec2 & size,
+    const glm::ivec2 & position) {
+  windowSize = size;
+  preCreate();
   window = glfwCreateWindow(size.x, size.y, "glfw", NULL, NULL);
   if (!window) {
     FAIL("Unable to create rendering window");
@@ -107,7 +185,7 @@ void GlfwApp::createWindow(const glm::ivec2 & size, const glm::ivec2 & position)
 }
 
 void GlfwApp::fullscreen(const glm::ivec2 & size, const char * display) {
-  this->size = size;
+  windowSize = size;
   int count;
   GLFWmonitor* target = nullptr;
   GLFWmonitor** monitors = glfwGetMonitors(&count);
@@ -125,6 +203,7 @@ void GlfwApp::fullscreen(const glm::ivec2 & size, const char * display) {
   if (nullptr == target) {
     FAIL("Unable to find Rift target monitor for fullscreen output");
   }
+  preCreate();
   window = glfwCreateWindow(size.x, size.y, "glfw", target, NULL);
   assert(window != 0);
   onCreate();
@@ -152,7 +231,7 @@ void GlfwApp::screenshot() {
 #ifdef HAVE_OPENCV
   //use fast 4-byte alignment (default anyway) if possible
   glFlush();
-  cv::Mat img(size.x, size.y, CV_8UC3);
+  cv::Mat img(windowSize.x, windowSize.y, CV_8UC3);
   glPixelStorei(GL_PACK_ALIGNMENT, (img.step & 3) ? 1 : 4);
   glPixelStorei(GL_PACK_ROW_LENGTH, img.step / img.elemSize());
   glReadPixels(0, 0, img.cols, img.rows, GL_BGR, GL_UNSIGNED_BYTE, img.data);
@@ -194,6 +273,7 @@ int GlfwApp::run() {
       framecount = 0;
     }
   }
+  glfwDestroyWindow(window);
   return 0;
 }
 
@@ -204,12 +284,15 @@ void GlfwApp::onKey(int key, int scancode, int action, int mods) {
 
   switch (key) {
   case GLFW_KEY_ESCAPE:
-    exit(0);
+    glfwSetWindowShouldClose(window, 1);
+    return;
+
 #ifdef HAVE_OPENCV
     case GLFW_KEY_S:
     if (mods & GLFW_MOD_SHIFT) {
       screenshot();
     }
+    return;
 #endif
   }
 }

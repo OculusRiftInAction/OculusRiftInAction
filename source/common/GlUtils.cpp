@@ -18,8 +18,9 @@
  ************************************************************************************/
 
 #include "Common.h"
+
+// This is a library for 3D mesh decompression
 #include <openctmpp.h>
-#include "Types.h"
 
 #ifdef HAVE_OPENCV
 
@@ -344,29 +345,29 @@ void GlUtils::tumble(const glm::vec3 & camera) {
 //            ofRect(-0.50, -0.02, 1.0, 0.04);
 //        ofPopMatrix();
 
-void GlUtils::renderGeometry(const GeometryPtr & geometry,
-    ShaderResource vs, ShaderResource fs) {
-  ProgramPtr program = GlUtils::getProgram(vs, fs);
+void GlUtils::renderGeometry(
+    const GeometryPtr & geometry,
+    gl::ProgramPtr program) {
   program->use();
   Stacks::lights().apply(program);
   Stacks::projection().apply(program);
   Stacks::modelview().apply(program);
   geometry->bindVertexArray();
-//  program->checkConfigured();
   geometry->draw();
 
   VertexArray::unbind();
   Program::clear();
 }
 
-void GlUtils::renderBunny(ShaderResource vs, ShaderResource fs) {
+void GlUtils::renderBunny() {
   static GeometryPtr bunnyGeometry =
       getMesh(Resource::MESHES_BUNNY2_CTM).getGeometry();
-  ProgramPtr program = GlUtils::getProgram(vs, fs);
+  ProgramPtr program = GlUtils::getProgram(
+      Resource::SHADERS_LITCOLORED_VS,
+      Resource::SHADERS_LITCOLORED_FS);
   program->use();
-  program->setUniform4f("Color", glm::vec4(1));
-  renderGeometry(bunnyGeometry, vs, fs);
-  Program::clear();
+  program->setUniform("Color", glm::vec4(1));
+  renderGeometry(bunnyGeometry, program);
 }
 
 gl::GeometryPtr GlUtils::getQuadGeometry(const glm::vec2 & min,
@@ -398,8 +399,25 @@ gl::GeometryPtr GlUtils::getQuadGeometry(const glm::vec2 & min,
       GL_TRIANGLES));
 }
 
-
 #ifdef HAVE_OPENCV
+
+template<GLenum TargetType = GL_TEXTURE_2D>
+void readPngToTexture(const void * data, size_t size,
+    std::shared_ptr<gl::Texture<TargetType> > & texture, glm::vec2 & textureSize) {
+  std::vector<unsigned char> v(size);
+  memcpy(&(v[0]), data, size);
+  cv::Mat image = cv::imdecode(v, CV_LOAD_IMAGE_ANYDEPTH);
+  texture = std::shared_ptr<gl::Texture<TargetType> >(new gl::Texture<TargetType>());
+  GL_CHECK_ERROR;
+  texture->bind();
+  GL_CHECK_ERROR;
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0, GL_RGB,
+  GL_UNSIGNED_BYTE, image.data);
+  GL_CHECK_ERROR;
+  gl::Texture<TargetType>::unbind();
+  GL_CHECK_ERROR;
+  }
+
 
 //void GlUtils::loadImageToBoundTexture(const std::string & file, glm::ivec2 & outSize, GLenum target) {
 //  cv::Mat image = cv::imread(file, CV_LOAD_IMAGE_COLOR);
@@ -413,8 +431,7 @@ gl::GeometryPtr GlUtils::getQuadGeometry(const glm::vec2 & min,
 //  glTexImage2D(target, 0, GL_RGBA8, image.cols, image.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, image.data);
 //}
 
-void GlUtils::getImageData(const std::string & file, glm::ivec2 & outSize, std::vector<unsigned char> & outData) {
-  cv::Mat image = cv::imread(file, CV_LOAD_IMAGE_COLOR);
+void getOpenCvImageData(cv::Mat & image, glm::ivec2 & outSize, std::vector<unsigned char> & outData) {
   // OpenCV uses upper left as the origin for the image data.  OpenGL
   // uses lower left, so we need to flip the image vertically before
   // we hand it to OpenGL
@@ -425,7 +442,35 @@ void GlUtils::getImageData(const std::string & file, glm::ivec2 & outSize, std::
   size_t byteCount = image.dataend - image.datastart;
   outData.resize(byteCount);
   memcpy(&outData[0], image.data, byteCount);
-//  glTexImage2D(target, 0, GL_RGBA8, image.cols, image.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, image.data);
+}
+
+void GlUtils::getImageData(
+    const std::string & file,
+    glm::ivec2 & outSize,
+    std::vector<unsigned char> & outData,
+    bool flip
+) {
+  cv::Mat image = cv::imread(file, CV_LOAD_IMAGE_COLOR);
+  getOpenCvImageData(image, outSize, outData);
+}
+
+void GlUtils::getImageData(
+  const std::vector<unsigned char> & indata,
+  glm::ivec2 & outSize,
+  std::vector<unsigned char> & outData,
+  bool flip
+) {
+  cv::Mat image = cv::imdecode(indata, CV_LOAD_IMAGE_COLOR);
+  getOpenCvImageData(image, outSize, outData);
+}
+
+void GlUtils::getImageData(
+  std::istream & in,
+  glm::ivec2 & outSize,
+  std::vector<unsigned char> & outData,
+  bool flip
+) {
+  // FIXME
 }
 
 #else
@@ -444,9 +489,12 @@ void PngDataCallback(png_structp png_ptr, png_bytep outBytes,
     throw runtime_error("PNG: short read");
 }
 
-void GlUtils::getImageData(const std::string & file, glm::ivec2 & outSize, std::vector<unsigned char> & outData) {
-//void GlUtils::loadImageToBoundTexture(const std::string & file, glm::ivec2 & outSize, GLenum target) {
-  ifstream in(file, ios::binary);
+void GlUtils::getImageData(
+    istream & in,
+    glm::ivec2 & outSize,
+    std::vector<unsigned char> & outData,
+    bool flip
+) {
   enum {
     kPngSignatureLength = 8
   };
@@ -494,7 +542,7 @@ void GlUtils::getImageData(const std::string & file, glm::ivec2 & outSize, std::
 
   png_bytepp row_pointers = png_get_rows(png_ptr, info_ptr);
   for (::uint32_t rowIdx = 0; rowIdx < height; ++rowIdx) {
-    size_t offset = height - (rowIdx + 1);
+    size_t offset = flip ? (height - (rowIdx + 1)) : rowIdx;
     offset *= bytesPerRow;
     memcpy(textureData + offset, row_pointers[rowIdx], bytesPerRow);
   }
@@ -514,12 +562,27 @@ void GlUtils::getImageData(const std::string & file, glm::ivec2 & outSize, std::
   default:
     FAIL("Unable to parse PNG color type %d", colorType);
   }
-
-//  glTexImage2D(target, 0, GL_RGBA8, width, height, 0, source_type,
-//    GL_UNSIGNED_BYTE, textureData);
-  GL_CHECK_ERROR;
-//  delete[] textureData;
   png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+}
+
+void GlUtils::getImageData(
+  const std::vector<unsigned char> & indata,
+  glm::ivec2 & outSize,
+  std::vector<unsigned char> & outData,
+  bool flip
+) {
+  std::istringstream in(std::string((const char*)&indata[0], indata.size()));
+  getImageData(in, outSize, outData, flip);
+}
+
+void GlUtils::getImageData(
+  Resource resource,
+  glm::ivec2 & outSize,
+  std::vector<unsigned char> & outData,
+  bool flip
+  ) {
+  std::istringstream in(Platform::getResourceData(resource));
+  getImageData(in, outSize, outData, flip);
 }
 
 #endif
@@ -527,8 +590,7 @@ void GlUtils::getImageData(const std::string & file, glm::ivec2 & outSize, std::
 
 #define EPSILON 0.002
 
-void GlUtils::renderArtificialHorizon(ShaderResource vertexShader,
-    ShaderResource fragmentShader) {
+void GlUtils::renderArtificialHorizon(float alpha) {
   static GeometryPtr geometry;
   if (!geometry) {
     Mesh mesh;
@@ -611,8 +673,29 @@ void GlUtils::renderArtificialHorizon(ShaderResource vertexShader,
     }
     geometry = mesh.getGeometry();
   }
-  renderGeometry(geometry, vertexShader, fragmentShader);
+  ProgramPtr program = getProgram(
+      Resource::SHADERS_LITCOLORED_VS,
+      Resource::SHADERS_LITCOLORED_FS);
+  program->use();
+  program->setUniform("ForceAlpha", alpha);
+  renderGeometry(geometry, program);
 }
+
+void GlUtils::renderRift() {
+  static gl::GeometryPtr geometry;
+  if (!geometry) {
+    Mesh mesh;
+    mesh.getModel().rotate(-107.0f, GlUtils::X_AXIS).scale(0.5f);
+    const Mesh & sourceMesh = GlUtils::getMesh(Resource::MESHES_RIFT_CTM);
+    mesh.addMesh(sourceMesh);
+    geometry = mesh.getGeometry();
+  }
+  ProgramPtr program = getProgram(
+      Resource::SHADERS_LIT_VS,
+      Resource::SHADERS_LIT_FS);
+  GlUtils::renderGeometry(geometry, program);
+}
+
 
 void GlUtils::drawQuad(const glm::vec2 & min, const glm::vec2 & max) {
   glBegin(GL_QUADS);
@@ -634,7 +717,7 @@ void GlUtils::drawColorCube() {
       CUBE_EDGE_COUNT * VERTICES_PER_EDGE, 0));
 
   gl::Program & renderProgram = *GlUtils::getProgram(
-      ShaderResource::SHADERS_SIMPLE_VS, ShaderResource::SHADERS_SIMPLE_FS);
+      Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_SIMPLE_FS);
   renderProgram.use();
   renderProgram.setUniform("Time", (float)Platform::elapsedMillis() / 1000.0f);
   // Load the projection and modelview matrices into the program
@@ -677,22 +760,22 @@ void GlUtils::drawColorCube() {
 void GlUtils::drawAngleTicks() {
 // Only necessary if you're using the fixed function pipeline
 // Fix the modelview at exactly 1 unit away from the origin, no rotation
-  gl::Stacks::modelview().push(glm::mat4(1)).translate(glm::vec3(0, 0, -1));
-  glMatrixMode(GL_MODELVIEW);
-  glLoadMatrixf(glm::value_ptr(gl::Stacks::modelview().top()));
-  glMatrixMode(GL_PROJECTION);
-  glLoadMatrixf(glm::value_ptr(gl::Stacks::projection().top()));
-
-  float offsets[] = { //
-      (float) tan( PI / 6.0f), // 30 degrees
-      (float) tan( PI / 4.0f), // 45 degrees
-      (float) tan( PI / 3.0f) // 60 degrees
-      };
+//  gl::Stacks::modelview().push(glm::mat4(1)).translate(glm::vec3(0, 0, -1));
+//  glMatrixMode(GL_MODELVIEW);
+//  glLoadMatrixf(glm::value_ptr(gl::Stacks::modelview().top()));
+//  glMatrixMode(GL_PROJECTION);
+//  glLoadMatrixf(glm::value_ptr(gl::Stacks::projection().top()));
+//
+//  float offsets[] = { //
+//      (float) tan( PI / 6.0f), // 30 degrees
+//      (float) tan( PI / 4.0f), // 45 degrees
+//      (float) tan( PI / 3.0f) // 60 degrees
+//      };
 // 43.9 degrees puts tick on the inner edge of the screen
 //           tan( PI / 4.22f ), // 42.6 degrees is the effective fov for wide screen
 //                             // 43.9 degrees puts tick on the inner edge of the screen
 
-  glLineWidth(4.0);
+//  glLineWidth(4.0);
 //  glBegin(GL_LINES);
 //  glColor3f(1, 1, 1);
 //  gl::vertex(glm::vec3(-2, 0, 0));
@@ -717,14 +800,12 @@ void GlUtils::drawAngleTicks() {
 //  gl::vertex(glm::vec3(0.05, -offset, 0));
 //  }
 //  glEnd();
-
-  gl::Stacks::modelview().pop();
+//  gl::Stacks::modelview().pop();
 }
 
 void GlUtils::draw3dGrid() {
   using namespace gl;
 
-  lineWidth(1.0);
   GL_CHECK_ERROR;
   static GeometryPtr g;
   if (!g) {
@@ -748,13 +829,13 @@ void GlUtils::draw3dGrid() {
     m.addVertex(-Z_AXIS);
     g = m.getGeometry(GL_LINES);
   }
-  ProgramPtr program = getProgram(ShaderResource::SHADERS_SIMPLE_VS, ShaderResource::SHADERS_SIMPLE_FS);
+  ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_SIMPLE_FS);
   GL_CHECK_ERROR;
   program->use();
   GL_CHECK_ERROR;
   program->setUniform("Color", glm::vec4(Colors::gray,1));
   GL_CHECK_ERROR;
-  renderGeometry(g, ShaderResource::SHADERS_SIMPLE_VS, ShaderResource::SHADERS_SIMPLE_FS);
+  renderGeometry(g, program);
   GL_CHECK_ERROR;
 }
 
@@ -775,37 +856,72 @@ void GlUtils::draw3dGrid() {
 //}
 //
 
-void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
-  using namespace gl;
-  lineWidth(1.0f);
-  float len = glm::length(vec);
-  if (len > 1.0f) {
-    vec /= len;
+namespace gl {
+  void color(const glm::vec3 & color) {
+    glColor3f(color.r, color.g, color.b);
+  }
+  void vertex(const glm::vec3 & v) {
+    glVertex3f(v.x, v.y, v.z);
   }
 
-  glm::vec3 vertices[3] = {
-    glm::vec3(0),
-    glm::vec3(vec.x, 0, vec.z),
-    vec
-  };
-
-
-
-
-//  begin(LINE_STRIP);
-//  color(Colors::gray);
+  template <size_t SIZE>
+  void vertices(glm::vec3 vs[SIZE]) {
+    for (int i = 0; i < SIZE; ++i) {
+      vertex(vs[i]);
+    }
+  }
+}
 //  vertex(glm::vec3(0));
-//  vertex();
-//  vertex(vec);
-//  end();
+
+
+void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
+
+  Mesh m;
+  m.color = Colors::gray;
+
+  m.addVertex(glm::vec3());
+  m.addVertex(glm::vec3(vec.x, 0, vec.z));
+
+  m.addVertex(glm::vec3(vec.x, 0, vec.z));
+  m.addVertex(vec);
+
+  m.fillColors(true);
+  m.color = col;
+  m.addVertex(vec);
+  m.addVertex(glm::vec3());
+
+  m.fillColors();
+  GeometryPtr g = m.getGeometry(GL_LINES);
+
+  ProgramPtr program = getProgram(
+      Resource::SHADERS_SIMPLECOLORED_VS,
+      Resource::SHADERS_SIMPLE_FS);
+  program->use();
+  renderGeometry(g, program);
+  gl::Program::clear();
+
+
+//  lineWidth(1.0f);
+//  float len = glm::length(vec);
+//  if (len > 1.0f) {
+//    vec /= len;
+//  }
+//  gl::Program::clear();
 //
-//// This has to be a seperate call because you can't change line width inside glBegin()/glEnd();
-//  lineWidth(2.0f + len);
-//  begin(LINES);
-//  color(col);
-//  vertex(glm::vec3(0));
-//  vertex(vec);
-//  end();
+//  glLineWidth(2.0f + len);
+//  glBegin(GL_LINES);
+//  gl::color(col);
+//  gl::vertex();
+//  gl::vertex();
+//  glEnd();
+//
+//  glLineWidth(1.0f);
+//  glBegin(GL_LINE_STRIP);
+//  gl::color(Colors::gray);
+//  gl::vertex(glm::vec3());
+//  gl::vertex(glm::vec3(vec.x, 0, vec.z));
+//  gl::vertex(vec);
+//  glEnd();
 }
 
 using namespace Text;
@@ -816,57 +932,44 @@ wstring toUtf16(const string & text) {
   return wide;
 }
 
-void GlUtils::renderString(const string & cstr, glm::vec2 cursor,
+//
+//static gl::GeometryPtr line;
+//if (!line) {
+//  Mesh mesh;
+//  mesh.color = Colors::white;
+//  mesh.addVertex(glm::vec3());
+//  mesh.addVertex(GlUtils::X_AXIS * 2.0f);
+//  mesh.fillColors();
+//  line = mesh.getGeometry(GL_LINES);
+//}
+// Draw a line at the cursor
+//{
+//  gl::ProgramPtr lineProgram = GlUtils::getProgram(
+//    Resource::SHADERS_SIMPLE_VS,
+//    Resource::SHADERS_SIMPLE_FS);
+//  renderGeometry(line, lineProgram);
+//}
+
+void GlUtils::renderString(const string & cstr, glm::vec2 & cursor,
     float fontSize, Resource fontResource) {
-  wstring str = toUtf16(cstr);
-  FontPtr font = getFont(fontResource);
-  gl::ProgramPtr program = GlUtils::getProgram(
-    ShaderResource::SHADERS_TEXT_VS,
-    ShaderResource::SHADERS_TEXT_FS);
-
-  program->use();
-  program->setUniform("Color", glm::vec4(1));
-  program->setUniform("Font", 0);
-
-  glm::mat4 proj = glm::ortho(-1.0f, 1.0f, -.75f, .75f);
-  program->setUniform4x4f("Projection", proj);
-
-  //gl::Stacks::projection().apply(program);
-
-  // Stores how far we've moved from the start of the string, in DTP units
-  float advance = 0;
-  float scale = Text::Font::DTP_TO_METERS * fontSize / font->mFontSize;
-
-  // Scale the curser from meters to font units
-  glm::vec2 localCursor = cursor / scale;
-  // And scale the modelview from into font units
-  gl::MatrixStack & mv = gl::Stacks::modelview().push().scale(scale);
-  font->mTexture->bind();
-  font->mGeometry->bindVertexArray();
-  for_each(str.begin(), str.end(), [&](::uint16_t id) {
-    if (font->contains(id)) {
-      // get metrics for this character to speed up measurements
-      const Font::Metrics & m = font->getMetrics(id);
-      // We create an offset vec2 to hold the local offset of this character
-      // This includes compensating for the inverted Y axis of the font
-      // coordinates
-      glm::vec2 offset(advance + m.dx, 2 * m.dy - m.h);
-      // Bind the new position
-      mv.push().translate(offset + localCursor).apply(program).pop();
-      // Render the item
-      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(m.indexOffset * sizeof(GLuint)));
-      advance += m.d;// font->getAdvance(m, mFontSize);
-    }
-  });
-  mv.pop();
-  cursor.x += advance * scale;
-
-  gl::VertexArray::unbind();
-  gl::Texture2d::unbind();
-  gl::Program::clear();
+  getFont(fontResource)->renderString(toUtf16(cstr), cursor, fontSize);
 }
 
-void GlUtils::renderString(const string & str, glm::vec3 cursor3d,
+void GlUtils::renderParagraph(const std::string & str) {
+  glm::vec2 cursor;
+  Text::FontPtr font = getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
+  rectf bounds;
+  wstring wstr = toUtf16(str);
+  for (int i = 0; i < wstr.length(); ++i) {
+    uint16_t wchar = wstr.at(i);
+    rectf letterBound = font->getBounds(wchar);
+//    extendLeft(bounds, letterBound);
+    SAY("foo");
+  }
+  renderString(str, cursor);
+}
+
+void GlUtils::renderString(const string & str, glm::vec3 & cursor3d,
     float fontSize, Resource fontResource) {
   glm::vec4 target = glm::vec4(cursor3d, 0);
   target = gl::Stacks::projection().top() * gl::Stacks::modelview().top() * target;
@@ -875,57 +978,53 @@ void GlUtils::renderString(const string & str, glm::vec3 cursor3d,
 }
 
 Text::FontPtr GlUtils::getFont(Resource fontName) {
-  return getFont(Platform::getResourcePath(fontName));
-}
-
-Text::FontPtr GlUtils::getFont(const string & file) {
-  static map<string, FontPtr> fonts;
-  if (fonts.find(file) == fonts.end()) {
+  static map<Resource, FontPtr> fonts;
+  if (fonts.find(fontName) == fonts.end()) {
+    std::string fontData = Platform::getResourceData(fontName);
     FontPtr result(new Font());
-    std::string fontData = Files::read(file);
-    size_t size = fontData.size();
-    result->read((const void*) fontData.data(), fontData.size());
-    fonts[file] = result;
+    result->read((const void*)fontData.data(), fontData.size());
+    fonts[fontName] = result;
   }
-  return fonts[file];
+  return fonts[fontName];
 }
 
 Text::FontPtr GlUtils::getDefaultFont() {
   return getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
 }
 
-ProgramPtr GlUtils::getProgram(ShaderResource vs, ShaderResource fs) {
-  return getProgram(getShaderPath(vs), getShaderPath(fs));
-}
-
 template<GLenum TYPE> struct ShaderInfo {
   time_t modified;
   gl::ShaderPtr shader;
 
-  bool valid(const string & file) {
-    return shader && (Files::modified(file) <= modified);
+  bool valid(Resource resource) {
+    return shader &&
+      (Resources::getResourceModified(resource) <= modified);
   }
 
-  void compile(const string & file) {
-    SAY("Compiling shader file %s", file.c_str());
-    shader = ShaderPtr(new Shader(TYPE, Files::read(file)));
-    modified = Files::modified(file);
+  void compile(Resource resource) {
+    SAY("Compiling shader file %s",
+      Resources::getResourcePath(resource).c_str());
 
+    std::string shaderSource =
+      Platform::getResourceData(resource);
+    modified = Resources::getResourceModified(resource);
+    shader = ShaderPtr(new Shader(TYPE, shaderSource));
   }
-  bool update(const string & file) {
-    if (!valid(file)) {
-      compile(file);
+
+  bool update(Resource resource) {
+    if (!valid(resource)) {
+      compile(resource);
       return true;
     }
     return false;
   }
 };
 
-ProgramPtr GlUtils::getProgram(const string & vs, const string & fs) {
+ProgramPtr GlUtils::getProgram(Resource vs, Resource fs) {
   typedef ShaderInfo<GL_VERTEX_SHADER> VShader;
   typedef ShaderInfo<GL_FRAGMENT_SHADER> FShader;
-  typedef map<string, VShader> VMap;
-  typedef map<string, FShader> FMap;
+  typedef map<Resource, VShader> VMap;
+  typedef map<Resource, FShader> FMap;
   static VMap vShaders;
   static FMap fShaders;
   typedef map<string, ProgramPtr> ProgramMap;
@@ -933,7 +1032,8 @@ ProgramPtr GlUtils::getProgram(const string & vs, const string & fs) {
   shader_error lastError(0, "none");
   VShader & vsi = vShaders[vs];
   FShader & fsi = fShaders[fs];
-  string key = vs + ":" + fs;
+  string key = Resources::getResourcePath(vs) + ":" +
+    Resources::getResourcePath(fs);
   try {
     bool relink = vsi.update(vs) | fsi.update(fs);
     if (relink || programs.end() == programs.find(key)) {
@@ -946,53 +1046,86 @@ ProgramPtr GlUtils::getProgram(const string & vs, const string & fs) {
   if (!programs[key]) {
     throw lastError;
   }
+  GL_CHECK_ERROR;
   return programs[key];
 }
 
 const Mesh & GlUtils::getMesh(Resource res) {
-  return getMesh(Platform::getResourcePath(res));
+  typedef map<Resource, MeshPtr> MeshMap;
+  static MeshMap meshes;
+  if (0 == meshes.count(res)) {
+    std::string meshData = Platform::getResourceData(res);
+    meshes[res] = MeshPtr(new Mesh(meshData));
+  }
+  return *meshes[res];
 }
 
-const Mesh & GlUtils::getMesh(const string & file) {
-  typedef map<string, MeshPtr> MeshMap;
-  static MeshMap meshes;
-  string key = file;
-  if (0 == meshes.count(file)) {
-    MeshPtr pmesh(new Mesh(file));
-    meshes[file] = MeshPtr(new Mesh(file));
+void GlUtils::renderSkybox(Resource firstResource) {
+  GL_CHECK_ERROR;
+  static gl::ProgramPtr skyboxProgram = getProgram(
+    Resource::SHADERS_CUBEMAP_VS,
+    Resource::SHADERS_CUBEMAP_FS);
+
+  // Skybox texture
+  MatrixStack & mv = gl::Stacks::modelview();
+  mv.push().untranslate();
+
+  // TODO better state management
+  {
+    glDisable(GL_DEPTH_TEST);
+    glCullFace(GL_FRONT);
+    getCubemapTextures(firstResource)->bind();
+    renderGeometry(GlUtils::getCubeGeometry(), skyboxProgram);
+    glCullFace(GL_BACK);
+    glEnable(GL_DEPTH_TEST);
   }
-  return *meshes[file];
+  gl::TextureCubeMap::unbind();
+  mv.pop();
 }
 
 gl::TextureCubeMapPtr GlUtils::getCubemapTextures(Resource firstResource) {
-  glEnable(GL_TEXTURE_CUBE_MAP);
-  TextureCubeMapPtr texture(new TextureCubeMap());
-  texture->bind();
-  texture->parameter(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  texture->parameter(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  texture->parameter(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  texture->parameter(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  texture->parameter(GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  typedef std::map<Resource, gl::TextureCubeMapPtr> Map;
+  typedef Map::iterator MapItr;
+  static Map skyboxMap;
 
-  static GLenum RESOURCE_ORDER[] = {
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_X,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
-  };
-
-  glm::ivec2 size;
-  for (int i = 0; i < 6; ++i) {
-    Resource image = static_cast<Resource>(firstResource + i);
-    std::vector<unsigned char> data;
-    GlUtils::getImageData(image, size, data);
-    texture->image2d(RESOURCE_ORDER[i], size, &data[0]);
+  MapItr itr = skyboxMap.find(firstResource);
+  if (skyboxMap.end() == itr) {
     GL_CHECK_ERROR;
+    //glEnable(GL_TEXTURE_CUBE_MAP);
+    GL_CHECK_ERROR;
+    TextureCubeMapPtr texture(new TextureCubeMap());
+    texture->bind();
+    texture->parameter(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    texture->parameter(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    texture->parameter(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    texture->parameter(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    texture->parameter(GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    GL_CHECK_ERROR;
+
+    static GLenum RESOURCE_ORDER[] = {
+      GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+      GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+      GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
+      GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+      GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
+      GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
+    };
+
+    glm::ivec2 size;
+    for (int i = 0; i < 6; ++i) {
+      Resource image = static_cast<Resource>(firstResource + i);
+      std::vector<unsigned char> data;
+      GlUtils::getImageData(image, size, data);
+      GL_CHECK_ERROR;
+      texture->image2d(RESOURCE_ORDER[i], size, &data[0]);
+      GL_CHECK_ERROR;
+    }
+
+    TextureCubeMap::unbind();
+    skyboxMap[firstResource] = texture;
+    return texture;
   }
-  TextureCubeMap::unbind();
-  return texture;
+  return itr->second;
 }
 
 gl::GeometryPtr GlUtils::getCubeGeometry() {
@@ -1034,7 +1167,7 @@ static void cubeRecurse(int elapsed, int depth) {
 static void dancingCubes(int elapsed, int elements = 8) {
   MatrixStack & mv = Stacks::modelview();
 
-  mv.push().scale(0.2);
+  mv.push().scale(0.2f);
   GlUtils::drawColorCube();
   mv.pop();
 

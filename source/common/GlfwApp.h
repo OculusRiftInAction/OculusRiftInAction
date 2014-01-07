@@ -25,9 +25,12 @@
 
 class GlfwApp {
 protected:
-  GLFWwindow * window;
-  glm::ivec2 size;
-  public:
+  GLFWwindow *  window;
+  glm::ivec2    windowSize;
+  float         windowAspect;
+  float         windowAspectInverse;
+
+public:
   GlfwApp();
   virtual ~GlfwApp();
 
@@ -47,4 +50,5 @@ protected:
   virtual void update();
 private:
   void onCreate();
+  void preCreate();
 };

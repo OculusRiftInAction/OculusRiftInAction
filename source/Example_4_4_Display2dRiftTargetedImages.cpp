@@ -4,7 +4,7 @@ using namespace std;
 using namespace gl;
 using namespace OVR;
 
-class Example_5_3_5 : public GlfwApp {
+class Display2dRiftTargeted : public GlfwApp {
 protected:
   HMDInfo hmdInfo;
   Texture2dPtr texture;
@@ -14,8 +14,10 @@ protected:
 
 public:
 
-  Example_5_3_5() {
-    Rift::getHmdInfo(hmdInfo);
+  Display2dRiftTargeted() {
+    OVR::Ptr<OVR::DeviceManager> ovrManager;
+    ovrManager = *OVR::DeviceManager::Create();
+    Rift::getHmdInfo(ovrManager, hmdInfo);
     eyeWidth = hmdInfo.HResolution / 2;
   }
 
@@ -54,8 +56,8 @@ public:
           glm::vec2(0.5f, 0.0f), glm::vec2(1.0f, 1.0f));
 
     program = GlUtils::getProgram(
-      ShaderResource::SHADERS_TEXTURE_VS,
-      ShaderResource::SHADERS_TEXTURE_FS);
+      Resource::SHADERS_TEXTURE_VS,
+      Resource::SHADERS_TEXTURE_FS);
   }
 
   virtual void draw() {
@@ -78,4 +80,4 @@ public:
   }
 };
 
-RUN_OVR_APP(Example_5_3_5)
+RUN_OVR_APP(Display2dRiftTargeted)

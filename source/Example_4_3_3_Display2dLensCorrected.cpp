@@ -4,7 +4,7 @@ using namespace std;
 using namespace gl;
 using namespace OVR;
 
-class Example_5_3_3 : public GlfwApp {
+class Display2dLensCorrected : public GlfwApp {
 protected:
   HMDInfo hmdInfo;
   Texture2dPtr texture;
@@ -14,8 +14,10 @@ protected:
 
 public:
 
-  Example_5_3_3() {
-    Rift::getHmdInfo(hmdInfo);
+  Display2dLensCorrected() {
+    OVR::Ptr<OVR::DeviceManager> ovrManager;
+    ovrManager = *OVR::DeviceManager::Create();
+    Rift::getHmdInfo(ovrManager, hmdInfo);
     eyeWidth = hmdInfo.HResolution / 2;
   }
 
@@ -58,8 +60,8 @@ public:
         geometryMin, geometryMax);
 
     program = GlUtils::getProgram(
-		ShaderResource::SHADERS_TEXTURERIFT_VS,
-		ShaderResource::SHADERS_TEXTURE_FS);
+		Resource::SHADERS_TEXTURERIFT_VS,
+		Resource::SHADERS_TEXTURE_FS);
     program->use();
     program->setUniform("ViewportAspectRatio", viewportAspectRatio);
 
@@ -67,7 +69,7 @@ public:
         hmdInfo.LensSeparationDistance /
         hmdInfo.HScreenSize;
     float lensOffset =
-        1.0f - (2.0 * lensDistance);
+        1.0f - (2.0f * lensDistance);
 
     program->setUniform("LensOffset", lensOffset);
     Program::clear();
@@ -95,5 +97,5 @@ public:
   }
 };
 
-RUN_OVR_APP(Example_5_3_3)
+RUN_OVR_APP(Display2dLensCorrected)
 

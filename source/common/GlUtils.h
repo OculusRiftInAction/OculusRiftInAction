@@ -46,67 +46,54 @@ public:
   static gl::TextureCubeMapPtr getCubemapTextures(Resource resource);
 
   static void getImageData(
-    const std::string & file,
+    std::istream & in,
     glm::ivec2 & outSize,
-    std::vector<unsigned char> & outData
+    std::vector<unsigned char> & outData,
+    bool flip = true
   );
 
+  static void getImageData(
+    const std::vector<unsigned char> & indata,
+    glm::ivec2 & outSize,
+    std::vector<unsigned char> & outData,
+    bool flip = true
+  );
 
   static void getImageData(
     Resource resource,
     glm::ivec2 & outSize,
-    std::vector<unsigned char> & outData
-  ) {
-    const std::string & path = Platform::getResourcePath(resource);
-    getImageData(path, outSize, outData);
-  }
-
-  template<GLenum TextureType>
-  static void getImageAsTexture(
-    std::shared_ptr<gl::Texture<TextureType> > & texture,
-    const std::string & file,
-    glm::ivec2 & outSize,
-    GLenum target = TextureType)
-  {
-    typedef gl::Texture<TextureType> Texture;
-    if (!texture) {
-      texture = typename Texture::Ptr(new Texture());
-    }
-    texture->bind();
-    std::vector<unsigned char> data;
-    getImageData(file, outSize, data);
-    texture->image2d(target, outSize, &data[0]);
-    texture->generateMipmap();
-    Texture::unbind();
-  }
+    std::vector<unsigned char> & outData,
+    bool flip = true
+    );
 
   template<GLenum TextureType>
   static void getImageAsTexture(
     std::shared_ptr<gl::Texture<TextureType> > & texture,
     Resource resource,
     glm::ivec2 & outSize,
-    GLenum target = TextureType)
-  {
-    const std::string & path = Platform::getResourcePath(resource);
-    getImageAsTexture<TextureType>(texture, path, outSize, target);
+    GLenum target = TextureType) {
+    typedef gl::Texture<TextureType>
+      Texture;
+    typedef std::shared_ptr<gl::Texture<TextureType> >
+      TexturePtr;
+    typedef std::vector<unsigned char>
+      Vector;
+    Vector imageData;
+    getImageData(resource, outSize, imageData);
+    texture = TexturePtr(new Texture());
+    texture->bind();
+    texture->image2d(outSize, &imageData[0]);
   }
+
 
   template<GLenum TextureType = GL_TEXTURE_2D>
   static void getImageAsGeometryAndTexture(
     Resource resource,
     gl::GeometryPtr & geometry,
     std::shared_ptr<gl::Texture<TextureType> > & texture) {
-      const std::string & path = Platform::getResourcePath(resource);
-      getImageAsGeometryAndTexture( path, geometry, texture );
-  }
 
-  template<GLenum TextureType = GL_TEXTURE_2D>
-  static void getImageAsGeometryAndTexture(
-      const std::string & file,
-      gl::GeometryPtr & geometry,
-      std::shared_ptr<gl::Texture<TextureType> > & texture) {
     glm::ivec2 imageSize;
-    GlUtils::getImageAsTexture(texture, file, imageSize);
+    GlUtils::getImageAsTexture(texture, resource, imageSize);
     float imageAspectRatio = glm::aspect(imageSize);
     glm::vec2 geometryMax(1.0f, 1.0f / imageAspectRatio);
     glm::vec2 geometryMin = geometryMax * -1.0f;
@@ -114,36 +101,33 @@ public:
   }
 
   static const Mesh & getMesh(Resource resource);
-  static const Mesh & getMesh(const std::string & file);
 
-  //static gl::ProgramPtr getProgram(ShaderResource resource);
   static gl::ProgramPtr getProgram(
-    ShaderResource vertexResource,
-    ShaderResource fragmentResource);
+    Resource vertexResource,
+    Resource fragmentResource);
   static gl::ProgramPtr getProgram(
     const std::string & vs,
-      const std::string & fs);
+    const std::string & fs);
 
   static Text::FontPtr getFont(Resource resource);
-  static Text::FontPtr getFont(const std::string & file);
   static Text::FontPtr getDefaultFont();
 
-  static void renderGeometry(const gl::GeometryPtr & geometry,
-    ShaderResource vertexShader, ShaderResource fragmentShader);
-  static void renderBunny(
-    ShaderResource vertexShader = ShaderResource::SHADERS_LIT_VS,
-    ShaderResource fragmentShader = ShaderResource::SHADERS_LIT_FS
-  );
-  static void renderArtificialHorizon(
-    ShaderResource vertexShader = ShaderResource::SHADERS_LITCOLORED_VS,
-    ShaderResource fragmentShader = ShaderResource::SHADERS_LITCOLORED_FS
-  );
+  static void renderGeometry(
+      const gl::GeometryPtr & geometry,
+      gl::ProgramPtr program);
 
-  static void renderString(const std::string & str, glm::vec2 cursor,
+  static void renderSkybox(Resource firstResource);
+  static void renderBunny();
+  static void renderArtificialHorizon( float alpha = 1.0f );
+  static void renderRift();
+
+  static void renderParagraph(const std::string & str);
+
+  static void renderString(const std::string & str, glm::vec2 & cursor,
       float fontSize = 12.0f, Resource font =
           Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
 
-  static void renderString(const std::string & str, glm::vec3 cursor,
+  static void renderString(const std::string & str, glm::vec3 & cursor,
       float fontSize = 12.0f, Resource font =
           Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
 

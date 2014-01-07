@@ -1,5 +1,6 @@
 project(OculusRiftExamples)
 cmake_minimum_required(VERSION 2.8)
+include (GenerateExportHeader)
 
 # Required for statically linking the MSVC runtime
 set(CMAKE_USER_MAKE_RULES_OVERRIDE
@@ -9,8 +10,34 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# First for the generic no-config case (e.g. with mingw)
+set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
+set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
+set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
+# Second, for multi-config builds (e.g. msvc)
+
+foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
+    string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
+    set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
+    set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
+    set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
+endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
+
 # Comment out to disable the debug build
-set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE DEBUG)
+set(CMAKE_DEBUG_POSTFIX "d")
+
+string( TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER )
+
+if(BUILD_TYPE_LOWER STREQUAL "debug")
+   set(RIFT_DEBUG 1)
+endif()
+
+if(RIFT_DEBUG)
+   message("Debug build, resources will be loaded from disk")
+else() 
+   message("Release build, resources will be loaded from executable/bundle")
+endif()
 
 # Verbosity is good, especially if a command fails
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -45,11 +72,6 @@ endif()
 # Add debug output from the Oculus SDK
 add_definitions(-DOVR_BUILD_DEBUG)
 
-# The Linux version of the community SDK requires an addition EDID handling library
-if(UNIX AND NOT(APPLE) AND NOT(CYGWIN))
-    add_subdirectory(libraries/OculusSDK/3rdParty/EDID)
-endif()
-
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(libraries/OculusSDK/LibOVR)
 
@@ -82,13 +104,17 @@ add_subdirectory(libraries/OpenCTM)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
+# Cross platform access to USB / HID hardware
+add_subdirectory(libraries/libusbx)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/libusbx)
+list(APPEND EXAMPLE_LIBS usbx)
+
 # OpenCV is a computer vision library with advanced
 # image loading and manipulation functionality
-find_package( OpenCV )
-
+# find_package( OpenCV )
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
-    list(APPEND EXTERNAL_LIBS ${OpenCV_LIBS})
+    list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
 else()
     # Without OpenCV, we have to fall back on libpng
@@ -121,20 +147,22 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
 # Boost is a general purpose C++ library
-set(Boost_USE_STATIC_LIBS OFF)
+#set(BOOST_ROOT C:/dev/boost_1_55_0)
+#set(BOOST_LIBRARYDIR C:/dev/boost_1_55_0/lib64-msvc-12.0)
+#set(Boost_DEBUG 1)
+set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost COMPONENTS filesystem system) 
+set(Boost_USE_STATIC_RUNTIME ON)
+find_package( Boost COMPONENTS filesystem system thread)
 
 if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS}) 
+    include_directories(${Boost_INCLUDE_DIRS})
+    link_directories(${Boost_LIBRARY_DIR}) 
     list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
     set(HAVE_BOOST 1)
 endif()
 
-set(SIXENSE_ROOT "/home/bdavis/src/sixenseSDK_linux_OSX")
-#find_package(Sixense)
-
+find_package(Sixense)
 if(SIXENSE_FOUND)
     include_directories(${SIXENSE_INCLUDE_DIR}) 
     list(APPEND EXAMPLE_LIBS ${SIXENSE_LIBRARIES})
@@ -148,6 +176,9 @@ if(SPNAV_FOUND)
     set(HAVE_SPNAV 1)
 endif()
 
+find_package(Threads)
+list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
+
 ###############################################################################
 #
 # Common GL code, using only headers.  
@@ -155,31 +186,34 @@ endif()
 add_subdirectory(libraries/gl)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
 
-# This is used by the resources and shaders logic to 
-# allow us to load non-C++ resources into the program 
-function(files_to_enum SOURCE_FILES RESULT_HEADER RESULT_MAP)
-    foreach (file ${SOURCE_FILES})
-        file(RELATIVE_PATH res ${CMAKE_CURRENT_SOURCE_DIR} ${file})
-        string(TOUPPER ${res} res)
-        string(REGEX REPLACE "\\.\\./" "" res "${res}" )
-        string(REGEX REPLACE "[^A-Z1-9]" "_" res "${res}" )
-        set(HEADER_BUFFER "${HEADER_BUFFER}\t${res},\n")
-        set(MAP_BUFFER "${MAP_BUFFER}\t\tfileMap[${res}] = \"${file}\";\n")
-    endforeach()
-    set(${RESULT_HEADER} "${HEADER_BUFFER}" PARENT_SCOPE)
-    set(${RESULT_MAP} "${MAP_BUFFER}" PARENT_SCOPE)
-endfunction()
-
 ###############################################################################
 #
 # Non-C++ resources that are shared by the examples
 # (shaders, meshes, images, fonts, etc)
 #
+# On Windows these will be pulled from a common resource DLL.  
+#
+# On OSX, they will be embedded in each application bundle, owing to CMakes
+# lack of support for shared frameworks
+# 
+# On Linux or if you enable the debug build, they will be pulled from the
+# source location at runtime.  
+#
 add_subdirectory(resources)
 include_directories(${CMAKE_BINARY_DIR}/resources)
-list(APPEND EXAMPLE_LIBS resources)
+list(APPEND EXAMPLE_LIBS Resources)
 
+###############################################################################
+#
+# Shared codebase for all the examples and demos
+#
 add_subdirectory(source/common)
 include_directories(source/common)
 include_directories(${CMAKE_BINARY_DIR}/source/common)
+
+###############################################################################
+#
+# The examples themselves
+#
 add_subdirectory(source)
+

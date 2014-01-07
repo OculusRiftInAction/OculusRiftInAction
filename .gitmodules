@@ -16,3 +16,6 @@
 [submodule "libraries/gl"]
 	path = libraries/gl
 	url = https://github.com/jherico/gl.git
+[submodule "libraries/libusbx"]
+	path = libraries/libusbx
+	url = https://github.com/jherico/libusbx.git

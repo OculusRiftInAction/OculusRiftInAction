@@ -22,16 +22,7 @@
 
 #include "Common.h"
 #include "IO.h"
-
-#ifdef HAVE_OPENCV
-#include <opencv2/opencv.hpp>
-#else
-#include <png.h>
-#endif
-
 namespace Text {
-
-using namespace std;
 
 // 1 point = 1pt = 1/72in (cala) = 0.3528 mm
 const float Font::DTP_TO_METERS = 0.003528f;
@@ -48,127 +39,52 @@ Font::~Font(void) {
 struct TextureVertex {
   glm::vec4 pos;
   glm::vec4 tex;
+  TextureVertex() {
+  }
   TextureVertex(const glm::vec2 & pos, const glm::vec2 & tex)
       : pos(pos, 0, 0), tex(tex, 0, 0) {
   }
 };
 
-#ifdef HAVE_OPENCV
-
-template<GLenum TargetType = GL_TEXTURE_2D>
-void readPngToTexture(const void * data, size_t size,
-    std::shared_ptr<gl::Texture<TargetType> > & texture, glm::vec2 & textureSize) {
-  std::vector<unsigned char> v(size);
-  memcpy(&(v[0]), data, size);
-  cv::Mat image = cv::imdecode(v, CV_LOAD_IMAGE_ANYDEPTH);
-  texture = std::shared_ptr<gl::Texture<TargetType> >(new gl::Texture<TargetType>());
-  GL_CHECK_ERROR;
-  texture->bind();
-  GL_CHECK_ERROR;
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, image.cols, image.rows, 0, GL_RGB,
-  GL_UNSIGNED_BYTE, image.data);
-  GL_CHECK_ERROR;
-  gl::Texture<TargetType>::unbind();
-  GL_CHECK_ERROR;
+struct QuadBuilder {
+  TextureVertex vertices[4];
+  QuadBuilder(const rectf & r, const rectf & tr) {
+    vertices[0] = TextureVertex(r.getLowerLeft(), tr.getUpperLeft());
+    vertices[1] = TextureVertex(r.getLowerRight(), tr.getUpperRight());
+    vertices[2] = TextureVertex(r.getUpperRight(), tr.getLowerRight());
+    vertices[3] = TextureVertex(r.getUpperLeft(), tr.getLowerLeft());
   }
+};
 
-#else
-
-void PngDataCallback(png_structp png_ptr, png_bytep outBytes,
-    png_size_t byteCountToRead) {
-  istream * pIn = (istream*) png_get_io_ptr(png_ptr);
-  if (pIn == nullptr)
-  throw runtime_error("PNG: missing stream pointer");
-
-  istream & in = *pIn; // png_ptr->io_ptr;
-  const ios::pos_type start = in.tellg();
-  readStream(in, outBytes, byteCountToRead);
-  const ios::pos_type bytesRead = in.tellg() - start;
-  if ((png_size_t) bytesRead != byteCountToRead)
-  throw runtime_error("PNG: short read");
-}
-
-void readPngToTexture(const void * data, size_t size,
+void readPngToTexture(const char * data, size_t size,
     gl::TexturePtr & texture,
     glm::vec2 & textureSize) {
+  glm::ivec2 imageSize;
+
   std::istringstream in(std::string(static_cast<const char*>(data), size));
-  enum {
-    kPngSignatureLength = 8
-  };
-  uint8_t pngSignature[kPngSignatureLength];
-  readStream(in, pngSignature);
-  if (!png_check_sig(pngSignature, kPngSignatureLength))
-    throw runtime_error("bad png sig");
 
-  // get PNG file info struct (memory is allocated by libpng)
-  png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-  NULL, NULL, NULL);
-  if (png_ptr == nullptr)
-    throw runtime_error("PNG: bad signature");
+  std::vector<unsigned char> imageData;
+  GlUtils::getImageData(in, imageSize, imageData, false);
 
-  // get PNG image data info struct (memory is allocated by libpng)
-  png_infop info_ptr = png_create_info_struct(png_ptr);
-  if (info_ptr == nullptr) {
-    // libpng must free file info struct memory before we bail
-    png_destroy_read_struct(&png_ptr, NULL, NULL);
-    throw runtime_error("PNG: failed to allocate header");
-  }
-
-  png_set_read_fn(png_ptr, &in, PngDataCallback);
-  // tell libpng we already read the signature
-  png_set_sig_bytes(png_ptr, kPngSignatureLength);
-
-  png_read_info(png_ptr, info_ptr);
-
-  png_uint_32 width = 0;
-  png_uint_32 height = 0;
-  int colorType = -1;
-  int bitDepth = 0;
-  uint32_t retval = png_get_IHDR(png_ptr, info_ptr, &width, &height,
-      &bitDepth, &colorType, nullptr, nullptr, nullptr);
-
-  if (retval != 1) {
-    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-    throw runtime_error("PNG: failed to read header");
-  }
-
-  textureSize = glm::vec2(width, height);
-  const size_t bytesPerRow = png_get_rowbytes(png_ptr, info_ptr);
-  uint8_t * textureData = new uint8_t[bytesPerRow * height];
-
-  for (uint32_t rowIdx = 0; rowIdx < height; ++rowIdx) {
-    size_t offset = height - (rowIdx + 1);
-    offset *= bytesPerRow;
-    png_read_row(png_ptr, (png_bytep) textureData + offset, NULL);
-  }
-
+  textureSize = glm::vec2(imageSize);
   texture = gl::TexturePtr(new gl::Texture2d());
   texture->bind();
   texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  texture->image2d(glm::ivec2(width, height), textureData, 0, GL_RED);
-  texture->generateMipmap();
+  texture->image2d(imageSize, &imageData[0], 0, GL_RED);
   gl::Texture2d::unbind();
-  delete[] textureData;
-  png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 }
-#endif
+
 void Font::read(const void * data, size_t size) {
   std::istringstream in(std::string(static_cast<const char*>(data), size));
-  // read header
-  uint8_t header;
+//  SignedDistanceFontFile sdff;
+//  sdff.read(in);
+
+  uint8_t header[4];
   readStream(in, header);
-  if (header != 'S')
+  if (memcmp(header, "SDFF", 4)) {
     FAIL("Bad font file");
-  readStream(in, header);
-  if (header != 'D')
-    FAIL("Bad font file");
-  readStream(in, header);
-  if (header != 'F')
-    FAIL("Bad font file");
-  readStream(in, header);
-  if (header != 'F')
-    FAIL("Bad font file");
+  }
 
   uint16_t version;
   readStream(in, version);
@@ -199,31 +115,23 @@ void Font::read(const void * data, size_t size) {
   for (int i = 0; i < count; ++i) {
     uint16_t charcode;
     readStream(in, charcode);
-
-    Metrics m;
-    readStream(in, m.x1);
-    readStream(in, m.y1);
-    readStream(in, m.w);
-    readStream(in, m.h);
-
-    readStream(in, m.dx);
-    readStream(in, m.dy);
+    Metrics & m = mMetrics[charcode];
+    readStream(in, m.ul.x);
+    readStream(in, m.ul.y);
+    readStream(in, m.size.x);
+    readStream(in, m.size.y);
+    readStream(in, m.offset.x);
+    readStream(in, m.offset.y);
     readStream(in, m.d);
-
-    m.x2 = m.x1 + m.w;
-    m.y2 = m.y1 + m.h;
-    std::swap(m.y2, m.y1);
-    m.y1 = -m.y1;
-    m.y2 = -m.y2;
-    mMetrics[charcode] = m;
+    m.lr = m.ul + m.size;
   }
 
   // read image data
   readPngToTexture((const char *) data + in.tellg(), size - in.tellg(),
       mTexture, mTextureSize);
 
-  std::vector < TextureVertex > vertexData;
-  std::vector < GLuint > indexData;
+  std::vector<TextureVertex> vertexData;
+  std::vector<GLuint> indexData;
   float texH = 0, texW = 0, texA = 0;
   int characters = 0;
   std::for_each(mMetrics.begin(), mMetrics.end(),
@@ -231,22 +139,14 @@ void Font::read(const void * data, size_t size) {
         uint16_t id = md.first;
         Font::Metrics & m = md.second;
         ++characters;
-
-		GLuint index = (GLuint)vertexData.size();
-
+        GLuint index = (GLuint)vertexData.size();
         rectf bounds = getBounds(m, mFontSize);
         rectf texBounds = getTexCoords(m);
-        TextureVertex vertex[4] = {
-          TextureVertex(bounds.getLowerLeft(), texBounds.getLowerLeft()),
-          TextureVertex(bounds.getLowerRight(), texBounds.getLowerRight()),
-          TextureVertex(bounds.getUpperRight(), texBounds.getUpperRight()),
-          TextureVertex(bounds.getUpperLeft(), texBounds.getUpperLeft())
-        };
 
-        vertexData.push_back(TextureVertex(bounds.getLowerLeft(), texBounds.getLowerLeft()));
-        vertexData.push_back(TextureVertex(bounds.getLowerRight(), texBounds.getLowerRight()));
-        vertexData.push_back(TextureVertex(bounds.getUpperRight(), texBounds.getUpperRight()));
-        vertexData.push_back(TextureVertex(bounds.getUpperLeft(), texBounds.getUpperLeft()));
+        QuadBuilder qb(bounds, texBounds);
+        for (int i = 0; i < 4; ++i) {
+          vertexData.push_back(qb.vertices[i]);
+        }
 
         m.indexOffset = indexData.size();
         indexData.push_back(index + 0);
@@ -281,16 +181,13 @@ rectf Font::getBounds(uint16_t charcode, float fontSize) const {
     return rectf();
 }
 
-rectf Font::getBounds(const Metrics &metrics, float fontSize) const {
+rectf Font::getBounds(const Metrics &m, float fontSize) const {
   float scale = (fontSize / mFontSize);
-
-  return rectf(glm::vec2(metrics.dx, -metrics.dy) * scale,
-      glm::vec2(metrics.dx + metrics.w, metrics.h - metrics.dy) * scale);
+  return rectf(m.offset * scale, m.offset + m.size * scale);
 }
 
-rectf Font::getTexCoords(const Metrics &metrics) const {
-  return rectf(glm::vec2(metrics.x1, metrics.y1) / mTextureSize,
-      glm::vec2(metrics.x2, metrics.y2) / mTextureSize);
+rectf Font::getTexCoords(const Metrics &m) const {
+  return rectf(m.ul / mTextureSize, m.lr / mTextureSize);
 }
 
 float Font::getAdvance(uint16_t charcode, float fontSize) const {
@@ -305,39 +202,177 @@ float Font::getAdvance(const Metrics &metrics, float fontSize) const {
   return metrics.d * fontSize / mFontSize;
 }
 
-rectf Font::measure(const std::wstring &text, float fontSize) const {
-  float offset = 0.0f;
-  rectf result(0.0f, 0.0f, 0.0f, 0.0f);
-
-  std::wstring::const_iterator citr;
-  for (citr = text.begin(); citr != text.end(); ++citr) {
-    uint16_t charcode = (uint16_t) * citr;
-
-    // TODO: handle special chars like /t
-    MetricsData::const_iterator itr = mMetrics.find(charcode);
-    if (itr != mMetrics.end()) {
-      result.include(
-          rectf(offset + itr->second.dx, -itr->second.dy,
-              offset + itr->second.dx + itr->second.w,
-              itr->second.h - itr->second.dy));
-      offset += itr->second.d;
-    }
-  }
-
-  // return
-  result.scale(fontSize / mFontSize);
-  return result;
+rectf Font::getDimensions(const std::wstring & str, float fontSize) {
+  return rectf();
 }
 
-float Font::measureWidth(const std::wstring &text, float fontSize,
+std::wstring toUtf16(const std::string & text) {
+//    wstring_convert<codecvt_utf8_utf16<wchar_t>> converter;
+  std::wstring wide(text.begin(), text.end()); //= converter.from_bytes(narrow.c_str());
+  return wide;
+}
+
+void Font::renderString(
+    const std::string & str,
+    glm::vec2 & cursor,
+    float fontSize,
+    float maxWidth) {
+  renderString(toUtf16(str), cursor, fontSize, maxWidth);
+}
+
+typedef std::pair<size_t, size_t> Token;
+typedef std::vector<Token> TokenList;
+
+bool tokenStop(uint16_t c) {
+  return c == ' ' || c == '\n';
+}
+
+std::vector<std::wstring> inline Tokenize(const std::wstring &source) {
+  static std::wstring tokens = toUtf16(" ");
+  std::vector<std::wstring> results;
+
+  size_t prev = 0;
+  size_t next = 0;
+  while ((next = source.find_first_of(tokens, prev)) != std::wstring::npos) {
+    if (next - prev != 0) {
+      results.push_back(source.substr(prev, next - prev));
+    }
+    prev = next + 1;
+  }
+
+  if (prev < source.size()) {
+    results.push_back(source.substr(prev));
+  }
+
+  return results;
+}
+
+void Font::renderString(
+    const std::wstring & str,
+    glm::vec2 & cursor,
+    float fontSize,
+    float maxWidth) {
+  float scale = Text::Font::DTP_TO_METERS * fontSize / mFontSize;
+  bool wrap = (maxWidth == maxWidth);
+  if (wrap) {
+    maxWidth /= scale;
+  }
+
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  size_t mvDepth = mv.size();
+
+  glm::vec4 aspectTest = gl::Stacks::projection().top() * glm::vec4(1, 1, 0, 1);
+  float aspect = std::abs(aspectTest.x / aspectTest.y);
+  mv.push().translate(cursor).translate(glm::vec2(0, scale * -mAscent));
+
+  // scale the modelview from into font units
+  mv.scale(scale);
+  gl::ProgramPtr program = GlUtils::getProgram(
+      Resource::SHADERS_TEXT_VS,
+      Resource::SHADERS_TEXT_FS);
+
+  program->use();
+  program->setUniform("Color", glm::vec4(1));
+  program->setUniform("Font", 0);
+  program->setUniform4x4f("Projection",
+      gl::Stacks::projection().top());
+
+  mTexture->bind();
+  mGeometry->bindVertexArray();
+
+  std::vector<std::wstring> tokens = Tokenize(str);
+
+  // Stores how far we've moved from the start of the string, in DTP units
+  glm::vec2 advance;
+  static std::wstring SPACE = toUtf16(" ");
+  for_each(tokens.begin(), tokens.end(), [&](const std::wstring & token) {
+    float tokenWidth = measureWidth(token, fontSize) ;
+    if (wrap && 0 != advance.x && (advance.x + tokenWidth) > maxWidth) {
+      advance.x = 0;
+      advance.y -= (mAscent + mDescent);
+    }
+
+    for_each(token.begin(), token.end(), [&](::uint16_t id) {
+      if ('\n' == id) {
+        advance.x = 0;
+        advance.y -= (mAscent + mDescent);
+        return;
+      }
+
+      if (!contains(id)) {
+        id = '?';
+      }
+
+      // get metrics for this character to speed up measurements
+      const Font::Metrics & m = getMetrics(id);
+
+      if (wrap && ((advance.x + m.d) > maxWidth)) {
+        advance.x = 0;
+        advance.y -= (mAscent + mDescent);
+      }
+
+      // We create an offset vec2 to hold the local offset of this character
+      // This includes compensating for the inverted Y axis of the font
+      // coordinates
+      glm::vec2 offset(advance);
+      offset.y -= m.size.y;
+      // Bind the new position
+      mv.push().translate(offset).apply(program).pop();
+      // Render the item
+      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(m.indexOffset * sizeof(GLuint)));
+      advance.x += m.d;//+ m.offset.x;// font->getAdvance(m, mFontSize);
+    });
+    advance.x += getMetrics(' ').d;
+  });
+
+  gl::VertexArray::unbind();
+  gl::Texture2d::unbind();
+  gl::Program::clear();
+  mv.pop();
+
+  //cursor.x += advance * scale;
+}
+
+//rectf Font::measure(const std::wstring &text, float fontSize) const {
+//  float offset = 0.0f;
+//  rectf result(0.0f, 0.0f, 0.0f, 0.0f);
+//
+//  std::wstring::const_iterator citr;
+//  for (citr = text.begin(); citr != text.end(); ++citr) {
+//    uint16_t charcode = (uint16_t) * citr;
+//
+//    // TODO: handle special chars like /t
+//    MetricsData::const_iterator itr = mMetrics.find(charcode);
+//    if (itr != mMetrics.end()) {
+//      result.include(
+//          rectf(offset + itr->second.dx, -itr->second.dy,
+//              offset + itr->second.dx + itr->second.w,
+//              itr->second.h - itr->second.dy));
+//      offset += itr->second.d;
+//    }
+//  }
+//
+//  // return
+//  result.scale(fontSize / mFontSize);
+//  return result;
+//}
+
+float Font::measureWidth(const std::wstring &text,
+    float fontSize,
+    bool precise) const {
+  return measureWidth(text, 0, text.length(), fontSize, precise);
+}
+
+float Font::measureWidth(
+    const std::wstring &text,
+    size_t start, size_t end,
+    float fontSize,
     bool precise) const {
   float offset = 0.0f;
   float adjust = 0.0f;
 
-  std::wstring::const_iterator citr;
-  for (citr = text.begin(); citr != text.end(); ++citr) {
-    uint16_t charcode = (uint16_t) * citr;
-
+  for (size_t i = start; i < end; ++i) {
+    uint16_t charcode = text.at(i);
     // TODO: handle special chars like /t
     MetricsData::const_iterator itr = mMetrics.find(charcode);
     if (itr != mMetrics.end()) {
@@ -346,11 +381,11 @@ float Font::measureWidth(const std::wstring &text, float fontSize,
       // precise measurement takes into account that the last character
       // contributes to the total width only by its own width, not its advance
       if (precise)
-        adjust = itr->second.dx + itr->second.w - itr->second.d;
+        adjust = itr->second.offset.x + itr->second.size.x - itr->second.d;
     }
   }
 
-  return (offset + adjust) * (fontSize / mFontSize);
+  return (offset + adjust);
 }
 
 }

@@ -19,11 +19,17 @@
 
 #pragma once
 
+#cmakedefine RIFT_DEBUG @RIFT_DEBUG@
+
 // OpenCV computer image processing libraries
-#cmakedefine HAVE_OPENCV
+#cmakedefine HAVE_OPENCV @HAVE_OPENCV@
+
 // Boost C++ libraries support
-#cmakedefine HAVE_BOOST
+#cmakedefine HAVE_BOOST @HAVE_BOOST@
+
 // Razer Hydra support
-#cmakedefine HAVE_SIXENSE
+#cmakedefine HAVE_SIXENSE @HAVE_SIXENSE@
+
 // 3D mouse support
-#cmakedefine HAVE_SPNAV
+#cmakedefine HAVE_SPNAV @HAVE_SPNAV@
+

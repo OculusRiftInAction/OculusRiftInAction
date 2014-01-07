@@ -1,7 +1,22 @@
 #pragma once
+#include <string>
+#include "Resources_Export.h"
 
-enum Resource {
+#cmakedefine RIFT_DEBUG @RIFT_DEBUG@
+#cmakedefine HAVE_BOOST @HAVE_BOOST@
+
+enum Resources_EXPORT Resource {
 ${RESOURCE_ENUM}  NO_RESOURCE
 };
 
-const std::string & getResourcePath(Resource resource);
+class Resources {
+  static Resources_EXPORT size_t getResourceSize(Resource resource);
+  static Resources_EXPORT void getResourceData(Resource resource, void * out);
+public:
+  static Resources_EXPORT const Resource VERTEX_SHADERS[];
+  static Resources_EXPORT const Resource FRAGMENT_SHADERS[];
+  static Resources_EXPORT const Resource LIB_SHADERS[];
+  static Resources_EXPORT const std::string & getResourcePath(Resource resource);
+  static Resources_EXPORT time_t getResourceModified(Resource resource);
+  friend class Platform;
+};

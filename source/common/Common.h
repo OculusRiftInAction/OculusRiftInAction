@@ -36,25 +36,13 @@
 #include <array>
 #include <stdint.h>
 #include <glm/glm.hpp>
-#include <glm/gtx/noise.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#ifdef __APPLE__
-#define GL_GLEXT_PROTOTYPES
-#include <OpenGL/gl3.h>
-#include <OpenGL/gl3ext.h>
-#else
 #include <GL/glew.h>
-#endif
 #include <OVR.h>
 #undef new
 
-#ifdef __APPLE__
-//#define glDeleteVertexArrays glDeleteVertexArraysAPPLE
-//#define glGenVertexArrays glGenVertexArraysAPPLE
-//#define glBindVertexArray glBindVertexArrayAPPLE
-#pragma thanks_obama
-#endif
+#include <Resources.h>
 
 #include <GlDebug.h>
 #include <GlMethods.h>
@@ -67,7 +55,6 @@
 #include <GlGeometry.h>
 #include <GlLighting.h>
 
-#include <Resources.h>
 
 template<class T>
 class circular_buffer : public std::list<T>{
@@ -86,13 +73,14 @@ public:
 
 class Platform {
 public:
-	static const std::string & getResourcePath(Resource resource) {
-		return ::getResourcePath(resource);
-	}
     static void sleepMillis(int millis);
     static long elapsedMillis();
     static void fail(const char * file, int line, const char * message, ...);
     static void say(std::ostream & out, const char * message, ...);
+    static std::string format(const char * formatString, ...);
+    static std::string getResourceData(Resource resource);
+private:
+
 };
 
 #ifndef PI
@@ -130,7 +118,6 @@ public:
         return -1; \
     }
 
-#include "Shaders.h"
 #include "Config.h"
 
 #include "Font.h"

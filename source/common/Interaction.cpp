@@ -20,7 +20,6 @@ glm::vec3 getTranslation(const spnav_event_motion & m, float scale = 1.0f / 5000
 glm::quat getRotation(const spnav_event_motion & m, float scale = 1.0f / 3000.0f) {
   return glm::quat(glm::vec3(m.rx, m.ry, m.rz) * scale);
 }
-
 #endif
 
 CameraControl::CameraControl()
@@ -45,7 +44,7 @@ void CameraControl::enableJoystick(bool enable) {
 }
 
 void translateCamera(glm::mat4 & camera, const glm::vec3 & delta) {
-  SAY("Translating %01.3f %01.3f %01.3f", delta.x, delta.y, delta.z);
+  // SAY("Translating %01.3f %01.3f %01.3f", delta.x, delta.y, delta.z);
   // Bring the vector into camera space coordinates
   glm::vec3 eyeDelta = glm::quat(camera) * delta;
   camera = glm::translate(glm::mat4(), eyeDelta) * camera;
@@ -53,6 +52,14 @@ void translateCamera(glm::mat4 & camera, const glm::vec3 & delta) {
 
 void rotateCamera(glm::mat4 & camera, const glm::quat & rot) {
   camera = camera * glm::mat4_cast(rot);
+}
+
+
+void recompose(glm::mat4 & camera) {
+  glm::vec4 t4 = camera[3];
+  t4 /= t4.w;
+  camera = glm::mat4_cast(glm::normalize(glm::quat(camera)));
+  camera[3] = t4;
 }
 
 #ifdef HAVE_SIXENSE
@@ -132,25 +139,57 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
 
 #endif
 
-//  for (int i = GLFW_JOYSTICK_1; i < GLFW_JOYSTICK_LAST; ++i) {
-//    SAY("%0d joystick active", glfwJoystickPresent(i));
-//  }
-  if (joystickEnabled && glfwJoystickPresent(0)) {
-    int axisCount = 0, buttonCount = 0;
-    float axes[32]; {
-      memset(axes, 0, sizeof(float) * 32);
-      const float * joyAxes = glfwGetJoystickAxes(0, &axisCount);
-      memcpy(axes, joyAxes, sizeof(float) * std::min(32, axisCount));
+  if (glfwJoystickPresent(0)) {
+    static const char * joyName = glfwGetJoystickName(0);
+    static bool x52present =
+        std::string(joyName).find("X52") !=
+            std::string::npos;
+
+    static std::shared_ptr<GlfwJoystick> joystick(
+        x52present ?
+            (GlfwJoystick*)new SaitekX52Pro::Controller(0) :
+            (GlfwJoystick*)new Xbox::Controller(0)
+        );
+    joystick->read();
+    glm::vec3 translation;
+    glm::quat rotation;
+    float scale = 500.0f;
+
+    if (x52present) {
+      using namespace SaitekX52Pro::Axis;
+      // 0 - 9
+      float scaleMod = joystick->getCalibratedAxisValue(SaitekX52Pro::Axis::THROTTLE_SLIDER);
+      scaleMod *= 0.5f;
+      scaleMod += 0.5f;
+      scaleMod *= 9.0f;
+      scaleMod += 1.0f;
+      scale /= scaleMod;
+
+
+      translation = joystick->getCalibratedVector(
+          STICK_POV_X,
+          STICK_POV_Y,
+          THROTTLE_MAIN);
+
+      glm::vec3 euler = joystick->getCalibratedVector(
+          STICK_Y, STICK_Z, STICK_X);
+      rotation = glm::quat(euler / 20.0f);
+    } else {
+      using namespace Xbox::Axis;
+      // We invert the Z axis because of the handedness of the
+      // coordinate system
+      translation.z = -joystick->getCalibratedAxisValue(LEFT_Y) * 100.0f;
+      rotation.y = (joystick->getCalibratedAxisValue(LEFT_TRIGGER) +
+          joystick->getCalibratedAxisValue(RIGHT_TRIGGER)) / 100.0f;
+      rotation.x = joystick->getCalibratedAxisValue(RIGHT_Y) / 200.0f;
+      rotation.z = joystick->getCalibratedAxisValue(RIGHT_X) / 400.0f;
     }
-    const unsigned char * buttons = glfwGetJoystickButtons (0, &buttonCount);
-    glm::vec3 translation(axes[0], -axes[4], -axes[1]);
-    if (translation != glm::vec3()) {
-      translateCamera(camera, translation / 100.0f);
+
+    if (glm::length(translation) > 0.01f) {
+      translateCamera(camera, translation / scale);
     }
-    glm::quat rotation = glm::angleAxis(axes[3], glm::vec3(0, 1, 0));
-    if (rotation != glm::quat()) {
-      rotateCamera(camera, rotation);
-    }
+    rotateCamera(camera, rotation);
+    recompose(camera);
   }
 }
 
@@ -211,217 +250,3 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
 //    sixenseGetAllNewestData(&acd);
 //    sixenseUtils::getTheControllerManager()->update(&acd);
 //  }
-/*
-*
-*
-
-package com.encom13.gl.scene;
-
-import java.io.IOException;
-
-import net.java.games.input.Component;
-import net.java.games.input.Component.Identifier;
-import net.java.games.input.Controller;
-import net.java.games.input.Controller.Type;
-import net.java.games.input.ControllerEnvironment;
-
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-
-import com.encom13.input.connextion.SpaceNav;
-import com.encom13.input.connextion.SpaceNav.ButtonEvent;
-import com.encom13.input.connextion.SpaceNav.MotionEvent;
-import com.encom13.input.oculus.fusion.SensorFusion;
-
-import copied.com.jme3.math.Quaternion;
-import copied.com.jme3.math.Vector2f;
-import copied.com.jme3.math.Vector3f;
-
-public class UserSceneInteraction {
-private final Camera       camera;
-private Controller         joy                      = null;
-private SpaceNavListener   spnav                    = null;
-private final SensorFusion fusion                   = new SensorFusion();
-
-public float               joystickRotationScale    = 1 / 100.0f;
-public float               joystickTranslationScale = 1 / 10.0f;
-
-public UserSceneInteraction(Camera camera) {
-this.camera = camera;
-}
-
-private static Vector2f fromMouseEvent(int x, int y) {
-Vector2f p = new Vector2f(x, y);
-p.multLocal(1 / 500.0f);
-return p;
-}
-
-public void enableRift(boolean enable) {
-//        try {
-//            fusion.SetGravityEnabled(false);
-////            com.encom13.input.oculus.RiftTracker.startListening(fusion.createHandler());
-//        } catch (IOException e) {
-//            throw new IllegalStateException();
-//        }
-}
-
-public void enableJoystick(boolean enable) {
-if ((this.joy != null) == enable) {
-return;
-} else if (enable) {
-Controller[] cs = ControllerEnvironment.getDefaultEnvironment().getControllers();
-// less weak
-for (Controller c : cs) {
-if (c.getType() == Type.GAMEPAD) {
-joy = c;
-break;
-}
-}
-} else {
-this.joy = null;
-}
-}
-
-public void enableSpaceNavigator(boolean enable) {
-if ((this.spnav != null) == enable) {
-return;
-} else if (enable) {
-SpaceNav.addEventListener(new SpaceNavListener());
-} else {
-SpaceNav.removeEventListener(spnav);
-this.spnav = null;
-}
-}
-
-public class SpaceNavListener implements SpaceNav.EventListener {
-@Override
-public void motionEvent(MotionEvent event) {
-float scale = 0.0005f;
-Vector3f tr = new Vector3f(event.x * scale, event.y * scale, -event.z * scale);
-if (tr.length() > 0.015f) {
-camera.translate(new Vector3f(event.x * scale, event.y * scale, -event.z * scale));
-}
-scale = 0.00005f;
-Vector3f rot = new Vector3f(event.rx * scale, event.ry * scale, 0);
-if (rot.length() > 0.001) {
-camera.rotate(new Quaternion().fromAngles(rot.x, rot.y, rot.z));
-}
-// camera.rotate(new Quaternion().fromAngles(event.rx * scale,
-// event.ry * scale, -event.rz * scale * 4));
-}
-
-@Override
-public void buttonEvent(ButtonEvent event) {
-camera.reset();
-}
-}
-
-public void shutdown() {
-enableSpaceNavigator(false);
-}
-
-private static final float walkingSpeed = 0.005f;
-
-// boolean keyDown = Keyboard.isKeyDown(Keyboard.KEY_X);
-
-public void applyInputUpdates() {
-// camera.setRotation(fusion.getPredictedOrientation());
-{
-Vector3f tr = new Vector3f();
-if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
-tr.z -= walkingSpeed;
-} else if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
-tr.z += walkingSpeed;
-} else if (Keyboard.isKeyDown(Keyboard.KEY_A)) {
-tr.x -= walkingSpeed;
-} else if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
-tr.x += walkingSpeed;
-}
-camera.translate(tr);
-}
-while (Keyboard.next()) {
-int key = Keyboard.getEventKey();
-switch (key) {
-case Keyboard.KEY_W:
-camera.translate(new Vector3f(0, 0, -walkingSpeed));
-break;
-case Keyboard.KEY_A:
-camera.translate(new Vector3f(-walkingSpeed, 0, 0));
-break;
-case Keyboard.KEY_S:
-camera.translate(new Vector3f(0, 0, walkingSpeed));
-break;
-case Keyboard.KEY_D:
-camera.translate(new Vector3f(walkingSpeed, 0, 0));
-break;
-// case Keyboard.KEY_R:
-// try {
-// if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) {
-// RiftTracker.getInstance().stopRecording();
-// } else {
-// RiftTracker.getInstance().record(new File("rift1.json"));
-// }
-// } catch (IOException e) {
-// throw new IllegalStateException(e);
-// }
-// break;
-}
-}
-
-while (Mouse.next()) {
-if (Mouse.isButtonDown(0)) {
-camera.rotate(fromMouseEvent(-Mouse.getEventDX(), Mouse.getEventDY()));
-} else if (Mouse.isButtonDown(1)) {
-camera.translate(fromMouseEvent(Mouse.getEventDX(), Mouse.getEventDY()));
-} else if (Mouse.isButtonDown(2)) {
-// camera.zoom(new Point(-Mouse.getEventDX(),
-// -Mouse.getEventDY()));
-}
-}
-
-if (null != joy) {
-joy.poll();
-Component c = joy.getComponent(Identifier.Button._4);
-if (c != null) {
-if (c.getPollData() != 0) {
-camera.reset();
-}
-}
-
-{
-c = joy.getComponent(Identifier.Axis.X);
-Component d = joy.getComponent(Identifier.Axis.Y);
-Vector2f rot = new Vector2f(-c.getPollData(), -d.getPollData());
-rot.multLocal(joystickRotationScale);
-if (rot.length() > 0.0053f) {
-camera.rotate(rot);
-}
-}
-
-{
-Vector3f tr = new Vector3f(joy.getComponent(Identifier.Axis.RX).getPollData(), 0, joy.getComponent(
-Identifier.Axis.RY).getPollData());
-tr.multLocal(joystickTranslationScale);
-if (tr.length() > 0.05f) {
-camera.translate(tr);
-}
-}
-}
-}
-}
-*/
-
-// This is the callback that gets registered with the sixenseUtils::controller_manager.
-// It will get called each time the user completes one of the setup steps so that the game
-// can update the instructions to the user. If the engine supports texture mapping, the
-// controller_manager can prove a pathname to a image file that contains the instructions
-// in graphic form.
-// The controller_manager serves the following functions:
-//  1) Makes sure the appropriate number of controllers are connected to the system.
-//     The number of required controllers is designaged by the
-//     game type (ie two player two controller game requires 4 controllers,
-//     one player one controller game requires one)
-//  2) Makes the player designate which controllers are held in which hand.
-//  3) Enables hemisphere tracking by calling the Sixense API call
-//     sixenseAutoEnableHemisphereTracking. After this is completed full 360 degree
-//     tracking is possible.

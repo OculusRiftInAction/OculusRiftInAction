@@ -37,3 +37,6 @@ template<typename T> std::istream &
 readStream(std::istream & in, T * t, size_t size) {
   return in.read(read_cast(t), sizeof(T) * size);
 }
+
+std::istream &
+readStream(std::istream & in, std::string & out);

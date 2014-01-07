@@ -19,6 +19,7 @@
 
 #pragma once
 #include <array>
+#include "OVR_Profile.h"
 
 class Rift {
 public:
@@ -37,21 +38,35 @@ public:
     // hmdInfo.DistortionK[2] = 0.11502f;
     hmdInfo.DistortionK[2] = 0.24f;
     hmdInfo.DistortionK[3] = 0;
+    hmdInfo.DesktopX = 100;
+    hmdInfo.DesktopY = 100;
     hmdInfo.ChromaAbCorrection[0] = 0.99600f;
     hmdInfo.ChromaAbCorrection[1] = -0.00400f;
     hmdInfo.ChromaAbCorrection[2] = 1.01400f;
     hmdInfo.ChromaAbCorrection[3] = 0;
   }
 
+  static glm::quat getStrabismusCorrection(const char * profileName = nullptr) {
+    OVR::Ptr<OVR::ProfileManager> profileManager =
+          *OVR::ProfileManager::Create();
+    OVR::Ptr<OVR::Profile> profile;
+    glm::quat result;
+//    if (nullptr != profileName) {
+//      profile = *profileManager->LoadProfile(profileName);
+//    } else {
+//      profile = *profileManager->LoadProfile(
+//          profileManager->GetDefaultProfileName());
+//    }
+//    if (profile) {
+//      OVR::Quatf strabCorrect = profile->GetStrabismusCorrection();
+//      result = fromOvr(strabCorrect);
+//    }
+    return result;
+  }
+
   static void getHmdInfo(
-      OVR::HMDInfo & out,
-      OVR::Ptr<OVR::DeviceManager> ovrManager =
-          OVR::Ptr<OVR::DeviceManager>()) {
-
-    if (!ovrManager) {
-      ovrManager = *OVR::DeviceManager::Create();
-    }
-
+    const OVR::Ptr<OVR::DeviceManager> & ovrManager,
+    OVR::HMDInfo & out) {
     if (!ovrManager) {
       FAIL("Unable to create Rift device manager");
     }
@@ -67,8 +82,15 @@ public:
 
     ovrHmd->GetDeviceInfo(&out);
 
+    // Hack to fix my broken rift, reporting the wrong K
+#ifdef BRADS_BROKEN_RIFT
+    out.DistortionK[0] = 1;
+    out.DistortionK[1] = 0.22f;
+    out.DistortionK[2] = 0.24f;
+    out.DistortionK[3] = 0;
+#endif
+
     ovrHmd = nullptr;
-    ovrManager = nullptr;
   }
 
   // Fetch a glm style quaternion from an OVR sensor fusion object
@@ -78,7 +100,7 @@ public:
 
   // Fetch a glm vector containing Euler angles from an OVR sensor fusion object
   static inline glm::vec3 getEulerAngles(OVR::SensorFusion & sensorFusion) {
-    return getEulerAngles(sensorFusion.GetOrientation());
+    return getEulerAngles(sensorFusion.GetPredictedOrientation());
   }
 
   static std::string formatOvrVector(const OVR::Vector3f & vector) {
@@ -111,68 +133,81 @@ public:
 };
 
 
-struct RiftRenderArgs {
-  glm::ivec2 size;
-  glm::ivec2 position;
+class RiftManagerApp {
+protected:
+  OVR::Ptr<OVR::DeviceManager> ovrManager;
+
+public:
+  RiftManagerApp() {
+    ovrManager = *OVR::DeviceManager::Create();
+  }
+};
+
+class RiftRenderApp : public GlfwApp, public RiftManagerApp {
+public:
+  struct PerEyeArgs {
+    const RiftRenderApp & renderApp;
+    const bool left;
+    const bool right;
+
+    glm::ivec2 viewportPosition;
+    glm::mat4 projectionOffset;
+    glm::mat4 modelviewOffset;
+    float lensOffset;
+
+    PerEyeArgs(const RiftRenderApp & renderApp, bool left)
+      : renderApp(renderApp), left(left), right(!left), lensOffset(0)
+    { }
+
+    void viewport() const {
+      gl::viewport(viewportPosition, renderApp.eyeSize);
+    }
+
+    void bindUniforms(gl::ProgramPtr & program) const {
+      program->setUniform("LensOffset", lensOffset);
+      GL_CHECK_ERROR;
+    }
+
+    glm::mat4 getProjection() const {
+      return projectionOffset * renderApp.getProjection();
+    }
+  };
+
+protected:
+  glm::ivec2 hmdSize;
+  glm::ivec2 hmdDesktopPosition;
   glm::ivec2 eyeSize;
 
   float eyeAspect;
   float fov;
   float postDistortionScale;
-  float lensOffset;
   glm::vec4 distortion;
-
-  struct PerEyeArgs {
-    const RiftRenderArgs & renderArgs;
-    const bool mirror;
-
-    glm::ivec2 viewportPosition;
-    glm::mat4 projectionOffset;
-    glm::mat4 modelviewOffset;
-
-    PerEyeArgs(const RiftRenderArgs & renderArgs, bool mirror)
-      : renderArgs(renderArgs), mirror(mirror) {
-    }
-
-    void viewport() const {
-      gl::viewport(viewportPosition, renderArgs.eyeSize);
-    }
-
-    void bindUniforms(gl::ProgramPtr & program) const {
-      program->setUniform("Mirror", mirror);
-      GL_CHECK_ERROR;
-    }
-
-    glm::mat4 getProjection() const {
-      return projectionOffset * renderArgs.getProjection();
-    }
-  };
   std::array<PerEyeArgs, 2> eye;
-//  RiftPerEyeRenderArgs eye[2];
 
-  RiftRenderArgs() :
+public:
+  RiftRenderApp() :
     eyeAspect(1),
     fov(60),
     postDistortionScale(1),
-    lensOffset(0),
-    eye({PerEyeArgs(*this, 0), PerEyeArgs(*this, 1)}) {
+    eye({ PerEyeArgs(*this, true), PerEyeArgs(*this, false) }) {
 
     OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(hmdInfo);
-    size = glm::ivec2(hmdInfo.HResolution, hmdInfo.VResolution);
-    position = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
+    Rift::getHmdInfo(ovrManager, hmdInfo);
+    hmdSize = glm::ivec2(hmdInfo.HResolution, hmdInfo.VResolution);
+    hmdDesktopPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
     eyeSize = glm::ivec2(hmdInfo.HResolution / 2, hmdInfo.VResolution);
     eyeAspect = glm::aspect(eyeSize);
     eye[1].viewportPosition = glm::ivec2(eyeSize.x, 0);
     float lensDistance =
-        hmdInfo.LensSeparationDistance /
-        hmdInfo.HScreenSize;
-    lensOffset = 1.0f - (2.0f * lensDistance);
+      hmdInfo.LensSeparationDistance /
+      hmdInfo.HScreenSize;
+    eye[0].lensOffset = 1.0f - (2.0f * lensDistance);
+    eye[1].lensOffset = -eye[0].lensOffset;
     distortion = glm::vec4(
-        hmdInfo.DistortionK[0],
-        hmdInfo.DistortionK[1],
-        hmdInfo.DistortionK[2],
-        hmdInfo.DistortionK[3]);
+      hmdInfo.DistortionK[0],
+      hmdInfo.DistortionK[1],
+      hmdInfo.DistortionK[2],
+      hmdInfo.DistortionK[3]);
 
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(hmdInfo);
@@ -189,20 +224,42 @@ struct RiftRenderArgs {
     {
       float modelviewOffset = stereoConfig.GetIPD() / 2.0f;
       glm::vec3 v = glm::vec3(modelviewOffset, 0, 0);
-      eye[0].modelviewOffset = glm::translate(glm::mat4(), v);
-      eye[1].modelviewOffset = glm::translate(glm::mat4(), -v);
+
+      glm::quat strabismusCorrection = Rift::getStrabismusCorrection();
+      eye[0].modelviewOffset =
+          glm::translate(glm::mat4(), v)
+        *
+      glm::mat4_cast(strabismusCorrection)
+        ;
+      eye[1].modelviewOffset =
+          glm::translate(glm::mat4(), -v)
+      *
+      glm::mat4_cast(glm::inverse(strabismusCorrection))
+          ;
+      //    profile->SetStrabismusCorrection(OVR::Quatf(
+      //        -0.0195252169,
+      //        0.0247310139,
+      //        -0.0144390352,
+      //        0.998797238
+      //    ));
+    }
+
+
+  }
+
+  virtual void createRenderingTarget() {
+    glfwWindowHint(GLFW_DECORATED, 0);
+    createWindow(hmdSize, hmdDesktopPosition);
+    if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
+      FAIL("Unable to create undecorated window");
     }
   }
 
+
   void bindUniforms(gl::ProgramPtr & program) const {
     program->setUniform("Aspect", eyeAspect);
-    GL_CHECK_ERROR;
-    program->setUniform("LensCenter", glm::vec2(lensOffset, 0.0f));
-    GL_CHECK_ERROR;
-    program->setUniform("DistortionScale", postDistortionScale);
-    GL_CHECK_ERROR;
+    program->setUniform("PostDistortionScale", postDistortionScale);
     program->setUniform("K", distortion);
-    GL_CHECK_ERROR;
   }
 
   template<GLenum TextureType, GLenum TextureFormat>
@@ -232,8 +289,8 @@ struct RiftRenderArgs {
       glClear(GL_COLOR_BUFFER_BIT);
 
       gl::ProgramPtr program = GlUtils::getProgram(
-          ShaderResource::SHADERS_VERTEXTORIFT_VS,
-          ShaderResource::SHADERS_GENERATEDISPLACEMENTMAP_FS);
+        Resource::SHADERS_VERTEXTORIFT_VS,
+        Resource::SHADERS_GENERATEDISPLACEMENTMAP_FS);
       program->use();
       bindUniforms(program);
       program->checkConfigured();
@@ -253,81 +310,9 @@ struct RiftRenderArgs {
   }
 };
 
-//struct RiftRenderResults {
-//  float aspect;
-//  float fov;
-//  bool projectionOffsetApplied;
-//};
-
-class RiftRenderApp : public GlfwApp {
-protected:
-  RiftRenderArgs renderArgs;
-
-public:
-  RiftRenderApp();
-  virtual void createRenderingTarget();
-};
-
-
-class RiftDualSensorApp : public RiftRenderApp, public OVR::MessageHandler {
-protected:
-  OVR::Ptr<OVR::DeviceManager> ovrManager;
-  OVR::Ptr<OVR::SensorDevice> ovrSensor;
-  OVR::SensorFusion sensorFusion[2];
-
-  RiftDualSensorApp() {
-    ovrManager = *OVR::DeviceManager::Create();
-    if (!ovrManager) {
-      FAIL("Unable to create device manager");
-    }
-
-    ovrSensor =
-        *ovrManager->EnumerateDevices<OVR::SensorDevice>().CreateDevice();
-    if (!ovrSensor) {
-      FAIL("Unable to locate Rift sensor device");
-    }
-    ovrSensor->SetMessageHandler(this);
-  }
-
-  virtual void OnMessage(const OVR::Message& msg) {
-    if (msg.Type == OVR::Message_BodyFrame) {
-      for (int i =0; i < 2; ++i) {
-        sensorFusion[i].OnMessage(static_cast<const OVR::MessageBodyFrame&>(msg));
-      }
-    }
-  }
-
-  virtual bool SupportsMessageType(OVR::MessageType type) const {
-    return (type == OVR::Message_BodyFrame);
-  }
-
-  void initGl() {
-    GlfwApp::initGl();
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-  }
-
-
-  virtual void onKey(int key, int scancode, int action, int mods) {
-    if (GLFW_PRESS != action) {
-      return;
-    }
-
-    switch (key) {
-    case GLFW_KEY_R:
-      for (int i = 0; i < 2; ++i) {
-        sensorFusion[i].Reset();
-      }
-      return;
-    }
-
-    RiftRenderApp::onKey(key, scancode, action, mods);
-  }
-};
-
 
 class RiftApp : public RiftRenderApp {
 protected:
-  OVR::Ptr<OVR::DeviceManager> ovrManager;
   OVR::Util::Render::StereoMode renderMode;
   OVR::SensorFusion sensorFusion;
   OVR::Ptr<OVR::SensorDevice> ovrSensor;
@@ -337,8 +322,8 @@ protected:
   gl::FrameBufferWrapper frameBuffer;
   gl::ProgramPtr distortProgram;
 
-  static const ShaderResource DISTORTION_VERTEX_SHADER;
-  static const ShaderResource DISTORTION_FRAGMENT_SHADER;
+  static const Resource DISTORTION_VERTEX_SHADER;
+  static const Resource DISTORTION_FRAGMENT_SHADER;
 
 public:
 
@@ -349,6 +334,11 @@ public:
   virtual void initGl();
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw();
+
+  virtual void renderScene(const PerEyeArgs & eyeArgs) {
+    gl::Stacks::projection().top() = eyeArgs.getProjection();
+    renderScene(eyeArgs.modelviewOffset);
+  }
 
   // This method should be overridden in derived classes in order to render
   // the scene.  The idea FoV

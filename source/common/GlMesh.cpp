@@ -20,10 +20,10 @@ void Mesh::clear() {
   indices.clear();
 }
 
-void Mesh::loadCtm(const std::string & file) {
+void Mesh::loadCtm(const std::string & data) {
   clear();
   CTMimporter importer;
-  importer.LoadData(Files::read(file));
+    importer.LoadData(data);
 
   int vertexCount = importer.GetInteger(CTM_VERTEX_COUNT);
   positions.resize(vertexCount);
@@ -32,7 +32,7 @@ void Mesh::loadCtm(const std::string & file) {
     positions[i] = make_vec3(ctmData + (i * 3));
   }
 
-  bool hasNormals = (bool) importer.GetInteger(CTM_HAS_NORMALS);
+  bool hasNormals = importer.GetInteger(CTM_HAS_NORMALS) ? true : false;
   if (hasNormals) {
     normals.resize(vertexCount);
     ctmData = importer.GetFloatArray(CTM_NORMALS);
