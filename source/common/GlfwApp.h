@@ -27,6 +27,7 @@ class GlfwApp {
 protected:
   GLFWwindow *  window;
   glm::ivec2    windowSize;
+  glm::ivec2    windowPosition;
   float         windowAspect;
   float         windowAspectInverse;
 
@@ -43,11 +44,14 @@ public:
   virtual void createWindow(int w, int h, int x = INT_MIN, int y = INT_MIN) {
     createWindow(glm::ivec2(w, h), glm::ivec2(x, y));
   }
-  virtual void fullscreen(const glm::ivec2 & size, const char * target);
+  virtual void createFullscreenWindow(const glm::ivec2 & size, GLFWmonitor * targetMonitor);
   virtual void destroyWindow();
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw();
   virtual void update();
+
+  static GLFWmonitor * getMonitorAtPosition(glm::ivec2 & position);
+
 private:
   void onCreate();
   void preCreate();

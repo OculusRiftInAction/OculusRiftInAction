@@ -9,12 +9,6 @@ protected:
   OVR::SensorFusion             sensorFusion;
   bool                          useTracker;
 
-//  OVR::HMDInfo                  hmdInfo;
-//  StereoMode                    renderMode;
-
-  glm::ivec2                    screenPosition;
-  glm::ivec2                    screenSize;
-
   gl::FrameBufferWrapper        frameBuffer;
   gl::GeometryPtr               quadGeometry;
 
@@ -23,7 +17,7 @@ protected:
   float                         eyeAspect;
   glm::vec4                     distortionCoefficients;
   float                         postDistortionScale;
-
+  float                         ipd;
   struct EyeArg {
     glm::ivec2                  viewportLocation;
     glm::mat4                   projectionOffset;
@@ -59,27 +53,63 @@ public:
       useTracker = sensorFusion.IsAttachedToSensor();
     }
 
-    screenSize = glm::ivec2(
-        hmdInfo.HResolution,
-        hmdInfo.VResolution);
-    screenPosition = glm::ivec2(
-      hmdInfo.DesktopX,
-      hmdInfo.DesktopY);
-    eyeSize = glm::ivec2(
-        hmdInfo.HResolution / 2.0f,
-        hmdInfo.VResolution);
+    ipd = hmdInfo.InterpupillaryDistance;
+    distortionCoefficients = glm::vec4(
+      hmdInfo.DistortionK[0], hmdInfo.DistortionK[1],
+      hmdInfo.DistortionK[2], hmdInfo.DistortionK[3]);
+    windowPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
+    // The HMDInfo gives us the position of the Rift in desktop 
+    // coordinates as well as the native resolution of the Rift 
+    // display panel, but NOT the current resolution of the signal
+    // being sent to the Rift.  
+    GLFWmonitor * hmdMonitor = 
+      GlfwApp::getMonitorAtPosition(windowPosition);
+    if (!hmdMonitor) {
+      FAIL("Unable to find Rift display");
+    }
 
+    // For the current resoltuion we must find the appropriate GLFW monitor
+    const GLFWvidmode * videoMode = 
+      glfwGetVideoMode(hmdMonitor);
+    windowSize = glm::ivec2(videoMode->width, videoMode->height);
+
+    // The eyeSize is used to help us set the viewport when rendering to 
+    // each eye.  This should be based off the video mode that is / will 
+    // be sent to the Rift
+    // We also use the eyeSize to set up the framebuffer which will be 
+    // used to render the scene to a texture for distortion and display 
+    // on the Rift.  The Framebuffer resolution does not have to match 
+    // the Physical display resolution in either aspect ratio or 
+    // resolution, but using a resolution less than the native pixels can
+    // negatively impact image quality.
+    eyeSize = windowSize;
+    eyeSize.x /= 2;
+
+    eyeArgs[1].viewportLocation = glm::ivec2(eyeSize.x, 0);
+    eyeArgs[0].viewportLocation = glm::ivec2(0, 0);
+
+    // Notice that the eyeAspect we calculate is based on the physical 
+    // display resolution, regardless of the current resolution being 
+    // sent to the Rift.  The Rift scales the image sent to it to fit
+    // the display panel, so a 1920x1080 image (with an aspect ratio of 
+    // 16:9 will be displayed with the aspect ratio of the Rift display
+    // (16:10 for the DK1).  This means that if you're cloning a 
+    // 1920x1080 output to the rift and an conventional monitor of those 
+    // dimensions the conventional monitor's image will appear a bit 
+    // squished.  This is expected and correct.
+    eyeAspect = (float)(hmdInfo.HResolution / 2) /
+      (float)hmdInfo.VResolution;
+
+    // Some of the values needed by the rendering or distortion need some 
+    // calculation to find, but the OVR SDK includes a utility class to
+    // do them, so we use it here to get the ProjectionOffset and the 
+    // post distortion scale.
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(hmdInfo);
+    // The overall distortion effect has a shrinking effect.  
     postDistortionScale = 1.0f / stereoConfig.GetDistortionScale();
-    distortionCoefficients = glm::vec4(
-        hmdInfo.DistortionK[0], hmdInfo.DistortionK[1],
-        hmdInfo.DistortionK[2], hmdInfo.DistortionK[3]);
-
-
-    eyeArgs[0].viewportLocation = glm::ivec2(0, 0);
-    eyeArgs[1].viewportLocation = glm::ivec2(eyeSize.x, 0);
-
+    // The projection offset and lens offset are both in normalized 
+    // device coordinates, i.e. [-1, 1] on both the X and Y axis
     glm::vec3 projectionOffsetVector =
         glm::vec3(stereoConfig.GetProjectionCenterOffset() / 2.0f, 0, 0);
     eyeArgs[0].projectionOffset =
@@ -87,6 +117,14 @@ public:
     eyeArgs[1].projectionOffset =
         glm::translate(glm::mat4(), -projectionOffsetVector);
 
+    eyeArgs[0].lensOffset =
+      1.0f - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
+    eyeArgs[1].lensOffset = -eyeArgs[0].lensOffset;
+
+
+    // The IPD and the modelview offset are in meters.  If you wish to have a 
+    // different unit for  the scale of your world coordinates, you would need 
+    // to apply the conversion factor here.
     glm::vec3 modelviewOffsetVector =
         glm::vec3(stereoConfig.GetIPD() / 2.0f, 0, 0);
     eyeArgs[0].modelviewOffset =
@@ -94,15 +132,10 @@ public:
     eyeArgs[1].modelviewOffset =
         glm::translate(glm::mat4(), -modelviewOffsetVector);
 
-    eyeArgs[0].lensOffset =
-        1.0f - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
-    eyeArgs[1].lensOffset = -eyeArgs[0].lensOffset;
-
-    eyeAspect = (float) eyeSize.x / (float) eyeSize.y;
 
     gl::Stacks::projection().top() = glm::perspective(
-        stereoConfig.GetYFOVDegrees(),
-        (float) eyeSize.x / (float) eyeSize.y,
+        stereoConfig.GetYFOVDegrees() * DEGREES_TO_RADIANS,
+        eyeAspect,
         Rift::ZNEAR, Rift::ZFAR);
   }
 
@@ -114,7 +147,7 @@ public:
 
   virtual void createRenderingTarget() {
     glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(screenSize, screenPosition);
+    createWindow(windowSize, windowPosition);
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
     }
@@ -157,7 +190,7 @@ public:
 
   virtual void update() {
     static const glm::vec3 CAMERA =
-        glm::vec3(0.0f, 0.0f, 0.4f);
+        glm::vec3(0.0f, 0.0f, 0.2f);
 
     glm::mat4 & modelview = gl::Stacks::modelview().top();
     modelview = glm::lookAt(CAMERA, GlUtils::ORIGIN, GlUtils::Y_AXIS);
@@ -208,14 +241,17 @@ public:
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     gl::MatrixStack & pm = gl::Stacks::projection();
-    pm.push();
-      pm.preMultiply(eyeArg.projectionOffset);
-      gl::MatrixStack & mv = gl::Stacks::modelview();
-      mv.push();
-        mv.preMultiply(eyeArg.modelviewOffset);
-        mv.scale(0.15f);
-        GlUtils::drawColorCube();
+    gl::MatrixStack & mv = gl::Stacks::modelview();
+    pm.push().preMultiply(eyeArg.projectionOffset);
+    mv.push().preMultiply(eyeArg.modelviewOffset);
+
+      mv.push().translate(glm::vec3(0, 0, -1.5f)).
+        rotate(glm::angleAxis(QUARTER_TAU, GlUtils::X_AXIS));
+        GlUtils::draw3dGrid();
       mv.pop();
+      mv.scale(ipd);
+      GlUtils::drawColorCube();
+    mv.pop();
     pm.pop();
   }
 };

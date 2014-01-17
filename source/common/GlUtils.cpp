@@ -21,6 +21,7 @@
 
 // This is a library for 3D mesh decompression
 #include <openctmpp.h>
+#include <unordered_map>
 
 #ifdef HAVE_OPENCV
 
@@ -370,6 +371,19 @@ void GlUtils::renderBunny() {
   renderGeometry(bunnyGeometry, program);
 }
 
+gl::GeometryPtr GlUtils::getQuadGeometry(float aspect, float size) {
+  glm::vec2 min(size / -2.0f), max(size / 2.0f);
+  if (aspect > 1.0f) {
+    min.y /= aspect;
+    max.y /= aspect;
+  } else if (aspect < 1.0f) {
+    min.x *= aspect;
+    max.x *= aspect;
+  }
+  return getQuadGeometry(min, max);
+}
+
+
 gl::GeometryPtr GlUtils::getQuadGeometry(const glm::vec2 & min,
     const glm::vec2 & max, const glm::vec2 & texMin,
     const glm::vec2 & texMax) {
@@ -435,7 +449,6 @@ void getOpenCvImageData(cv::Mat & image, glm::ivec2 & outSize, std::vector<unsig
   // OpenCV uses upper left as the origin for the image data.  OpenGL
   // uses lower left, so we need to flip the image vertically before
   // we hand it to OpenGL
-  cv::flip(image, image, 0);
   cv::cvtColor(image, image, CV_BGR2RGB);
   outSize.x = image.cols;
   outSize.y = image.rows;
@@ -445,14 +458,17 @@ void getOpenCvImageData(cv::Mat & image, glm::ivec2 & outSize, std::vector<unsig
 }
 
 void GlUtils::getImageData(
-    const std::string & file,
+    Resource resource,
     glm::ivec2 & outSize,
     std::vector<unsigned char> & outData,
     bool flip
 ) {
-  cv::Mat image = cv::imread(file, CV_LOAD_IMAGE_COLOR);
-  getOpenCvImageData(image, outSize, outData);
+  size_t size = Resources::getResourceSize(resource);
+  std::vector<uint8_t> data; data.resize(size);
+  Resources::getResourceData(resource, &data[0]);
+  getImageData(data, outSize, outData, flip);
 }
+
 
 void GlUtils::getImageData(
   const std::vector<unsigned char> & indata,
@@ -461,16 +477,10 @@ void GlUtils::getImageData(
   bool flip
 ) {
   cv::Mat image = cv::imdecode(indata, CV_LOAD_IMAGE_COLOR);
+  if (flip) {
+    cv::flip(image, image, 0);
+  }
   getOpenCvImageData(image, outSize, outData);
-}
-
-void GlUtils::getImageData(
-  std::istream & in,
-  glm::ivec2 & outSize,
-  std::vector<unsigned char> & outData,
-  bool flip
-) {
-  // FIXME
 }
 
 #else
@@ -489,7 +499,7 @@ void PngDataCallback(png_structp png_ptr, png_bytep outBytes,
     throw runtime_error("PNG: short read");
 }
 
-void GlUtils::getImageData(
+void getPngImageData(
     istream & in,
     glm::ivec2 & outSize,
     std::vector<unsigned char> & outData,
@@ -572,7 +582,7 @@ void GlUtils::getImageData(
   bool flip
 ) {
   std::istringstream in(std::string((const char*)&indata[0], indata.size()));
-  getImageData(in, outSize, outData, flip);
+  getPngImageData(in, outSize, outData, flip);
 }
 
 void GlUtils::getImageData(
@@ -582,7 +592,7 @@ void GlUtils::getImageData(
   bool flip
   ) {
   std::istringstream in(Platform::getResourceData(resource));
-  getImageData(in, outSize, outData, flip);
+  getPngImageData(in, outSize, outData, flip);
 }
 
 #endif
@@ -606,32 +616,32 @@ void GlUtils::renderArtificialHorizon(float alpha) {
       glm::vec2 bar(0.5, 0.025);
       glm::vec2 smallBar(0.3, 0.015);
       for (int i = 1; i <= 4; ++i) {
-        float angle = i * 20.0f;
+        float angle = i * (TAU / 18.0f);
         m.identity().rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(bar);
-        m.identity().rotate(180.0f, GlUtils::Y_AXIS).rotate(angle,
+        m.identity().rotate(HALF_TAU, GlUtils::Y_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(bar);
-        m.identity().rotate(180.0f, GlUtils::Z_AXIS).rotate(angle,
+        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(bar);
-        m.identity().rotate(180.0f, GlUtils::Z_AXIS).rotate(180.0f,
+        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(HALF_TAU,
             GlUtils::Y_AXIS).rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(bar);
 
-        angle -= 10.0f;
+        angle -= (TAU / 36.0f);
         m.identity().rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
-        m.identity().rotate(180.0f, GlUtils::Y_AXIS).rotate(angle,
+        m.identity().rotate(HALF_TAU, GlUtils::Y_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
-        m.identity().rotate(180.0f, GlUtils::Z_AXIS).rotate(angle,
+        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
-        m.identity().rotate(180.0f, GlUtils::Z_AXIS).rotate(180.0f,
+        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(HALF_TAU,
             GlUtils::Y_AXIS).rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
@@ -641,11 +651,11 @@ void GlUtils::renderArtificialHorizon(float alpha) {
     mesh.fillNormals(true);
 
     const Mesh & hemi = getMesh(Resource::MESHES_HEMI_CTM);
-    m.top() = glm::rotate(glm::mat4(), -90.0f, GlUtils::X_AXIS);
+    m.top() = glm::rotate(glm::mat4(), -QUARTER_TAU, GlUtils::X_AXIS);
     mesh.getColor() = Colors::cyan;
     mesh.addMesh(hemi, true);
 
-    m.top() = glm::rotate(glm::mat4(), 90.0f, GlUtils::X_AXIS);
+    m.top() = glm::rotate(glm::mat4(), QUARTER_TAU, GlUtils::X_AXIS);
     mesh.getColor() = Colors::orange;
     mesh.addMesh(hemi);
     {
@@ -706,55 +716,65 @@ void GlUtils::drawQuad(const glm::vec2 & min, const glm::vec2 & max) {
   glEnd();
 }
 
+gl::GeometryPtr GlUtils::getColorCubeGeometry() {
+  static GeometryPtr  geometry;
+  if (!geometry) {
+    Mesh mesh;
+    glm::vec3 move(0, 0, 0.5f);
+    gl::MatrixStack & m = mesh.model;
+
+    m.push().rotate(glm::angleAxis(QUARTER_TAU, Y_AXIS)).translate(move);
+    mesh.color = Colors::red;
+    mesh.addQuad(glm::vec2(1.0));
+    mesh.fillColors(true);
+    m.pop();
+
+    m.push().rotate(glm::angleAxis(-QUARTER_TAU, X_AXIS)).translate(move);
+    mesh.color = Colors::green;
+    mesh.addQuad(glm::vec2(1.0));
+    m.pop();
+
+    m.push().translate(move);
+    mesh.color = Colors::blue;
+    mesh.addQuad(glm::vec2(1.0));
+    m.pop();
+
+    m.push().rotate(glm::angleAxis(-QUARTER_TAU, Y_AXIS)).translate(move);
+    mesh.color = Colors::cyan;
+    mesh.addQuad(glm::vec2(1.0));
+    m.pop();
+
+    m.push().rotate(glm::angleAxis(QUARTER_TAU, X_AXIS)).translate(move);
+    mesh.color = Colors::yellow;
+    mesh.addQuad(glm::vec2(1.0));
+    m.pop();
+
+    m.push().rotate(glm::angleAxis(-HALF_TAU, X_AXIS)).translate(move);
+    mesh.color = Colors::magenta;
+    mesh.addQuad(glm::vec2(1.0));
+    m.pop();
+
+    geometry = mesh.getGeometry();
+  }
+  return geometry;
+}
+
+
 void GlUtils::drawColorCube() {
   // These hold the vertices, indices and the binding between the
   // Shader variable names and the values loaded into video memory
+  /*
   static GeometryPtr cubeGeometry(
       new Geometry(getCubeVertices(), getCubeIndices(),
       CUBE_FACE_COUNT * TRIANGLES_PER_FACE, 0));
   static GeometryPtr cubeWireGeometry(
       new Geometry(getCubeVertices(), getCubeWireIndices(),
       CUBE_EDGE_COUNT * VERTICES_PER_EDGE, 0));
+      */
 
-  gl::Program & renderProgram = *GlUtils::getProgram(
-      Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_SIMPLE_FS);
-  renderProgram.use();
-  renderProgram.setUniform("Time", (float)Platform::elapsedMillis() / 1000.0f);
-  // Load the projection and modelview matrices into the program
-  Stacks::projection().apply(renderProgram);
-  Stacks::modelview().apply(renderProgram);
-
-  // Draw the cube faces, two calls for each face in order to set
-  // the color and then draw the geometry
-  cubeGeometry->bindVertexArray();
-//  for (uintptr_t i = 0; i < CUBE_FACE_COUNT; ++i) {
-//    renderProgram.setUniform4f("Color", glm::vec4(CUBE_FACE_COLORS[i], 1));
-//    glDrawElements(GL_TRIANGLES,
-//    TRIANGLES_PER_FACE * VERTICES_PER_TRIANGLE,
-//    GL_UNSIGNED_INT, (void*) (i * 6 * 4));
-//  }
-//  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-  for (uintptr_t i = 0; i < CUBE_FACE_COUNT; ++i) {
-    renderProgram.setUniform4f("Color", glm::vec4(CUBE_FACE_COLORS[i], 1));
-    glDrawElements(GL_TRIANGLES,
-    TRIANGLES_PER_FACE * VERTICES_PER_TRIANGLE,
-    GL_UNSIGNED_INT, (void*) (i * 6 * 4));
-  }
-  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-  VertexArray::unbind();
-
-  // Now scale the modelview matrix slightly, so we can draw the cube outline
-  // The apply method copies the top value into the shader, so we don't need to
-  // keep the stack pushed while we render
-//  Stacks::modelview().push().scale(1.01f).apply(renderProgram).pop();
-  // Drawing a white wireframe around the cube
-//  renderProgram.setUniform4f("Color", glm::vec4(Colors::white, 1));
-//  cubeWireGeometry->bindVertexArray();
-//  glDrawElements(GL_LINES, CUBE_EDGE_COUNT * VERTICES_PER_EDGE,
-//  GL_UNSIGNED_INT, (void*) 0);
-//  VertexArray::unbind();
-
-  glUseProgram(0);
+  const gl::ProgramPtr & renderProgram = GlUtils::getProgram(
+      Resource::SHADERS_SIMPLECOLORED_VS, Resource::SHADERS_SIMPLE_FS);
+  GlUtils::renderGeometry(getColorCubeGeometry(), renderProgram);
 }
 
 void GlUtils::drawAngleTicks() {
@@ -875,7 +895,6 @@ namespace gl {
 
 
 void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
-
   Mesh m;
   m.color = Colors::gray;
 
@@ -891,7 +910,8 @@ void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
   m.addVertex(glm::vec3());
 
   m.fillColors();
-  GeometryPtr g = m.getGeometry(GL_LINES);
+  static GeometryPtr g = m.getGeometry(GL_LINES);
+  g->updateVertices(m.buildVertices());
 
   ProgramPtr program = getProgram(
       Resource::SHADERS_SIMPLECOLORED_VS,
@@ -1020,14 +1040,17 @@ template<GLenum TYPE> struct ShaderInfo {
   }
 };
 
-ProgramPtr GlUtils::getProgram(Resource vs, Resource fs) {
+const ProgramPtr & GlUtils::getProgram(Resource vs, Resource fs) {
+  LARGE_INTEGER start, stop, freq;
+  QueryPerformanceCounter(&start);
+
   typedef ShaderInfo<GL_VERTEX_SHADER> VShader;
   typedef ShaderInfo<GL_FRAGMENT_SHADER> FShader;
-  typedef map<Resource, VShader> VMap;
-  typedef map<Resource, FShader> FMap;
+  typedef unordered_map<Resource, VShader> VMap;
+  typedef unordered_map<Resource, FShader> FMap;
   static VMap vShaders;
   static FMap fShaders;
-  typedef map<string, ProgramPtr> ProgramMap;
+  typedef unordered_map<string, ProgramPtr> ProgramMap;
   static ProgramMap programs;
   shader_error lastError(0, "none");
   VShader & vsi = vShaders[vs];
@@ -1046,8 +1069,13 @@ ProgramPtr GlUtils::getProgram(Resource vs, Resource fs) {
   if (!programs[key]) {
     throw lastError;
   }
-  GL_CHECK_ERROR;
-  return programs[key];
+  const ProgramPtr & ptr = programs[key];
+  QueryPerformanceCounter(&stop);
+  QueryPerformanceFrequency(&freq);
+  uint64_t diff = stop.QuadPart - start.QuadPart;
+  diff /= freq.QuadPart;
+  //GL_CHECK_ERROR;
+  return ptr;
 }
 
 const Mesh & GlUtils::getMesh(Resource res) {

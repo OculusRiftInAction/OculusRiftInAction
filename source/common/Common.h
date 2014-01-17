@@ -22,6 +22,9 @@
 
 #ifdef WIN32
 #include <Windows.h>
+#if !defined(_DEBUG)
+#undef RIFT_DEBUG
+#endif
 #endif
 
 #define __STDC_FORMAT_MACROS 1
@@ -34,10 +37,14 @@
 #include <list>
 #include <algorithm>
 #include <array>
+#include <map>
+#include <unordered_map>
 #include <stdint.h>
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/noise.hpp>
 #include <GL/glew.h>
 #include <OVR.h>
 #undef new
@@ -79,13 +86,27 @@ public:
     static void say(std::ostream & out, const char * message, ...);
     static std::string format(const char * formatString, ...);
     static std::string getResourceData(Resource resource);
-private:
-
+    static std::string replaceAll(const std::string & in, const std::string & from, const std::string & to);
 };
 
 #ifndef PI
 #define PI 3.14159265f
 #endif
+
+#ifndef HALF_PI
+#define HALF_PI (PI / 2.0f)
+#endif
+
+#ifndef TWO_PI
+#define TWO_PI (PI * 2.0f)
+#endif
+
+// What is Tau?
+// http://tauday.com/
+// http://www.youtube.com/watch?v=jG7vhMMXagQ
+#define TAU TWO_PI
+#define HALF_TAU PI
+#define QUARTER_TAU HALF_PI
 
 #ifndef RADIANS_TO_DEGREES
 #define RADIANS_TO_DEGREES (180.0f / PI)

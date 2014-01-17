@@ -25,5 +25,6 @@ class Files {
 public:
   static std::string read(const std::string & filename);
   static time_t modified(const std::string & filename);
+  static boolean exists(const std::string & filename);
 };
 

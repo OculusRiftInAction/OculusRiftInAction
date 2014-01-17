@@ -1,12 +1,13 @@
-project(OculusRiftExamples)
-cmake_minimum_required(VERSION 2.8)
-include (GenerateExportHeader)
-
 # Required for statically linking the MSVC runtime
 set(CMAKE_USER_MAKE_RULES_OVERRIDE
    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_flag_overrides.cmake)
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_flag_overrides.cmake)
+
+project(OculusRiftExamples)
+cmake_minimum_required(VERSION 2.8)
+include (GenerateExportHeader)
+
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -95,6 +96,10 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND EXAMPLE_LIBS glew)
 
 # GLFW - Cross platform OpenGL window creation and input handling
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
+set(GLFW_INSTALL OFF CACHE BOOL "Generate installation target")
 add_subdirectory(libraries/glfw)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
 list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
@@ -104,14 +109,20 @@ add_subdirectory(libraries/OpenCTM)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
+set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables")
+set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step")
+add_subdirectory(libraries/jsoncpp)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
+list(APPEND EXAMPLE_LIBS jsoncpp)
+
 # Cross platform access to USB / HID hardware
-add_subdirectory(libraries/libusbx)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/libusbx)
-list(APPEND EXAMPLE_LIBS usbx)
+#add_subdirectory(libraries/libusbx)
+#include_directories(${CMAKE_SOURCE_DIR}/libraries/libusbx)
+#list(APPEND EXAMPLE_LIBS usbx)
 
 # OpenCV is a computer vision library with advanced
 # image loading and manipulation functionality
-# find_package( OpenCV )
+find_package( OpenCV )
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
@@ -122,15 +133,17 @@ else()
     # build the library.  For Unix systems we locate 
     # the native package
     if((WIN32 OR APPLE))
+        # zlib
         add_subdirectory(libraries/zlib)
         set(ZLIB_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/libraries/zlib)
         include_directories(${CMAKE_BINARY_DIR}/libraries/zlib)
         include_directories(${CMAKE_SOURCE_DIR}/libraries/zlib)
         list(APPEND EXAMPLE_LIBS zlib)
 
-        SET(PNG_STATIC ON CACHE BOOL "Build PNG static library")
-        SET(PNG_TESTS OFF CACHE BOOL "Build PNG tests")
-        SET(PNG_SHARED OFF CACHE BOOL "Build PNG shared library")
+        # png
+        set(PNG_STATIC ON CACHE BOOL "Build PNG static library")
+        set(PNG_TESTS OFF CACHE BOOL "Build PNG tests")
+        set(PNG_SHARED OFF CACHE BOOL "Build PNG shared library")
         add_subdirectory(libraries/libpng)
         include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
         include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
@@ -147,8 +160,6 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
 # Boost is a general purpose C++ library
-#set(BOOST_ROOT C:/dev/boost_1_55_0)
-#set(BOOST_LIBRARYDIR C:/dev/boost_1_55_0/lib64-msvc-12.0)
 #set(Boost_DEBUG 1)
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
@@ -200,6 +211,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
 # source location at runtime.  
 #
 add_subdirectory(resources)
+include_directories(resources)
 include_directories(${CMAKE_BINARY_DIR}/resources)
 list(APPEND EXAMPLE_LIBS Resources)
 

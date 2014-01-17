@@ -1,0 +1,17 @@
+#pragma once
+
+#ifdef WIN32
+  #ifdef _DEBUG
+    #define RIFT_DEBUG 1
+  #else
+    #undef RIFT_DEBUG
+  #endif
+#else
+#cmakedefine RIFT_DEBUG @RIFT_DEBUG@
+#endif
+
+#cmakedefine HAVE_BOOST @HAVE_BOOST@
+
+enum Resources_EXPORT Resource {
+${RESOURCE_ENUM}  NO_RESOURCE
+};

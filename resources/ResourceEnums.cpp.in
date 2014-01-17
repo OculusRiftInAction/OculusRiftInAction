@@ -1,0 +1,24 @@
+#include <string>
+#include <map>
+#include "Resources.h"
+
+using namespace std;
+
+
+const Resource Resources::VERTEX_SHADERS[] = {
+${VERTEX_SHADER_ENUM}  NO_RESOURCE
+};
+
+const Resource Resources::FRAGMENT_SHADERS[] = {
+${FRAGMENT_SHADER_ENUM}  NO_RESOURCE
+};
+
+const Resource Resources::LIB_SHADERS[] = {
+${COMMON_SHADER_ENUM}  NO_RESOURCE
+};
+
+const Resources::Map::value_type Resources::RESOURCE_MAP_VALUES[] = { 
+${RESOURCE_MAP}  std::make_pair(NO_RESOURCE, "")
+};
+
+const string Resources::RESOURCE_ROOT = "${RESOURCE_ROOT}";

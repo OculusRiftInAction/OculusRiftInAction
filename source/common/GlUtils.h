@@ -34,7 +34,12 @@ public:
   static void draw3dGrid();
   static void draw3dVector(glm::vec3 vec, const glm::vec3 & col);
 
+  static gl::GeometryPtr getColorCubeGeometry();
   static gl::GeometryPtr getCubeGeometry();
+
+  static gl::GeometryPtr getQuadGeometry(
+    float aspect, float size = 2.0f
+  );
 
   static gl::GeometryPtr getQuadGeometry(
       const glm::vec2 & min = glm::vec2(-1),
@@ -44,13 +49,6 @@ public:
   );
 
   static gl::TextureCubeMapPtr getCubemapTextures(Resource resource);
-
-  static void getImageData(
-    std::istream & in,
-    glm::ivec2 & outSize,
-    std::vector<unsigned char> & outData,
-    bool flip = true
-  );
 
   static void getImageData(
     const std::vector<unsigned char> & indata,
@@ -83,6 +81,9 @@ public:
     texture = TexturePtr(new Texture());
     texture->bind();
     texture->image2d(outSize, &imageData[0]);
+    texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    Texture::unbind();
   }
 
 
@@ -102,12 +103,9 @@ public:
 
   static const Mesh & getMesh(Resource resource);
 
-  static gl::ProgramPtr getProgram(
+  static const gl::ProgramPtr & getProgram(
     Resource vertexResource,
     Resource fragmentResource);
-  static gl::ProgramPtr getProgram(
-    const std::string & vs,
-    const std::string & fs);
 
   static Text::FontPtr getFont(Resource resource);
   static Text::FontPtr getDefaultFont();

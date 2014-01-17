@@ -61,17 +61,24 @@ void readPngToTexture(const char * data, size_t size,
     glm::vec2 & textureSize) {
   glm::ivec2 imageSize;
 
-  std::istringstream in(std::string(static_cast<const char*>(data), size));
+  std::vector<unsigned char> pngData;
+  pngData.resize(size);
+  memcpy(&pngData[0], data, size);
 
   std::vector<unsigned char> imageData;
-  GlUtils::getImageData(in, imageSize, imageData, false);
+  GlUtils::getImageData(pngData, imageSize, imageData, false);
 
   textureSize = glm::vec2(imageSize);
   texture = gl::TexturePtr(new gl::Texture2d());
   texture->bind();
   texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+#ifdef HAVE_OPENCV
+  texture->image2d(imageSize, &imageData[0], 0, GL_RGB);
+#else
   texture->image2d(imageSize, &imageData[0], 0, GL_RED);
+#endif
+
   gl::Texture2d::unbind();
 }
 
@@ -329,7 +336,6 @@ void Font::renderString(
   gl::Texture2d::unbind();
   gl::Program::clear();
   mv.pop();
-
   //cursor.x += advance * scale;
 }
 

@@ -62,10 +62,13 @@ void Platform::fail(const char * file, int line, const char * message, ...) {
   std::cerr << error << std::endl;
   // If you got here, something's pretty wrong
 #ifdef WIN32
+  if (NULL == GetConsoleWindow()) {
+    MessageBoxA(NULL, ERROR_BUFFER2, "Message", IDOK | MB_ICONERROR);
+  }
   DebugBreak();
 #endif
-  assert(0);
-  throw error;
+  // assert(0);
+  throw std::runtime_error(error.c_str());
 }
 
 void Platform::say(std::ostream & out, const char * message, ...) {
@@ -75,10 +78,8 @@ void Platform::say(std::ostream & out, const char * message, ...) {
   vsnprintf(SAY_BUFFER, BUFFER_SIZE, message, arg);
   va_end(arg);
 #ifdef WIN32
-  if (NULL == GetConsoleWindow()) {
-    OutputDebugStringA(SAY_BUFFER);
-	OutputDebugStringA("\n");
-  }
+  OutputDebugStringA(SAY_BUFFER);
+  OutputDebugStringA("\n");
 #endif
   out << std::string(SAY_BUFFER) << std::endl;
 }
@@ -110,3 +111,16 @@ std::string Platform::format(const char * fmt_str, ...) {
     }
     return std::string(formatted.get());
 }
+
+
+
+std::string Platform::replaceAll(const std::string & in, const std::string & from, const std::string & to) {
+  std::string str(in);
+  size_t start_pos = 0;
+  while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+    str.replace(start_pos, from.length(), to);
+    start_pos += to.length(); // ...
+  }
+  return str;
+}
+

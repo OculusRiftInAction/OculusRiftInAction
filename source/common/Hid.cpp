@@ -19,6 +19,7 @@
 
 #include "Common.h"
 #include "Hid.h"
+/*
 #include <libusb/libusb.h>
 
 // HID Class-Specific Requests values. See section 7.2 of the HID specifications
@@ -62,6 +63,6 @@ void FeatureReport::write(libusb_device_handle * handle) {
     }
   }
 }
-
 } // namespace hid
+*/
 

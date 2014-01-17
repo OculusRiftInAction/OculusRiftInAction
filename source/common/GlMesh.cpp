@@ -95,7 +95,7 @@ void Mesh::fillNormals(bool force) {
 
 void Mesh::addVertex(const glm::vec3 & vertex) {
 	positions.push_back(transform(model.top(), vertex));
-	indices.push_back(indices.size());
+	indices.push_back((GLuint)indices.size());
 }
 
 void Mesh::addMesh(const Mesh & mesh, bool forceColor) {
@@ -178,22 +178,9 @@ void Mesh::validate() const {
   }
 }
 
-GeometryPtr Mesh::getGeometry(GLenum elementType) const {
-  validate();
-  int flags = 0;
-  size_t attributeCount = 1;
-  if (!normals.empty()) {
-    flags |= Geometry::Flag::HAS_NORMAL;
-    attributeCount++;
-  }
-  if (!colors.empty()) {
-    flags |= Geometry::Flag::HAS_COLOR;
-    attributeCount++;
-  }
-  if (!texCoords.empty()) {
-    flags |= Geometry::Flag::HAS_TEXTURE;
-    attributeCount++;
-  }
+std::vector<glm::vec4> Mesh::buildVertices() const {
+  int flags = getFlags();
+  size_t attributeCount = getAttributeCount();
   size_t vertexCount = positions.size();
   vector<vec4> vertices;
   vertices.reserve(vertexCount * attributeCount);
@@ -209,6 +196,14 @@ GeometryPtr Mesh::getGeometry(GLenum elementType) const {
       vertices.push_back(vec4(texCoords[i], 1, 1));
     }
   }
+  return vertices;
+}
+
+GeometryPtr Mesh::getGeometry(GLenum elementType) const {
+  validate();
+  int flags = getFlags();
+  size_t attributeCount = getAttributeCount();
+  std::vector<glm::vec4> vertices = buildVertices();
   // TODO add triangle stripping algorithm?
   int elements;
   int verticesPerElement;

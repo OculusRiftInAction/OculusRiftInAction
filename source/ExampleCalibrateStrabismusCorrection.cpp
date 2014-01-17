@@ -5,8 +5,9 @@ using namespace glm;
 using namespace gl;
 enum Step {
   INTRO,
-  HORIZONTAL,
-  VERTICAL,
+  YAW,
+  PITCH,
+  ROLL,
   DONE,
 };
 
@@ -14,7 +15,7 @@ const glm::vec3 CAMERA_START = glm::vec3(0, 1, 2);
 
 class CalibrateStrabismusCorrection : public RiftApp {
 protected:
-  Step step = INTRO;
+  Step step;
   glm::mat4 player;
   glm::quat ref;
   glm::quat offset;
@@ -25,7 +26,7 @@ protected:
 
 public:
 
-  CalibrateStrabismusCorrection() {
+  CalibrateStrabismusCorrection() : step(INTRO) {
     sensorFusion.SetGravityEnabled(true);
     sensorFusion.SetPredictionEnabled(true);
   }
@@ -47,8 +48,14 @@ public:
     {
       Mesh mesh;
       mesh.color = Colors::white;
-      mesh.addVertex(glm::vec3());
-      mesh.addVertex(-GlUtils::Z_AXIS * 2.0f);
+      mesh.addVertex(GlUtils::X_AXIS * 0.2f);
+      mesh.addVertex(GlUtils::X_AXIS * 2.0f);
+      mesh.addVertex(-GlUtils::X_AXIS * 0.2f);
+      mesh.addVertex(-GlUtils::X_AXIS * 2.0f);
+      mesh.addVertex(GlUtils::Y_AXIS * 0.2f);
+      mesh.addVertex(GlUtils::Y_AXIS * 2.0f);
+      mesh.addVertex(-GlUtils::Y_AXIS * 0.2f);
+      mesh.addVertex(-GlUtils::Y_AXIS * 2.0f);
       mesh.fillColors();
       geometry = mesh.getGeometry(GL_LINES);
     }
@@ -56,27 +63,31 @@ public:
 
 
   void onKey(int key, int scancode, int action, int mods) {
-    if (GLFW_PRESS != action) {
-      return;
-    }
-
     gl::MatrixStack & mv = gl::Stacks::modelview();
-    switch (key) {
+
+    if (GLFW_PRESS == action) switch (key) {
     case GLFW_KEY_SPACE:
       switch (step) {
       case INTRO:
-        step = VERTICAL;
+        step = PITCH;
         ref = Rift::getQuaternion(sensorFusion);
         break;
 
-      case VERTICAL:
-        step = HORIZONTAL;
+      case PITCH:
+        step = YAW;
         ref = Rift::getQuaternion(sensorFusion);
         break;
 
-      case HORIZONTAL:
+      case YAW:
         step = DONE;
+//        step = ROLL;
+//        ref = Rift::getQuaternion(sensorFusion);
+//        break;
+//
+//      case ROLL:
+//        step = DONE;
 
+        Rift::setStrabismusCorrection(offset);
         mv.identity();
         sensorFusion.Reset();
         player = glm::inverse(glm::lookAt(CAMERA_START, glm::vec3(0, 0.5f, 0), GlUtils::Y_AXIS));
@@ -98,20 +109,11 @@ public:
       sensorFusion.Reset();
       player = glm::inverse(glm::lookAt(CAMERA_START, glm::vec3(0, 0.5f, 0), GlUtils::Y_AXIS));
       return;
-
-    case GLFW_KEY_A:
-      break;
-
-    case GLFW_KEY_S:
-      break;
-
-    case GLFW_KEY_D:
-      break;
-
-    case GLFW_KEY_W:
-      return;
     }
 
+    if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+      return;
+    }
     RiftApp::onKey(key, scancode, action, mods);
   }
 
@@ -123,18 +125,23 @@ public:
     glm::vec3 rawEuler = glm::eulerAngles(slerp(glm::quat(), distance, 0.5f));
     static glm::vec3 correctEuler;
     switch (step) {
-    case HORIZONTAL:
-      correctEuler.y = rawEuler.y;
-      offset = glm::quat(correctEuler * DEGREES_TO_RADIANS);
+    case PITCH:
+      correctEuler.x = rawEuler.x;
+      offset = glm::quat(correctEuler);
       break;
 
-    case VERTICAL:
-      correctEuler.x = rawEuler.x;
-      offset = glm::quat(correctEuler * DEGREES_TO_RADIANS);
+    case YAW:
+      correctEuler.y = rawEuler.y;
+      offset = glm::quat(correctEuler);
+      break;
+
+    case ROLL:
+      correctEuler.z = rawEuler.z;
+//      offset = glm::quat(correctEuler);
       break;
 
     case DONE:
-//      CameraControl::instance().applyInteraction(player);
+      CameraControl::instance().applyInteraction(player);
       break;
     }
   }
@@ -147,23 +154,21 @@ public:
     return glm::mat4_cast(strabismusCorrection);
   }
 
-
-
   virtual void renderCalibration(const PerEyeArgs & eyeArgs) {
     gl::MatrixStack & mv = gl::Stacks::modelview();
     gl::MatrixStack & pr = gl::Stacks::projection();
     glm::vec2 cursor(-0.4f, this->eyeAspect * 0.3f);
 
-    static std::string text(
-        "This utility will allow you to calibrate your per-eye offset for "
-        "correcting strabismus, potentially reducing double vision and/or "
-        "the need for prismatic glasses in the Rift\n\n"
-        "If you normally wear prismatic glasses you should remove them for "
-        "this test.\n\n"
-        "Press spacebar to continue");
     switch (step) {
     case INTRO:
       {
+        static std::string text(
+            "This utility will allow you to calibrate your per-eye offset for "
+            "correcting strabismus, potentially reducing double vision and/or "
+            "the need for prismatic glasses in the Rift\n\n"
+            "If you normally wear prismatic glasses you should remove them for "
+            "this test.\n\n"
+            "Press spacebar to continue");
         mv.identity();
         gl::MatrixStack & pr = gl::Stacks::projection();
         pr.push().top() = eyeArgs.projectionOffset *
@@ -173,28 +178,38 @@ public:
       }
       return;
 
-    case VERTICAL:
+    case PITCH:
       mv.identity();
       pr.push().top() = eyeArgs.projectionOffset *
           glm::ortho(-1.0f, 1.0f, -eyeAspect, eyeAspect);
       font->renderString("Look up and down until the lines are even\n\nPress spacebar to continue", cursor, 10.0f, 0.7f);
       pr.pop();
       mv.top() = glm::lookAt(glm::vec3(0, 5, 0),
-          GlUtils::ORIGIN,
-          eyeArgs.left ? GlUtils::X_AXIS : -GlUtils::X_AXIS);
+          GlUtils::ORIGIN, GlUtils::Z_AXIS);
       break;
 
-    case HORIZONTAL:
+    case YAW:
       mv.identity();
       pr.push().top() = eyeArgs.projectionOffset * glm::ortho(-1.0f, 1.0f, -eyeAspect, eyeAspect);
       font->renderString("Move your head horizontally left and right until the lines are even", cursor, 10.0f, 0.7f);
       pr.pop();
 
-      mv.top() = glm::lookAt(glm::vec3(0, 5, 0),
+      mv.top() = glm::lookAt(glm::vec3(5, 0, 0),
+          GlUtils::ORIGIN, GlUtils::Y_AXIS);
+      break;
+
+    case ROLL:
+      mv.identity();
+      pr.push().top() = eyeArgs.projectionOffset * glm::ortho(-1.0f, 1.0f, -eyeAspect, eyeAspect);
+      font->renderString("Move your head horizontally left and right until the lines are even", cursor, 10.0f, 0.7f);
+      pr.pop();
+
+      mv.top() = glm::lookAt(glm::vec3(0, 0, 5),
           GlUtils::ORIGIN,
-          eyeArgs.left ? -GlUtils::Z_AXIS : GlUtils::Z_AXIS);
+          eyeArgs.left ? -GlUtils::Y_AXIS : GlUtils::Y_AXIS);
       break;
     }
+
     mv.push().preMultiply(getStrabismusCorrection(eyeArgs));
     GlUtils::renderGeometry(
         geometry,
@@ -203,7 +218,6 @@ public:
             Resource::SHADERS_SIMPLE_FS
         ));
     mv.pop();
-
   }
 
   virtual void renderScene(const PerEyeArgs & eyeArgs) {

@@ -1,6 +1,5 @@
 #version 330
 
-uniform bool Mirror = false;
 uniform float LensOffset = 0.0;
 uniform float ViewportAspectRatio = 1.0;
 
@@ -16,8 +15,7 @@ void main() {
   vTexCoord -= 1.0;
   // now correct for the lens offset
   float eyeLensOffset = LensOffset;
-  eyeLensOffset *= (Mirror ? -1 : 1);
-  vTexCoord.x -= eyeLensOffset;
+  vTexCoord.x -= LensOffset;
   vTexCoord.y /= ViewportAspectRatio;
 
   gl_Position = vec4(Position, 1);

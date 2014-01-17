@@ -19,7 +19,17 @@
 
 #pragma once
 
+// Win32 is a special case, since CMake creates a project with both 
+// debug and relase targets
+#ifdef WIN32
+  #ifdef _DEBUG
+    #define RIFT_DEBUG 1
+  #else
+    #undef RIFT_DEBUG
+  #endif
+#else
 #cmakedefine RIFT_DEBUG @RIFT_DEBUG@
+#endif
 
 // OpenCV computer image processing libraries
 #cmakedefine HAVE_OPENCV @HAVE_OPENCV@

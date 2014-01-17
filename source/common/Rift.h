@@ -46,23 +46,27 @@ public:
     hmdInfo.ChromaAbCorrection[3] = 0;
   }
 
-  static glm::quat getStrabismusCorrection(const char * profileName = nullptr) {
-    OVR::Ptr<OVR::ProfileManager> profileManager =
-          *OVR::ProfileManager::Create();
-    OVR::Ptr<OVR::Profile> profile;
-    glm::quat result;
-//    if (nullptr != profileName) {
-//      profile = *profileManager->LoadProfile(profileName);
-//    } else {
-//      profile = *profileManager->LoadProfile(
-//          profileManager->GetDefaultProfileName());
-//    }
-//    if (profile) {
-//      OVR::Quatf strabCorrect = profile->GetStrabismusCorrection();
-//      result = fromOvr(strabCorrect);
-//    }
-    return result;
+  static void getRiftPositionAndSize(const OVR::HMDInfo & hmdInfo,
+    glm::ivec2 & windowPosition,
+    glm::ivec2 & windowSize) {
+
+    windowPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
+    GLFWmonitor * hmdMonitor =
+      GlfwApp::getMonitorAtPosition(windowPosition);
+
+    if (!hmdMonitor) {
+      FAIL("Unable to find Rift display");
+    }
+
+    const GLFWvidmode * videoMode =
+      glfwGetVideoMode(hmdMonitor);
+    windowSize = glm::ivec2(videoMode->width, videoMode->height);
   }
+
+  static GLFWmonitor * getRiftMonitor(const OVR::HMDInfo & hmdInfo);
+
+  static glm::quat getStrabismusCorrection();
+  static void setStrabismusCorrection(const glm::quat & q);
 
   static void getHmdInfo(
     const OVR::Ptr<OVR::DeviceManager> & ovrManager,
@@ -130,6 +134,7 @@ public:
   static const float FRAMEBUFFER_OBJECT_SCALE;
   static const float ZFAR;
   static const float ZNEAR;
+
 };
 
 
@@ -151,6 +156,7 @@ public:
     const bool right;
 
     glm::ivec2 viewportPosition;
+    glm::mat4 strabsimusCorrection;
     glm::mat4 projectionOffset;
     glm::mat4 modelviewOffset;
     float lensOffset;
@@ -174,9 +180,11 @@ public:
   };
 
 protected:
-  glm::ivec2 hmdSize;
+  glm::ivec2 hmdNativeResolution;
   glm::ivec2 hmdDesktopPosition;
+  GLFWmonitor * hmdMonitor;
   glm::ivec2 eyeSize;
+  bool fullscreen;
 
   float eyeAspect;
   float fov;
@@ -185,76 +193,23 @@ protected:
   std::array<PerEyeArgs, 2> eye;
 
 public:
-  RiftRenderApp() :
-    eyeAspect(1),
-    fov(60),
-    postDistortionScale(1),
-    eye({ PerEyeArgs(*this, true), PerEyeArgs(*this, false) }) {
-
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    hmdSize = glm::ivec2(hmdInfo.HResolution, hmdInfo.VResolution);
-    hmdDesktopPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
-    eyeSize = glm::ivec2(hmdInfo.HResolution / 2, hmdInfo.VResolution);
-    eyeAspect = glm::aspect(eyeSize);
-    eye[1].viewportPosition = glm::ivec2(eyeSize.x, 0);
-    float lensDistance =
-      hmdInfo.LensSeparationDistance /
-      hmdInfo.HScreenSize;
-    eye[0].lensOffset = 1.0f - (2.0f * lensDistance);
-    eye[1].lensOffset = -eye[0].lensOffset;
-    distortion = glm::vec4(
-      hmdInfo.DistortionK[0],
-      hmdInfo.DistortionK[1],
-      hmdInfo.DistortionK[2],
-      hmdInfo.DistortionK[3]);
-
-    OVR::Util::Render::StereoConfig stereoConfig;
-    stereoConfig.SetHMDInfo(hmdInfo);
-    fov = stereoConfig.GetYFOVDegrees();
-    postDistortionScale = 1.0f / stereoConfig.GetDistortionScale();
-
-    {
-      float projectionOffset = stereoConfig.GetProjectionCenterOffset();
-      glm::vec3 v = glm::vec3(projectionOffset, 0, 0);
-      eye[0].projectionOffset = glm::translate(glm::mat4(), v);
-      eye[1].projectionOffset = glm::translate(glm::mat4(), -v);
-    }
-
-    {
-      float modelviewOffset = stereoConfig.GetIPD() / 2.0f;
-      glm::vec3 v = glm::vec3(modelviewOffset, 0, 0);
-
-      glm::quat strabismusCorrection = Rift::getStrabismusCorrection();
-      eye[0].modelviewOffset =
-          glm::translate(glm::mat4(), v)
-        *
-      glm::mat4_cast(strabismusCorrection)
-        ;
-      eye[1].modelviewOffset =
-          glm::translate(glm::mat4(), -v)
-      *
-      glm::mat4_cast(glm::inverse(strabismusCorrection))
-          ;
-      //    profile->SetStrabismusCorrection(OVR::Quatf(
-      //        -0.0195252169,
-      //        0.0247310139,
-      //        -0.0144390352,
-      //        0.998797238
-      //    ));
-    }
-
-
-  }
+  RiftRenderApp(bool fullscreen = false);
 
   virtual void createRenderingTarget() {
-    glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(hmdSize, hmdDesktopPosition);
-    if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-      FAIL("Unable to create undecorated window");
+    if (fullscreen) {
+      this->createFullscreenWindow(hmdNativeResolution, hmdMonitor);
+    } else {
+      const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
+      glfwWindowHint(GLFW_DECORATED, 0);
+      createWindow(glm::ivec2(videoMode->width, videoMode->height), hmdDesktopPosition);
+      if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
+        FAIL("Unable to create undecorated window");
+      }
     }
+    eyeSize = windowSize;
+    eyeSize.x /= 2;
+    eye[1].viewportPosition = glm::ivec2(eyeSize.x, 0);
   }
-
 
   void bindUniforms(gl::ProgramPtr & program) const {
     program->setUniform("Aspect", eyeAspect);
@@ -352,8 +307,10 @@ public:
         OVR::System::Init(); \
         try { \
             return AppClass().run(); \
-        } catch (const std::string & error) { \
-            SAY(error.c_str()); \
+        } catch (std::exception & error) { \
+            SAY_ERR(error.what()); \
+        } catch (std::string & error) { \
+            SAY_ERR(error.c_str()); \
         } \
         OVR::System::Destroy(); \
         return -1; \

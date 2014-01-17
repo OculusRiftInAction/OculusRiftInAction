@@ -6,35 +6,33 @@ using namespace OVR;
 
 class Display2dRiftTargeted : public GlfwApp {
 protected:
-  HMDInfo hmdInfo;
   Texture2dPtr texture;
   GeometryPtr quadGeometries[2];
   ProgramPtr program;
-  int eyeWidth;
+  glm::ivec2 eyeSize;
+  float eyeAspect;
 
 public:
 
   Display2dRiftTargeted() {
     OVR::Ptr<OVR::DeviceManager> ovrManager;
     ovrManager = *OVR::DeviceManager::Create();
+    HMDInfo hmdInfo;
     Rift::getHmdInfo(ovrManager, hmdInfo);
-    eyeWidth = hmdInfo.HResolution / 2;
+    Rift::getRiftPositionAndSize(hmdInfo, windowPosition, windowSize);
+    eyeSize = windowSize;
+    eyeSize.x /= 2;
+    eyeAspect = ((float)hmdInfo.HResolution / 2.0f) / (float)hmdInfo.VResolution;
   }
 
   virtual void createRenderingTarget() {
     glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(
-        hmdInfo.HResolution, hmdInfo.VResolution,
-        hmdInfo.DesktopX, hmdInfo.DesktopY
-        );
+    createWindow(windowSize, windowPosition);
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
     }
   }
 
-  // This simple program only uses a single program, texture and set of
-  // geometry, so we can bind all of them here at the start, rather than
-  // every frame
   void initGl() {
     GlfwApp::initGl();
     glDisable(GL_BLEND);
@@ -58,6 +56,10 @@ public:
     program = GlUtils::getProgram(
       Resource::SHADERS_TEXTURE_VS,
       Resource::SHADERS_TEXTURE_FS);
+
+    program->use();
+    program->setUniform("ViewportAspectRatio", eyeAspect);
+    Program::clear();
   }
 
   virtual void draw() {
@@ -66,11 +68,13 @@ public:
     program->use();
     texture->bind();
 
-    glViewport(0, 0, eyeWidth, hmdInfo.VResolution);
+    glm::ivec2 position(0, 0);
+    gl::viewport(position, eyeSize);
     quadGeometries[0]->bindVertexArray();
     quadGeometries[0]->draw();
 
-    glViewport(eyeWidth, 0, eyeWidth, hmdInfo.VResolution);
+    position.x = eyeSize.x;
+    gl::viewport(position, eyeSize);
     quadGeometries[1]->bindVertexArray();
     quadGeometries[1]->draw();
 

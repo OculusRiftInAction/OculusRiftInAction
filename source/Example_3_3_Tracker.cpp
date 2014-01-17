@@ -40,7 +40,7 @@ public:
 
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     gl::Stacks::projection().top() = glm::perspective(
-      60.0f, glm::aspect(windowSize),
+      TAU / 6.0f, glm::aspect(windowSize),
       Rift::ZNEAR, Rift::ZFAR);
     gl::Stacks::modelview().top() = glm::lookAt(
       glm::vec3(0.0f, 0.0f, 3.5f),
@@ -107,7 +107,8 @@ public:
     gl::MatrixStack & mv = gl::Stacks::modelview();
     gl::MatrixStack & pr = gl::Stacks::projection();
 
-    mv.push().rotate(glm::inverse(currentOrientation));
+    mv.push().rotate(glm::inverse(currentOrientation)).
+      rotate(glm::angleAxis(-QUARTER_TAU, GlUtils::X_AXIS));
     GlUtils::renderRift();
     mv.pop();
 

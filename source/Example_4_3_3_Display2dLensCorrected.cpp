@@ -6,27 +6,34 @@ using namespace OVR;
 
 class Display2dLensCorrected : public GlfwApp {
 protected:
-  HMDInfo hmdInfo;
   Texture2dPtr texture;
   GeometryPtr quadGeometry;
   ProgramPtr program;
-  int eyeWidth;
+  glm::ivec2 eyeSize;
+  float eyeAspect;
+  float lensOffset;
 
 public:
 
   Display2dLensCorrected() {
     OVR::Ptr<OVR::DeviceManager> ovrManager;
     ovrManager = *OVR::DeviceManager::Create();
+    HMDInfo hmdInfo;
     Rift::getHmdInfo(ovrManager, hmdInfo);
-    eyeWidth = hmdInfo.HResolution / 2;
+    Rift::getRiftPositionAndSize(hmdInfo, windowPosition, windowSize);
+    eyeSize = windowSize;
+    eyeSize.x /= 2;
+    eyeAspect = ((float)hmdInfo.HResolution / 2.0f) / (float)hmdInfo.VResolution;
+    float lensDistance =
+      hmdInfo.LensSeparationDistance /
+      hmdInfo.HScreenSize;
+    lensOffset =
+      1.0f - (2.0f * lensDistance);
   }
 
   void createRenderingTarget() {
     glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(
-        hmdInfo.HResolution, hmdInfo.VResolution,
-        hmdInfo.DesktopX, hmdInfo.DesktopY
-    );
+    createWindow(windowSize, windowPosition);
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
     }
@@ -38,16 +45,14 @@ public:
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 
-    float viewportAspectRatio = (float) eyeWidth / (float) hmdInfo.VResolution;
-
     glm::ivec2 imageSize;
-    GlUtils::getImageAsTexture(texture,
-        // Resource::IMAGES_SPACE_NEEDLE_PNG,
-        // Resource::IMAGES_TALLMAN_CARGO_PNG,
-        Resource::IMAGES_SHOULDER_CAT_PNG,
-        imageSize);
+    GlUtils::getImageAsTexture(
+      texture,
+      Resource::IMAGES_SHOULDER_CAT_PNG,
+      imageSize);
 
-    float imageAspectRatio = (float) imageSize.x / (float) imageSize.y;
+    float viewportAspectRatio = eyeAspect;
+    float imageAspectRatio = (float)imageSize.x / (float)imageSize.y;
     glm::vec2 geometryMax(1.0f, 1.0f / imageAspectRatio);
 
     if (imageAspectRatio < viewportAspectRatio) {
@@ -60,18 +65,10 @@ public:
         geometryMin, geometryMax);
 
     program = GlUtils::getProgram(
-		Resource::SHADERS_TEXTURERIFT_VS,
-		Resource::SHADERS_TEXTURE_FS);
+		  Resource::SHADERS_TEXTURERIFT_VS,
+		  Resource::SHADERS_TEXTURE_FS);
     program->use();
     program->setUniform("ViewportAspectRatio", viewportAspectRatio);
-
-    float lensDistance =
-        hmdInfo.LensSeparationDistance /
-        hmdInfo.HScreenSize;
-    float lensOffset =
-        1.0f - (2.0f * lensDistance);
-
-    program->setUniform("LensOffset", lensOffset);
     Program::clear();
   }
 
@@ -83,12 +80,14 @@ public:
 
     quadGeometry->bindVertexArray();
 
-    glViewport(0, 0, eyeWidth, hmdInfo.VResolution);
-    program->setUniform("Mirror", 0);
+    glm::ivec2 position(0, 0);
+    gl::viewport(position, eyeSize);
+    program->setUniform("LensOffset", lensOffset);
     quadGeometry->draw();
 
-    glViewport(eyeWidth, 0, eyeWidth, hmdInfo.VResolution);
-    program->setUniform("Mirror", 1);
+    position.x = eyeSize.x;
+    gl::viewport(position, eyeSize);
+    program->setUniform("LensOffset", -lensOffset);
     quadGeometry->draw();
 
     VertexArray::unbind();

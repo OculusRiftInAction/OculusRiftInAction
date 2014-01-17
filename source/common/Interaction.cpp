@@ -43,6 +43,7 @@ void CameraControl::enableJoystick(bool enable) {
   joystickEnabled = enable;
 }
 
+
 void translateCamera(glm::mat4 & camera, const glm::vec3 & delta) {
   // SAY("Translating %01.3f %01.3f %01.3f", delta.x, delta.y, delta.z);
   // Bring the vector into camera space coordinates
@@ -75,6 +76,40 @@ static glm::quat getHydraOrientation(const sixenseControllerData & c) {
   return glm::quat(euler * 2.0f * 3.14159f / 360.0f);
 }
 #endif
+
+bool CameraControl::onKey(glm::mat4 & camera, int key, int scancode, int action, int mods) {
+  if (GLFW_PRESS != action && GLFW_RELEASE != action) {
+    return false;
+  }
+
+
+  static int x = 0;
+  static int z = 0;
+  bool eatKey = false;
+  switch (key) {
+  case GLFW_KEY_A:
+    keyboardTranslate.x += (GLFW_PRESS == action) ? -1 : 1;
+    eatKey = true;
+    break;
+
+  case GLFW_KEY_D:
+    keyboardTranslate.x += (GLFW_PRESS == action) ? 1 : -1;
+    eatKey = true;
+    break;
+
+  case GLFW_KEY_S:
+    keyboardTranslate.z += (GLFW_PRESS == action) ? 1 : -1;
+    eatKey = true;
+    break;
+
+  case GLFW_KEY_W:
+    keyboardTranslate.z += (GLFW_PRESS == action) ? -1 : 1;
+    eatKey = true;
+    break;
+  }
+  return eatKey;
+}
+
 
 void CameraControl::applyInteraction(glm::mat4 & camera) {
 #ifdef HAVE_SIXENSE
@@ -191,6 +226,10 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
     rotateCamera(camera, rotation);
     recompose(camera);
   }
+
+  //SAY("%d %d", keyboardTranslate.x, keyboardTranslate.z);
+  translateCamera(camera, glm::vec3(keyboardTranslate) / 100.0f);
+
 }
 
 //
@@ -207,7 +246,7 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
 //curOrient = camera.getOrientation() * curOrient;
 //
 //
-//  curOrient = glm::angleAxis(180.0f, GlUtils::Z_AXIS) * curOrient;
+//  curOrient = glm::angleAxis(HALF_TAU, GlUtils::Z_AXIS) * curOrient;
 //  curPos = glm::vec3(
 //      left.pos[0],
 //      left.pos[1],

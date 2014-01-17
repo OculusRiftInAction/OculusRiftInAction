@@ -54,3 +54,13 @@ time_t Files::modified(const string & filename) {
   return 0;
 #endif
 }
+
+
+boolean Files::exists(const string & filename) {
+#ifdef HAVE_BOOST
+  return boost::filesystem::exists(filename);
+#else
+  // FIXME
+  return false;
+#endif
+}

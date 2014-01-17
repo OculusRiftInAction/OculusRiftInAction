@@ -64,6 +64,36 @@ struct Mesh {
     addQuad(size.x, size.y);
   }
 
+  size_t getAttributeCount() const {
+    size_t attributeCount = 1;
+    if (!normals.empty()) {
+      attributeCount++;
+    }
+    if (!colors.empty()) {
+      attributeCount++;
+    }
+    if (!texCoords.empty()) {
+      attributeCount++;
+    }
+    return attributeCount;
+  }
+
+  int getFlags() const {
+    int flags = 0;
+    if (!normals.empty()) {
+      flags |= gl::Geometry::Flag::HAS_NORMAL;
+    }
+    if (!colors.empty()) {
+      flags |= gl::Geometry::Flag::HAS_COLOR;
+    }
+    if (!texCoords.empty()) {
+      flags |= gl::Geometry::Flag::HAS_TEXTURE;
+    }
+    return flags;
+  }
+
+  std::vector<glm::vec4> buildVertices() const;
+
   // Converts an in CPU memory mesh to an in GPU memory
   // geometry object (represented as some gl buffers and
   // a vertex array object

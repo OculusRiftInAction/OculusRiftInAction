@@ -1,4 +1,4 @@
-project(Resources)
+project(ExampleResources)
 include (GenerateExportHeader)
 
 file(GLOB MESHES meshes/*.ctm)
@@ -54,15 +54,10 @@ function(files_to_enum SOURCE_FILES RESULT_HEADER)
         string(REGEX REPLACE "\\.\\./" "" res "${res}" )
         string(REGEX REPLACE "[^A-Z1-9]" "_" res "${res}" )
         set(HEADER_BUFFER "${HEADER_BUFFER}\t${res},\n")
-        set(MAP_BUFFER "${MAP_BUFFER}  fileMap[${res}] = \"${file}\";\n")
-        if (NOT(RIFT_DEBUG)) 
-            if (APPLE)
-                set(MAP_BUFFER "${MAP_BUFFER}  fileMap[${res}] = \"${relative}\";\n")
-            elseif(WIN32) 
-                set(MAP_BUFFER "${MAP_BUFFER}  fileMap[${res}] = \"${res}\";\n")
-            endif()
-        endif()
-        set(RC_BUFFER "${RC_BUFFER}\n${res} TEXTFILE \"${file}\"")
+        set(MAP_BUFFER "${MAP_BUFFER}  std::make_pair(${res}, \"${relative}\"), \n")
+
+        string(REGEX REPLACE " " "_" relative_str "${relative}" )
+        set(RC_BUFFER "${RC_BUFFER}\n${relative_str} TEXTFILE \"${file}\"")
     endforeach()
     set(${RESULT_HEADER} "${HEADER_BUFFER}" PARENT_SCOPE)
 
@@ -86,19 +81,21 @@ endfunction()
 files_to_enum("${VERTEX_SHADERS}" "VERTEX_SHADER_ENUM")
 files_to_enum("${FRAGMENT_SHADERS}" "FRAGMENT_SHADER_ENUM" )
 files_to_enum("${COMMON_SHADERS}" "COMMON_SHADER_ENUM")
-files_to_enum("${ALL_SHADERS}" "SHADER_ENUM" "SHADER_MAP" "SHADER_RC")
 files_to_enum("${ALL_RESOURCES}" "RESOURCE_ENUM" "RESOURCE_MAP" "RESOURCE_RC")
+set(RESOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
-configure_file( Resources.h.in Resources.h )
-configure_file( Resources.cpp.in Resources.cpp )
+configure_file( ResourceEnums.h.in ResourceEnums.h )
+configure_file( ResourceEnums.cpp.in ResourceEnums.cpp )
 
 set(SOURCE_FILES 
-    ResourcesImpl.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/Resources.cpp 
-    ${CMAKE_CURRENT_BINARY_DIR}/Resources.h
+    Resources.cpp
+    Resources.h
+    ${CMAKE_CURRENT_BINARY_DIR}/ResourceEnums.cpp 
+    ${CMAKE_CURRENT_BINARY_DIR}/ResourceEnums.h
 )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 if (HAVE_BOOST)
     list(APPEND RESOURCE_LIBRARIES ${Boost_LIBRARIES})

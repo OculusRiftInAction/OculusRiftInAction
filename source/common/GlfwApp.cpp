@@ -23,6 +23,12 @@
 #include <opencv2/opencv.hpp>
 #endif
 
+#ifdef __APPLE__
+#include <CoreGraphics/CGDirectDisplay.h>
+#include <CoreGraphics/CGDisplayConfiguration.h>
+#endif
+
+
 void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action,
     int mods) {
   GlfwApp * instance = (GlfwApp *) glfwGetWindowUserPointer(window);
@@ -163,18 +169,20 @@ void GlfwApp::preCreate() {
   glfwWindowHint(GLFW_DEPTH_BITS, 16);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-//  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-//  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#endif
 #ifdef RIFT_DEBUG
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 #endif
 }
 
-void GlfwApp::createWindow(const glm::ivec2 & size,
-    const glm::ivec2 & position) {
+void GlfwApp::createWindow(const glm::ivec2 & size, const glm::ivec2 & position) {
   windowSize = size;
+  windowPosition = position;
   preCreate();
-  window = glfwCreateWindow(size.x, size.y, "glfw", NULL, NULL);
+  window = glfwCreateWindow(size.x, size.y, "glfw", nullptr, nullptr);
   if (!window) {
     FAIL("Unable to create rendering window");
   }
@@ -184,27 +192,11 @@ void GlfwApp::createWindow(const glm::ivec2 & size,
   onCreate();
 }
 
-void GlfwApp::fullscreen(const glm::ivec2 & size, const char * display) {
+void GlfwApp::createFullscreenWindow(const glm::ivec2 & size, GLFWmonitor * monitor) {
   windowSize = size;
-  int count;
-  GLFWmonitor* target = nullptr;
-  GLFWmonitor** monitors = glfwGetMonitors(&count);
-  for (int i = 0; i < count; ++i) {
-    GLFWmonitor * monitor = monitors[i];
-    int x, y;
-    glfwGetMonitorPhysicalSize(monitor, &x, &y);
-    const GLFWvidmode * mode = glfwGetVideoMode(monitor);
-    const char * monitorName = glfwGetMonitorName(monitor);
-    if (0 == strcmp(display, monitorName)) {
-      target = monitor;
-      break;
-    }
-  }
-  if (nullptr == target) {
-    FAIL("Unable to find Rift target monitor for fullscreen output");
-  }
   preCreate();
-  window = glfwCreateWindow(size.x, size.y, "glfw", target, NULL);
+  const GLFWvidmode * currentMode = glfwGetVideoMode(monitor);
+  window = glfwCreateWindow(windowSize.x, windowSize.y, "glfw", monitor, nullptr);
   assert(window != 0);
   onCreate();
 }
@@ -251,7 +243,7 @@ int GlfwApp::run() {
   createRenderingTarget();
 
   if (!window) {
-    return -1;
+    FAIL("Unable to create OpenGL window");
   }
 
   initGl();
@@ -303,3 +295,84 @@ void GlfwApp::draw() {
 void GlfwApp::update() {
 }
 
+GLFWmonitor * GlfwApp::getMonitorAtPosition(glm::ivec2 & position) {
+  int count;
+  GLFWmonitor ** monitors = glfwGetMonitors(&count);
+  for (int i = 0; i < count; ++i) {
+    glm::ivec2 candidatePosition;
+    glfwGetMonitorPos(monitors[i], &candidatePosition.x, &candidatePosition.y);
+    if (candidatePosition == position) {
+      return monitors[i];
+    }
+  }
+  return nullptr;
+}
+
+/*
+#define MK(X, Y, Z) \
+X Y; memset(&Y, 0, sizeof(X)); Y.Z = sizeof(X);
+bool GlfwApp::getCurrentResolution(const std::string & displayName, long displayId, glm::ivec2 & size, glm::ivec2 & position) {
+  int count;
+  // Try a cross-platform mechanism for fetching the information
+  GLFWmonitor ** monitors = glfwGetMonitors(&count);
+  for (int i = 0; i < count; ++i) {
+    std::string monitorName = glfwGetMonitorName(monitors[i]);
+//    std::wstring deviceName = glfwGetWin32DeviceName(monitors[i]);
+    if (monitorName == displayName) {
+      glfwGetMonitorPos(monitors[i], &position.x, &position.y);
+      const GLFWvidmode * mode = glfwGetVideoMode(monitors[i]);
+      size.x = mode->width;
+      size.y = mode->height;
+      return true;
+    }
+  }
+
+#ifdef WIN32
+  MK(DISPLAY_DEVICEA, dd, cb);
+  DWORD deviceNum = 0;
+  while (EnumDisplayDevicesA(NULL, deviceNum, &dd, 0)){
+    MK(DEVMODEA, deviceMode, dmSize);
+    EnumDisplaySettingsExA(dd.DeviceName, ENUM_CURRENT_SETTINGS, &deviceMode, 0);
+
+    if (displayName == std::string(dd.DeviceName)) {
+      size.x = deviceMode.dmPelsWidth;
+      size.y = deviceMode.dmPelsHeight;
+      position.x = deviceMode.dmPosition.x;
+      position.y = deviceMode.dmPosition.y;
+      return true;
+    }
+
+    MK(DISPLAY_DEVICEA, dd2, cb);
+    DWORD monitorNum = 0;
+    while (EnumDisplayDevicesA(dd.DeviceName, monitorNum, &dd2, 0)) {
+      if (displayName == std::string(dd2.DeviceName)) {
+        size.x = deviceMode.dmPelsWidth;
+        size.y = deviceMode.dmPelsHeight;
+        position.x = deviceMode.dmPosition.x;
+        position.y = deviceMode.dmPosition.y;
+        return true;
+      }
+      monitorNum++;
+    }
+    deviceNum++;
+  }
+#elif __APPLE__
+    uint32_t monitorCount;
+    CGGetOnlineDisplayList(0, NULL, &monitorCount);
+    std::vector<CGDirectDisplayID> displays(monitorCount);
+    CGGetOnlineDisplayList(monitorCount, &displays[0], &monitorCount);
+    for (int i = 0;  i < monitorCount;  i++) {
+        if (displayId == displays[i]) {
+            CGRect rect = CGDisplayBounds (displays[i]);
+            size.x = rect.size.width;
+            size.y = rect.size.height;
+            position.x = rect.origin.x;
+            position.y = rect.origin.y;
+            return true;
+        }
+    }
+#else
+#endif
+  return false;
+}
+*/
