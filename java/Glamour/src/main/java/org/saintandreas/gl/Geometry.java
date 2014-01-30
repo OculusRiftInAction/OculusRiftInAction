@@ -72,8 +72,8 @@ public class Geometry {
     }
   }
 
-  protected final VertexBuffer vbo;
-  protected final VertexArray vao;
+  public final VertexBuffer vbo;
+  public final VertexArray vao;
   protected final int drawType;
   protected final int elements;
 
@@ -94,5 +94,10 @@ public class Geometry {
   
   public VertexBuffer getVertxBuffer() {
     return vbo;
+  }
+  
+  public void destroy() {
+    vao.destroy();
+    vbo.destroy();
   }
 }

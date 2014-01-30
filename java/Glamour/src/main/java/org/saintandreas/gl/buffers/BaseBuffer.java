@@ -9,7 +9,7 @@ import java.nio.ShortBuffer;
 
 public class BaseBuffer {
 
-  int buffer;
+  int buffer = -1;
   final int target;
 
   public BaseBuffer(int buffer, int target) {
@@ -64,5 +64,10 @@ public class BaseBuffer {
 
   public void setData(ShortBuffer data, int usage) {
     glBufferData(target, data, usage);
+  }
+  
+  public void destroy() {
+    glDeleteBuffers(buffer);
+    buffer = -1;
   }
 }

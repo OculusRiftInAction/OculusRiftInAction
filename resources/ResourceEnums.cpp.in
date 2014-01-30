@@ -17,7 +17,7 @@ const Resource Resources::LIB_SHADERS[] = {
 ${COMMON_SHADER_ENUM}  NO_RESOURCE
 };
 
-const Resources::Map::value_type Resources::RESOURCE_MAP_VALUES[] = { 
+const Resources::Pair Resources::RESOURCE_MAP_VALUES[] = { 
 ${RESOURCE_MAP}  std::make_pair(NO_RESOURCE, "")
 };
 

@@ -1,10 +1,10 @@
-#include <OVR.h>
 #include "Common.h"
 
 class SensorFusionExample : public GlfwApp {
   OVR::Ptr<OVR::DeviceManager> ovrManager;
   OVR::Ptr<OVR::SensorDevice> ovrSensor;
   OVR::SensorFusion sensorFusion;
+
   glm::quat currentOrientation;
   bool renderSensors;
 

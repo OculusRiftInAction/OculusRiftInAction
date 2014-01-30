@@ -30,6 +30,7 @@ protected:
   glm::ivec2    windowPosition;
   float         windowAspect;
   float         windowAspectInverse;
+  float         fps;
 
 public:
   GlfwApp();
@@ -49,8 +50,9 @@ public:
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw();
   virtual void update();
+  virtual void renderStringAt(const std::string & str, float x, float y);
 
-  static GLFWmonitor * getMonitorAtPosition(glm::ivec2 & position);
+  static GLFWmonitor * getMonitorAtPosition(const glm::ivec2 & position);
 
 private:
   void onCreate();

@@ -29,7 +29,7 @@ void Mesh::loadCtm(const std::string & data) {
   positions.resize(vertexCount);
   const float * ctmData = importer.GetFloatArray(CTM_VERTICES);
   for (int i = 0; i < vertexCount; ++i) {
-    positions[i] = make_vec3(ctmData + (i * 3));
+    positions[i] = glm::vec4(make_vec3(ctmData + (i * 3)), 1);
   }
 
   bool hasNormals = importer.GetInteger(CTM_HAS_NORMALS) ? true : false;
@@ -37,7 +37,7 @@ void Mesh::loadCtm(const std::string & data) {
     normals.resize(vertexCount);
     ctmData = importer.GetFloatArray(CTM_NORMALS);
     for (int i = 0; i < vertexCount; ++i) {
-      normals[i] = make_vec3(ctmData + (i * 3));
+      normals[i] = glm::vec4(make_vec3(ctmData + (i * 3)), 1);
     }
   }
 
@@ -65,7 +65,7 @@ void add_all_transformed(const mat4 & xfm, T & dest, const T & src) {
   int destSize = dest.size();
   dest.reserve(dest.size() + src.size());
   for (int i = 0; i < src.size(); ++i) {
-    dest.push_back(transform(xfm, src[i]));
+    dest.push_back(xfm * src[i]);
   }
 }
 
@@ -93,8 +93,13 @@ void Mesh::fillNormals(bool force) {
   }
 }
 
+void Mesh::addVertex(const glm::vec4 & vertex) {
+  positions.push_back(model.top() * vertex);
+  indices.push_back((GLuint)indices.size());
+}
+
 void Mesh::addVertex(const glm::vec3 & vertex) {
-	positions.push_back(transform(model.top(), vertex));
+  positions.push_back(glm::vec4(transform(model.top(), vertex), 1));
 	indices.push_back((GLuint)indices.size());
 }
 
@@ -135,12 +140,12 @@ void Mesh::addQuad(float width, float height) {
   float x = width / 2.0f;
   float y = height / 2.0f;
 
-  VVec3 quad;
+  VVec4 quad;
   // C++11      { vec3(-x, -y, 0), vec3(x, -y, 0), vec3(x, y, 0), vec3(-x, y, 0),  });
-  quad.push_back(vec3(-x, -y, 0));
-  quad.push_back(vec3(x, -y, 0));
-  quad.push_back(vec3(x, y, 0));
-  quad.push_back(vec3(-x, y, 0));
+  quad.push_back(vec4(-x, -y, 0, 1));
+  quad.push_back(vec4(x, -y, 0, 1));
+  quad.push_back(vec4(x, y, 0, 1));
+  quad.push_back(vec4(-x, y, 0, 1));
   // Positions are transformed
   add_all_transformed(model.top(), positions, quad);
   if (normals.size()) {
@@ -185,9 +190,9 @@ std::vector<glm::vec4> Mesh::buildVertices() const {
   vector<vec4> vertices;
   vertices.reserve(vertexCount * attributeCount);
   for (int i = 0; i < vertexCount; ++i) {
-    vertices.push_back(vec4(positions[i], 1));
+    vertices.push_back(positions[i]);
     if (flags & Geometry::Flag::HAS_NORMAL) {
-      vertices.push_back(vec4(normals[i], 1));
+      vertices.push_back(normals[i]);
     }
     if (flags & Geometry::Flag::HAS_COLOR) {
       vertices.push_back(vec4(colors[i], 1));
@@ -216,6 +221,10 @@ GeometryPtr Mesh::getGeometry(GLenum elementType) const {
     elements = (unsigned int)indices.size() / 3;
 	  verticesPerElement = 3;
 	  break;
+  case GL_POINTS:
+    elements = (unsigned int)indices.size();
+    verticesPerElement = 1;
+    break;
   default:
 	  throw runtime_error("unsupported geometry type");
   }

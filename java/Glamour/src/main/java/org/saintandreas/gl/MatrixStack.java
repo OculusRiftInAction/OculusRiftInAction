@@ -21,6 +21,11 @@ public class MatrixStack extends Stack<Matrix4f> {
     return this;
   }
 
+  public MatrixStack identity() {
+    peek().setIdentity();
+    return this;
+  }
+
   public MatrixStack transpose() {
     peek().transpose();
     return this;

@@ -133,8 +133,10 @@ public:
     MAIN_DECL { \
         try { \
             return AppClass().run(); \
+        } catch (std::exception & error) { \
+            SAY_ERR(error.what()); \
         } catch (const std::string & error) { \
-            SAY(error.c_str()); \
+            SAY_ERR(error.c_str()); \
         } \
         return -1; \
     }

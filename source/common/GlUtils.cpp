@@ -661,7 +661,7 @@ void GlUtils::renderArtificialHorizon(float alpha) {
     {
       set<int> poleIndices;
       for (int i = 0; i < mesh.positions.size(); ++i) {
-        const glm::vec3 & v = mesh.positions[i];
+        const glm::vec4 & v = mesh.positions[i];
         if (abs(v.x) < EPSILON && abs(v.z) < EPSILON) {
           poleIndices.insert(i);
         }
@@ -1041,9 +1041,6 @@ template<GLenum TYPE> struct ShaderInfo {
 };
 
 const ProgramPtr & GlUtils::getProgram(Resource vs, Resource fs) {
-  LARGE_INTEGER start, stop, freq;
-  QueryPerformanceCounter(&start);
-
   typedef ShaderInfo<GL_VERTEX_SHADER> VShader;
   typedef ShaderInfo<GL_FRAGMENT_SHADER> FShader;
   typedef unordered_map<Resource, VShader> VMap;
@@ -1070,10 +1067,6 @@ const ProgramPtr & GlUtils::getProgram(Resource vs, Resource fs) {
     throw lastError;
   }
   const ProgramPtr & ptr = programs[key];
-  QueryPerformanceCounter(&stop);
-  QueryPerformanceFrequency(&freq);
-  uint64_t diff = stop.QuadPart - start.QuadPart;
-  diff /= freq.QuadPart;
   //GL_CHECK_ERROR;
   return ptr;
 }

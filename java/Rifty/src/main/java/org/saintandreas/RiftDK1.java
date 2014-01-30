@@ -1,13 +1,13 @@
 package org.saintandreas;
 
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
+
 import org.lwjgl.util.vector.ReadableVector2f;
 import org.lwjgl.util.vector.Vector2f;
 
 public class RiftDK1 extends Hmd {
-
-  // private static final float K[] = new float[] { 0.75f, 0.12f, 0.14f, 0.05f
-  // };
-  public static final float K[] = new float[] { 1.0f, 0.22f, 0.24f, 0.00f };
   // hmdInfo.ChromaAbCorrection[0] = 0.99600f;
   // hmdInfo.ChromaAbCorrection[1] = -0.00400f;
   // hmdInfo.ChromaAbCorrection[2] = 1.01400f;
@@ -25,44 +25,66 @@ public class RiftDK1 extends Hmd {
     LensOffset = 1.0f - (2.0f * lensDistance);
   }
 
-  public static final float PostScale;
-  static {
-    final float fit = 1f + LensOffset;
-    PostScale = getDistortionRaw(fit) / fit;
+  private static double getDistortionForCoefficients(double r, double[] K) {
+    double rsq = r * r;
+    return K[0] + rsq * (K[1] + rsq * (K[2] + rsq * K[3]));
   }
 
-  static final float EPSILON = 0.0001f;
-  static boolean closeEnough(float a, float b) {
+  public static final double DistortionK[];
+  static {
+    // The Rift uses input coefficients that shrink the image,
+    // and then uses a scalar to re-expand the image to fill
+    // the screen.  This two step process needlessly complicates 
+    // rendering, so we're going to take the original Rift 
+    // coefficients and replace them with pre-scaled ones
+    // using the same formula to calculate the scalar that
+    // the Oculus SDK
+    final double fit = 1f + LensOffset;
+    double k[] = new double[] { 1.0f, 0.22f, 0.24f, 0.00f };
+    double fitScale = fit / getDistortionForCoefficients(fit, k);
+    DistortionK = new double[] { k[0] * fitScale, k[1] * fitScale,
+        k[2] * fitScale, k[3] * fitScale };
+  }
+
+  static final double EPSILON = 0.0000001;
+
+  static boolean closeEnough(double a, double b) {
     return Math.abs(a - b) < EPSILON;
   }
 
-  // Find r such that getDistortion(r) * r == target
-  static float findDistortedRadius(float sourceRadius) {
-    // Binary search
-    float max = 10f;
-    float min = 0;
-    float test = 0;
+  // The distortion function actualy calculates the 
+  // inverse of what we want.  The correct solution
+  // would be to invert the polynomial that is used
+  // in the distortion function.  I don't know how to 
+  // do that, but I DO know how to execute a binary 
+  // search for the value.  This is much more expensive 
+  // in terms of computation, but we only go through the
+  // process for each point when initially setting up 
+  // the per eye meshes.
+  static double findDistortedRadius(double targetRadius) {
+    // We know the distorted R is always greater than the input.
+    // So distorting the input provides us with an easy max value
+    // for the binary search
+    double max = getRiftDistortion(targetRadius) + 1;
+    double min = 0;
+
     while (true) {
-      float r = ((max - min) / 2f) + min;
-      test = getDistortion(r) * r / PostScale;
-      if (closeEnough(test, sourceRadius)) {
-        return r;
+      double sourceRadius = ((max - min) / 2.0) + min;
+      double distortedRadius = 
+          getRiftDistortion(sourceRadius) * sourceRadius;
+      if (closeEnough(distortedRadius, targetRadius)) {
+        return sourceRadius;
       }
-      if (test < sourceRadius) {
-        min = r;
+      if (distortedRadius < targetRadius) {
+        min = sourceRadius;
       } else {
-        max = r;
+        max = sourceRadius;
       }
     }
   }
 
-  static float getDistortionRaw(float r) {
-    float rsq = r * r;
-    return K[0] + rsq * (K[1] + rsq * (K[2] + rsq * K[3]));
-  }
-
-  static float getDistortion(float r) {
-    return getDistortionRaw(r);
+  static double getRiftDistortion(double r) {
+    return getDistortionForCoefficients(r, DistortionK);
   }
 
   public Vector2f getDistorted(Eye eye, Vector2f screen) {
@@ -75,20 +97,34 @@ public class RiftDK1 extends Hmd {
     Vector2f rift = new Vector2f(screen);
     rift.y *= yscale;
     rift.x += xoffset;
-    float length = rift.length();
+    double length = rift.length();
 
-    float distortion = findDistortedRadius(length);
+    double distortion = findDistortedRadius(length);
     Vector2f distorted = new Vector2f(rift);
     if (distorted.lengthSquared() > 0.0f) {
       distorted.normalise();
     }
-    distorted.scale(distortion);
+    distorted.scale((float)distortion);
     Vector2f restored = new Vector2f(distorted);
-    restored.scale(getDistortion(distorted.length()));
+    restored.scale((float)getRiftDistortion(distorted.length()));
 
     distorted.y /= yscale;
     distorted.x -= xoffset;
     return distorted;
+  }
+
+  public static Rectangle findRiftRect() {
+    GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+    GraphicsDevice[] gs = ge.getScreenDevices();
+    for (int j = 0; j < gs.length; j++) {
+      GraphicsDevice gd = gs[j];
+      Rectangle r = gd.getDefaultConfiguration().getBounds();
+      // FIXME super weak Rift detection.
+      if (r.width == 1280 && r.height == 800) {
+        return r;
+      }
+    }
+    return null;
   }
 
 }

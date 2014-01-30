@@ -3,6 +3,15 @@ OculusRiftExamples
 
 Example code for using the Oculus Rift
 
+# Notes
+
+This example code is designed to use static linking throughout.  This means static linking against the C/C++ runtimes 
+on windows (to avoid issues with missing Visual Studio redistributables) and static linking against all of the 
+included submodules.  Dynamic linking is only used for system libraries (other than the C++ runtime on Windows) and 
+for the resource DLL on windows.  In order to avoid having each executable contain a distinct copy of the (currently 
+30MB) resource files, a single DLL is created to hold them, and the common library functionality has utility methods 
+to load them.
+
 # Instructions for building (on Linux)
 
 	git clone https://github.com/OculusCommunitySDK/OculusRiftExamples.git OculusRiftExamples

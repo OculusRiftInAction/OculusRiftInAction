@@ -13,8 +13,11 @@
 #include <cassert>
 #include <memory.h>
 #include <sstream>
+#include <functional>
+#include <unordered_map>
+#include <string>
 #include <stdexcept>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/stat.h>
 
 #ifdef HAVE_BOOST
@@ -28,7 +31,9 @@ using namespace boost::filesystem;
 #define FILE_LOADING 1
 #endif
 
+
 const std::string & Resources::getResourcePath(Resource resource) {
+  typedef std::unordered_map<Resource, std::string> Map;
   static bool init = false;
   static Map resources;
 
@@ -69,7 +74,7 @@ const std::string & Resources::getResourcePath(Resource resource) {
   return resources[resource];
 }
 
-// Everything except for windows resources ultimately boils down to a file path 
+// Everything except for windows resources ultimately boils down to a file path
 // and file loading
 #if defined(WIN32) && !defined(FILE_LOADING)
 
@@ -112,7 +117,7 @@ time_t Resources::getResourceModified(Resource resource) {
   return 0;
 }
 
-#else 
+#else
 
 std::string slurpStream(std::istream& in) {
   std::stringstream sstr;

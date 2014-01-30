@@ -162,10 +162,6 @@ public final class OpenGL {
     return result;
   }
 
-  public static List<Vector4f> makeTexturedQuad(Vector2f min, Vector2f max) {
-    return makeTexturedQuad(min, max, new Vector2f(0, 0), new Vector2f(1, 1));
-  }
-
   public static VertexBuffer toVertexBuffer(Collection<Vector4f> vertices) {
     FloatBuffer fb = BufferUtils.createFloatBuffer(vertices.size() * 4);
     for (Vector4f v : vertices) {
@@ -192,18 +188,33 @@ public final class OpenGL {
     return result;
   }
 
-  public static List<Vector4f> makeTexturedQuad(Vector2f min, Vector2f max,
+  public static IndexedGeometry makeTexturedQuad(Vector2f min, Vector2f max) {
+    return makeTexturedQuad(min, max, new Vector2f(0, 0), new Vector2f(1, 1));
+  }
+
+  public static IndexedGeometry makeTexturedQuad(Vector2f min, Vector2f max,
       Vector2f tmin, Vector2f tmax) {
-    List<Vector4f> result = new ArrayList<>();
-    result.add(new Vector4f(min.x, min.y, 0, 1));
-    result.add(new Vector4f(tmin.x, tmin.y, 0, 0));
-    result.add(new Vector4f(max.x, min.y, 0, 1));
-    result.add(new Vector4f(tmax.x, tmin.y, 0, 0));
-    result.add(new Vector4f(min.x, max.y, 0, 1));
-    result.add(new Vector4f(tmin.x, tmax.y, 0, 0));
-    result.add(new Vector4f(max.x, max.y, 0, 1));
-    result.add(new Vector4f(tmax.x, tmax.y, 0, 0));
-    return result;
+    VertexBuffer vertices;
+    {
+      List<Vector4f> result = new ArrayList<>();
+      result.add(new Vector4f(min.x, min.y, 0, 1));
+      result.add(new Vector4f(tmin.x, tmin.y, 0, 0));
+      result.add(new Vector4f(max.x, min.y, 0, 1));
+      result.add(new Vector4f(tmax.x, tmin.y, 0, 0));
+      result.add(new Vector4f(min.x, max.y, 0, 1));
+      result.add(new Vector4f(tmin.x, tmax.y, 0, 0));
+      result.add(new Vector4f(max.x, max.y, 0, 1));
+      result.add(new Vector4f(tmax.x, tmax.y, 0, 0));
+      vertices = toVertexBuffer(makeColorCubeVertices());
+    }
+    IndexBuffer indices = toIndexBuffer(Lists.newArrayList(
+        Short.valueOf((short) 0), Short.valueOf((short) 1),
+        Short.valueOf((short) 2), Short.valueOf((short) 3)));
+    IndexedGeometry.Builder builder = new IndexedGeometry.Builder(indices,
+        vertices, 4);
+    builder.withDrawType(GL_TRIANGLE_STRIP).withAttribute(Attribute.POSITION)
+        .withAttribute(Attribute.TEX);
+    return builder.build();
   }
 
   public static Matrix4f orthographic(float left, float right, float bottom,

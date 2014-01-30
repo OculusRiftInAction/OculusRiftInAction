@@ -1,7 +1,4 @@
-#include <OVR.h>
 #include "Common.h"
-
-using namespace gl;
 
 class SensorFusionPredictionExample : public GlfwApp {
   OVR::Ptr<OVR::DeviceManager> ovrManager;
@@ -32,9 +29,7 @@ public:
   }
 
   void createRenderingTarget() {
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    createWindow(glm::ivec2(800, 600), glm::ivec2(100, 100));
+    createWindow(glm::ivec2(1280, 800), glm::ivec2(100, 100));
   }
 
   void initGl() {
@@ -68,30 +63,29 @@ public:
       sensorFusion.SetPrediction(sensorFusion.GetPredictionDelta() / 1.5f, true);
       return;
     }
-
     GlfwApp::onKey(key, scancode, action, mods);
   }
 
   void update() {
-    /*
-     * The SensorFusion object is continuously being updated in the
-     * background, so we want to ensure that we only ever fetch information
-     * from it once per frame (meaning one fetch for both eyes).
-     *
-     * If we were to fetch it repeatedly over the course of the render, the
-     * value might change, which would lead to undesirable artifacts in
-     * rendering
-     */
     currentOrientation = Rift::fromOvr(sensorFusion.GetOrientation());
     predictedOrientation = Rift::fromOvr(sensorFusion.GetPredictedOrientation());
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    std::string message = Platform::format(
+      "Prediction Delta: %0.2f ms\n",
+      sensorFusion.GetPredictionDelta() * 1000.0f);
+    renderStringAt(message, -0.9f, 0.9f);
+
     gl::MatrixStack & mv = gl::Stacks::modelview();
+    gl::MatrixStack & pr = gl::Stacks::projection();
+
     mv.push().rotate(predictedOrientation);
     GlUtils::renderArtificialHorizon();
     mv.pop();
+
     mv.push().rotate(currentOrientation);
     mv.scale(1.25f);
     GlUtils::renderArtificialHorizon(0.3f);

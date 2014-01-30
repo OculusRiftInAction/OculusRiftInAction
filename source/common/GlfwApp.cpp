@@ -218,12 +218,27 @@ GlfwApp::~GlfwApp() {
   glfwTerminate();
 }
 
+void GlfwApp::renderStringAt(const std::string & str, float x, float y) {
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  gl::MatrixStack & pr = gl::Stacks::projection();
+  mv.push().identity();
+  pr.push().top() = glm::ortho(
+    -1.0f, 1.0f,
+    -windowAspectInverse, windowAspectInverse,
+    -100.0f, 100.0f);
+  glm::vec2 cursor(x, windowAspectInverse * y);
+  GlUtils::renderString(str, cursor, 18.0f);
+  pr.pop();
+  mv.pop();
+
+}
+
 void GlfwApp::screenshot() {
 
 #ifdef HAVE_OPENCV
   //use fast 4-byte alignment (default anyway) if possible
   glFlush();
-  cv::Mat img(windowSize.x, windowSize.y, CV_8UC3);
+  cv::Mat img(windowSize.y, windowSize.x, CV_8UC3);
   glPixelStorei(GL_PACK_ALIGNMENT, (img.step & 3) ? 1 : 4);
   glPixelStorei(GL_PACK_ROW_LENGTH, img.step / img.elemSize());
   glReadPixels(0, 0, img.cols, img.rows, GL_BGR, GL_UNSIGNED_BYTE, img.data);
@@ -259,7 +274,7 @@ int GlfwApp::run() {
     ++framecount;
     if ((now - start) >= 2000) {
       float elapsed = (now - start) / 1000.f;
-      float fps = (float) framecount / elapsed;
+      fps = (float) framecount / elapsed;
       SAY("FPS: %0.2f\n", fps);
       start = now;
       framecount = 0;
@@ -295,7 +310,7 @@ void GlfwApp::draw() {
 void GlfwApp::update() {
 }
 
-GLFWmonitor * GlfwApp::getMonitorAtPosition(glm::ivec2 & position) {
+GLFWmonitor * GlfwApp::getMonitorAtPosition(const glm::ivec2 & position) {
   int count;
   GLFWmonitor ** monitors = glfwGetMonitors(&count);
   for (int i = 0; i < count; ++i) {

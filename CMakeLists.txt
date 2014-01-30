@@ -8,7 +8,6 @@ project(OculusRiftExamples)
 cmake_minimum_required(VERSION 2.8)
 include (GenerateExportHeader)
 
-
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # First for the generic no-config case (e.g. with mingw)
@@ -36,6 +35,8 @@ endif()
 
 if(RIFT_DEBUG)
    message("Debug build, resources will be loaded from disk")
+   set(OVR_DEBUG_BUILD 1)
+   add_definitions(-DOVR_DEBUG_BUILD)
 else() 
    message("Release build, resources will be loaded from executable/bundle")
 endif()
@@ -109,20 +110,9 @@ add_subdirectory(libraries/OpenCTM)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
-set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables")
-set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step")
-add_subdirectory(libraries/jsoncpp)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
-list(APPEND EXAMPLE_LIBS jsoncpp)
-
-# Cross platform access to USB / HID hardware
-#add_subdirectory(libraries/libusbx)
-#include_directories(${CMAKE_SOURCE_DIR}/libraries/libusbx)
-#list(APPEND EXAMPLE_LIBS usbx)
-
 # OpenCV is a computer vision library with advanced
 # image loading and manipulation functionality
-find_package( OpenCV )
+# find_package( OpenCV )
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
@@ -159,33 +149,48 @@ endif()
 # the syntax of GLSL
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
+#set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables")
+#set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step")
+#add_subdirectory(libraries/jsoncpp)
+#include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
+#list(APPEND EXAMPLE_LIBS jsoncpp)
+
+
 # Boost is a general purpose C++ library
 #set(Boost_DEBUG 1)
-set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME ON)
-find_package( Boost COMPONENTS filesystem system thread)
-
-if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
-    link_directories(${Boost_LIBRARY_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
-    set(HAVE_BOOST 1)
-endif()
-
-find_package(Sixense)
-if(SIXENSE_FOUND)
-    include_directories(${SIXENSE_INCLUDE_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${SIXENSE_LIBRARIES})
-    set(HAVE_SIXENSE 1)
-endif()
-
-find_package(SpaceNavigator)
-if(SPNAV_FOUND)
-    include_directories(${SPNAV_INCLUDE_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${SPNAV_LIBRARIES})
-    set(HAVE_SPNAV 1)
-endif()
+# set(Boost_USE_STATIC_LIBS ON)
+# set(Boost_USE_MULTITHREADED ON)
+# set(Boost_USE_STATIC_RUNTIME ON)
+# find_package( Boost COMPONENTS filesystem system thread)
+# if(Boost_FOUND)
+#     include_directories(${Boost_INCLUDE_DIRS})
+#     link_directories(${Boost_LIBRARY_DIR}) 
+#     list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
+#     set(HAVE_BOOST 1)
+# endif()
+# 
+# find_package(Sixense)
+# if(SIXENSE_FOUND)
+#     include_directories(${SIXENSE_INCLUDE_DIR}) 
+#     list(APPEND EXAMPLE_LIBS ${SIXENSE_LIBRARIES})
+#     set(HAVE_SIXENSE 1)
+# endif()
+# 
+# find_package(SpaceNavigator)
+# if(SPNAV_FOUND)
+#     include_directories(${SPNAV_INCLUDE_DIR}) 
+#     list(APPEND EXAMPLE_LIBS ${SPNAV_LIBRARIES})
+#     set(HAVE_SPNAV 1)
+# endif()
+#
+# find_package( Steamworks )
+# 
+# find_package( Depthsense )
+# if (DEPTHSENSE_FOUND) 
+#     include_directories(${DEPTHSENSE_INCLUDE_DIR})
+#     list(APPEND EXAMPLE_LIBS ${DEPTHSENSE_LIBRARY})
+#     set(HAVE_DEPTHSENSE 1)
+# endif()
 
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )

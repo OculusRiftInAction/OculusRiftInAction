@@ -32,11 +32,6 @@ using namespace boost::filesystem;
 
 using namespace std;
 
-string slurpStream(istream& in) {
-  stringstream sstr;
-  sstr << in.rdbuf();
-  return sstr.str();
-}
 
 string Files::read(const string & filename) {
   ifstream ins(filename.c_str(), ios::binary);
@@ -44,7 +39,9 @@ string Files::read(const string & filename) {
     throw runtime_error("Failed to load file " + filename);
   }
   assert(ins);
-  return slurpStream(ins);
+  stringstream sstr;
+  sstr << ins.rdbuf();
+  return sstr.str();
 }
 
 time_t Files::modified(const string & filename) {
@@ -56,7 +53,7 @@ time_t Files::modified(const string & filename) {
 }
 
 
-boolean Files::exists(const string & filename) {
+bool Files::exists(const string & filename) {
 #ifdef HAVE_BOOST
   return boost::filesystem::exists(filename);
 #else

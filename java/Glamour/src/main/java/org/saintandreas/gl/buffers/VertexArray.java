@@ -3,7 +3,7 @@ package org.saintandreas.gl.buffers;
 import static org.lwjgl.opengl.GL30.*;
 
 public class VertexArray {
-  int vao;
+  int vao = -1;
 
   public VertexArray() {
     vao = glGenVertexArrays();
@@ -15,5 +15,10 @@ public class VertexArray {
 
   public static void unbind() {
     glBindVertexArray(0);
+  }
+
+  public void destroy() {
+    glDeleteVertexArrays(vao);
+    vao = -1;
   }
 }

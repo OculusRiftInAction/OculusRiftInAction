@@ -33,6 +33,7 @@ public abstract class Hmd {
         screen = getDistorted(eye, screen);
         vertices.add(new Vector4f(screen.x, screen.y, 0, 1));
         vertices.add(new Vector4f(texture.x, texture.y, 0, 0));
+        vertices.add(new Vector4f(texture.x, texture.y, 0, 1));
       }
     }
     List<Short> indices = new ArrayList<>();
@@ -53,6 +54,7 @@ public abstract class Hmd {
     b.withDrawType(GL_TRIANGLE_STRIP);
     b.withAttribute(Attribute.POSITION);
     b.withAttribute(Attribute.TEX);
+    b.withAttribute(Attribute.COLOR);
     OpenGL.checkError();
     IndexedGeometry result = b.build();
     OpenGL.checkError();

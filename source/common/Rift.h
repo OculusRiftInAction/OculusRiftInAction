@@ -19,122 +19,34 @@
 
 #pragma once
 #include <array>
-#include "OVR_Profile.h"
 
 class Rift {
 public:
-  static void getDk1HmdValues(OVR::HMDInfo & hmdInfo) {
-    hmdInfo.HResolution = 1280;
-    hmdInfo.VResolution = 800;
-    hmdInfo.HScreenSize = 0.14976f;
-    hmdInfo.VScreenSize = 0.09360f;
-    hmdInfo.VScreenCenter = 0.04680f;
-    hmdInfo.EyeToScreenDistance = 0.04100f;
-    hmdInfo.LensSeparationDistance = 0.06350f;
-    hmdInfo.InterpupillaryDistance = 0.06400f;
-    hmdInfo.DistortionK[0] = 1;
-    // hmdInfo.DistortionK[1] = 0.18007f;
-    hmdInfo.DistortionK[1] = 0.22f;
-    // hmdInfo.DistortionK[2] = 0.11502f;
-    hmdInfo.DistortionK[2] = 0.24f;
-    hmdInfo.DistortionK[3] = 0;
-    hmdInfo.DesktopX = 100;
-    hmdInfo.DesktopY = 100;
-    hmdInfo.ChromaAbCorrection[0] = 0.99600f;
-    hmdInfo.ChromaAbCorrection[1] = -0.00400f;
-    hmdInfo.ChromaAbCorrection[2] = 1.01400f;
-    hmdInfo.ChromaAbCorrection[3] = 0;
-  }
-
+  static void getDk1HmdValues(OVR::HMDInfo & hmdInfo);
   static void getRiftPositionAndSize(const OVR::HMDInfo & hmdInfo,
-    glm::ivec2 & windowPosition,
-    glm::ivec2 & windowSize) {
-
-    windowPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
-    GLFWmonitor * hmdMonitor =
-      GlfwApp::getMonitorAtPosition(windowPosition);
-
-    if (!hmdMonitor) {
-      FAIL("Unable to find Rift display");
-    }
-
-    const GLFWvidmode * videoMode =
-      glfwGetVideoMode(hmdMonitor);
-    windowSize = glm::ivec2(videoMode->width, videoMode->height);
-  }
-
-  static GLFWmonitor * getRiftMonitor(const OVR::HMDInfo & hmdInfo);
+      glm::ivec2 & windowPosition, glm::ivec2 & windowSize);
 
   static glm::quat getStrabismusCorrection();
   static void setStrabismusCorrection(const glm::quat & q);
 
   static void getHmdInfo(
     const OVR::Ptr<OVR::DeviceManager> & ovrManager,
-    OVR::HMDInfo & out) {
-    if (!ovrManager) {
-      FAIL("Unable to create Rift device manager");
-    }
-
-    OVR::Ptr<OVR::HMDDevice> ovrHmd = *ovrManager->
-        EnumerateDevices<OVR::HMDDevice>().CreateDevice();
-
-    if (!ovrHmd) {
-//      FAIL("Unable to detect Rift display");
-      getDk1HmdValues(out);
-      return;
-    }
-
-    ovrHmd->GetDeviceInfo(&out);
-
-    // Hack to fix my broken rift, reporting the wrong K
-#ifdef BRADS_BROKEN_RIFT
-    out.DistortionK[0] = 1;
-    out.DistortionK[1] = 0.22f;
-    out.DistortionK[2] = 0.24f;
-    out.DistortionK[3] = 0;
-#endif
-
-    ovrHmd = nullptr;
-  }
+    OVR::HMDInfo & out);
 
   // Fetch a glm style quaternion from an OVR sensor fusion object
-  static inline glm::quat getQuaternion(OVR::SensorFusion & sensorFusion) {
-    return glm::quat(getEulerAngles(sensorFusion));
-  }
+  static glm::quat getQuaternion(OVR::SensorFusion & sensorFusion);
 
   // Fetch a glm vector containing Euler angles from an OVR sensor fusion object
-  static inline glm::vec3 getEulerAngles(OVR::SensorFusion & sensorFusion) {
-    return getEulerAngles(sensorFusion.GetPredictedOrientation());
-  }
+  static glm::vec3 getEulerAngles(OVR::SensorFusion & sensorFusion);
+  static glm::vec3 getEulerAngles(const OVR::Quatf & in);
 
-  static std::string formatOvrVector(const OVR::Vector3f & vector) {
-    static char BUFFER[128];
-    sprintf(BUFFER, "%+03.2f %+03.2f %+03.2f", vector.x, vector.y, vector.z);
-    return std::string(BUFFER);
-  }
-
-  static glm::vec3 fromOvr(const OVR::Vector3f & in) {
-    return glm::vec3(in.x, in.y, in.z);
-  }
-
-  static glm::quat fromOvr(const OVR::Quatf & in) {
-    return glm::quat(getEulerAngles(in));
-  }
-
-  static glm::vec3 getEulerAngles(const OVR::Quatf & in) {
-    glm::vec3 eulerAngles;
-    in.GetEulerAngles<
-        OVR::Axis_X, OVR::Axis_Y, OVR::Axis_Z,
-        OVR::Rotate_CW, OVR::Handed_R
-        >(&eulerAngles.x, &eulerAngles.y, &eulerAngles.z);
-    return eulerAngles;
-  }
+  static glm::vec3 fromOvr(const OVR::Vector3f & in);
+  static glm::quat fromOvr(const OVR::Quatf & in);
 
   static const float MONO_FOV;
   static const float FRAMEBUFFER_OBJECT_SCALE;
   static const float ZFAR;
   static const float ZNEAR;
-
 };
 
 
@@ -187,6 +99,7 @@ protected:
   bool fullscreen;
 
   float eyeAspect;
+  float eyeAspectInverse;
   float fov;
   float postDistortionScale;
   glm::vec4 distortion;
@@ -281,6 +194,8 @@ protected:
   static const Resource DISTORTION_FRAGMENT_SHADER;
 
 public:
+
+  void renderStringAt(const std::string & str, float x, float y);
 
 
   RiftApp();

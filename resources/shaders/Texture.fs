@@ -10,5 +10,4 @@ void main() {
     discard;
   }
   FragColor = texture(sampler, vTexCoord);
-  //FragColor = vec4(vTexCoord, 0, 1);
 }

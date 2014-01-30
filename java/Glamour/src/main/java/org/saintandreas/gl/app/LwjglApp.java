@@ -1,6 +1,10 @@
 package org.saintandreas.gl.app;
 
 
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
+
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -8,9 +12,9 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import org.lwjgl.opengl.GLContext;
 
-public class LwjglApp implements Runnable {
+public abstract class LwjglApp implements Runnable {
   private GLContext glContext = new GLContext();
-  protected int width = 960, height = 600;
+  protected int width, height;
   protected float aspect = 1.0f;
 
   protected void initGl() {
@@ -19,16 +23,25 @@ public class LwjglApp implements Runnable {
   protected void drawFrame() {
   }
 
-  protected void setupDisplay() throws LWJGLException {
-    width = 1280;
-    height = 800;
-    Display.setDisplayMode(new DisplayMode(width, height));
+  protected abstract void setupDisplay();
+
+  protected void setupDisplay(Rectangle r) {
+    setupDisplay(r.x, r.y, r.width, r.height);
   }
   
+  protected void setupDisplay(int left, int top, int width, int height) {
+    try {
+      Display.setDisplayMode(new DisplayMode(width, height));
+    } catch (LWJGLException e) {
+      throw new RuntimeException(e);
+    }
+    Display.setLocation(left, top);
+    onResize(width, height);
+  }
+
   @Override
   public void run() {
     try {
-      System.setProperty("org.lwjgl.opengl.Window.undecorated","true");
       setupDisplay();
       Display.create();
       GLContext.useContext(glContext, false);
@@ -47,6 +60,7 @@ public class LwjglApp implements Runnable {
       Display.update();
       Display.sync(60);
     }
+    onDestroy();
     Display.destroy();
   }
 
@@ -58,4 +72,21 @@ public class LwjglApp implements Runnable {
     this.height = height;
     this.aspect = (float)width / (float)height;
   }
+
+  protected void onDestroy() {
+  }
+
+  public static Rectangle findNonPrimaryRect() {
+    GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+    GraphicsDevice[] gs = ge.getScreenDevices();
+    for (int j = 0; j < gs.length; j++) {
+      GraphicsDevice gd = gs[j];
+      if (gd == ge.getDefaultScreenDevice()) {
+        continue;
+      }
+      return gd.getDefaultConfiguration().getBounds();
+    }
+    return null;
+  }
+
 }

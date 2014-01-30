@@ -20,10 +20,6 @@ public class IndexedGeometry extends Geometry {
     @Override
     protected VertexArray buildVertexArray() {
       VertexArray vao = super.buildVertexArray();
-      vao.bind();
-      ibo.bind();
-      VertexArray.unbind();
-      ibo.unbind();
       return vao;
     }
 
@@ -49,4 +45,10 @@ public class IndexedGeometry extends Geometry {
   public void draw() {
     glDrawElements(drawType, elements, GL_UNSIGNED_SHORT, 0);
   }
+  
+  public void destroy() {
+    super.destroy();
+    ibo.destroy();
+  }
+
 }
