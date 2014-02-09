@@ -19,3 +19,9 @@
 [submodule "libraries/libusbx"]
 	path = libraries/libusbx
 	url = https://github.com/jherico/libusbx.git
+[submodule "libraries/java/math"]
+	path = libraries/java/math
+	url = https://github.com/jherico/java-math.git
+[submodule "libraries/ARToolkit"]
+	path = libraries/ARToolkit
+	url = https://github.com/jherico/ARToolkit.git
