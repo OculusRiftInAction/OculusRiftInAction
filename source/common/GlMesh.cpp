@@ -64,7 +64,7 @@ template<typename T>
 void add_all_transformed(const mat4 & xfm, T & dest, const T & src) {
   int destSize = dest.size();
   dest.reserve(dest.size() + src.size());
-  for (int i = 0; i < src.size(); ++i) {
+  for (size_t i = 0; i < src.size(); ++i) {
     dest.push_back(xfm * src[i]);
   }
 }
@@ -72,7 +72,7 @@ void add_all_transformed(const mat4 & xfm, T & dest, const T & src) {
 template<typename T>
 void add_all_incremented(const size_t increment, T & dest, const T & src) {
   dest.reserve(dest.size() + src.size());
-  for (int i = 0; i < src.size(); ++i) {
+  for (size_t i = 0; i < src.size(); ++i) {
     dest.push_back(src[i] + increment);
   }
 }
@@ -189,7 +189,7 @@ std::vector<glm::vec4> Mesh::buildVertices() const {
   size_t vertexCount = positions.size();
   vector<vec4> vertices;
   vertices.reserve(vertexCount * attributeCount);
-  for (int i = 0; i < vertexCount; ++i) {
+  for (size_t i = 0; i < vertexCount; ++i) {
     vertices.push_back(positions[i]);
     if (flags & Geometry::Flag::HAS_NORMAL) {
       vertices.push_back(normals[i]);

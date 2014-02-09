@@ -29,7 +29,7 @@ public:
   }
 
   void createRenderingTarget() {
-    createWindow(glm::ivec2(1280, 800), glm::ivec2(100, 100));
+    createWindow(glm::uvec2(1280, 800), glm::ivec2(100, 100));
   }
 
   void initGl() {

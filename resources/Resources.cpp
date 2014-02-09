@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#undef HAVE_BOOST
 #ifdef HAVE_BOOST
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -93,10 +94,7 @@ size_t Resources::getResourceSize(Resource resource) {
   const std::string & path = getResourcePath(resource);
   HRSRC res = FindResourceA(module, path.c_str(), "TEXTFILE");
   assert(res);
-  HGLOBAL mem = LoadResource(module, res);
-  assert(mem);
   DWORD size = SizeofResource(module, res);
-  FreeResource(mem);
   return size;
 }
 

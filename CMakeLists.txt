@@ -90,6 +90,11 @@ set(EXAMPLE_LIBS OculusVR )
 # Non-Oculus third party dependencies 
 #
 
+# Augmented reality tracking library
+add_subdirectory(libraries/ARToolkit/lib)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/ARToolkit/lib/include)
+list(APPEND EXAMPLE_LIBS ARToolkit)
+
 # Cross platform access to shader functionality
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
@@ -109,6 +114,13 @@ list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 add_subdirectory(libraries/OpenCTM)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
+
+# Json parsing library
+set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables")
+set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step")
+add_subdirectory(libraries/jsoncpp)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
+list(APPEND EXAMPLE_LIBS jsoncpp)
 
 # OpenCV is a computer vision library with advanced
 # image loading and manipulation functionality
@@ -143,54 +155,64 @@ else()
         include_directories(${PNG_INCLUDE_DIR})
         list(APPEND EXAMPLE_LIBS ${PNG_LIBRARIES})
     endif()
+    set_target_properties(zlib PROPERTIES FOLDER "3rdparty")
+    set_target_properties(png PROPERTIES FOLDER "3rdparty")
 endif()
 
 # Vector / matrix header only math library based on
 # the syntax of GLSL
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
-#set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables")
-#set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step")
-#add_subdirectory(libraries/jsoncpp)
-#include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
-#list(APPEND EXAMPLE_LIBS jsoncpp)
-
-
 # Boost is a general purpose C++ library
 #set(Boost_DEBUG 1)
-# set(Boost_USE_STATIC_LIBS ON)
-# set(Boost_USE_MULTITHREADED ON)
-# set(Boost_USE_STATIC_RUNTIME ON)
-# find_package( Boost COMPONENTS filesystem system thread)
-# if(Boost_FOUND)
-#     include_directories(${Boost_INCLUDE_DIRS})
-#     link_directories(${Boost_LIBRARY_DIR}) 
-#     list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
-#     set(HAVE_BOOST 1)
-# endif()
-# 
-# find_package(Sixense)
-# if(SIXENSE_FOUND)
-#     include_directories(${SIXENSE_INCLUDE_DIR}) 
-#     list(APPEND EXAMPLE_LIBS ${SIXENSE_LIBRARIES})
-#     set(HAVE_SIXENSE 1)
-# endif()
-# 
-# find_package(SpaceNavigator)
-# if(SPNAV_FOUND)
-#     include_directories(${SPNAV_INCLUDE_DIR}) 
-#     list(APPEND EXAMPLE_LIBS ${SPNAV_LIBRARIES})
-#     set(HAVE_SPNAV 1)
-# endif()
-#
-# find_package( Steamworks )
-# 
-# find_package( Depthsense )
-# if (DEPTHSENSE_FOUND) 
-#     include_directories(${DEPTHSENSE_INCLUDE_DIR})
-#     list(APPEND EXAMPLE_LIBS ${DEPTHSENSE_LIBRARY})
-#     set(HAVE_DEPTHSENSE 1)
-# endif()
+set(Boost_USE_STATIC_LIBS ON)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME ON)
+find_package( Boost COMPONENTS filesystem system thread)
+if(Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+    link_directories(${Boost_LIBRARY_DIR}) 
+    list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
+    set(HAVE_BOOST 1)
+endif()
+
+set(SIXENSE_ROOT "c:/dev/SixenseSDK_062612")
+#find_package(Sixense)
+if(SIXENSE_FOUND)
+    include_directories(${SIXENSE_INCLUDE_DIR}) 
+    list(APPEND EXAMPLE_LIBS ${SIXENSE_LIBRARIES})
+    set(HAVE_SIXENSE 1)
+endif()
+
+#find_package(SpaceNavigator)
+if(SPNAV_FOUND)
+    include_directories(${SPNAV_INCLUDE_DIR}) 
+    list(APPEND EXAMPLE_LIBS ${SPNAV_LIBRARIES})
+    set(HAVE_SPNAV 1)
+endif()
+
+set(STEAMWORKS_SDK "c:/dev/steamworks/sdk")
+find_package( Steamworks )
+if(STEAMWORKS_FOUND)
+    include_directories(${STEAMWORKS_INCLUDE_DIR}) 
+    list(APPEND EXAMPLE_LIBS ${STEAMWORKS_LIBRARY})
+    set(HAVE_STEAMWORKS 1)
+endif()
+
+find_package( PerceptualComputing )
+if (PERC_FOUND) 
+    include_directories(${PERC_INCLUDE_DIR})
+    list(APPEND EXAMPLE_LIBS ${PERC_LIBRARY})
+    set(HAVE_PERC 1)
+endif()
+
+find_package( Depthsense )
+if (DEPTHSENSE_FOUND) 
+    include_directories(${DEPTHSENSE_INCLUDE_DIR})
+    list(APPEND EXAMPLE_LIBS ${DEPTHSENSE_LIBRARY})
+    set(HAVE_DEPTHSENSE 1)
+endif()
+
 
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
@@ -218,7 +240,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
 add_subdirectory(resources)
 include_directories(resources)
 include_directories(${CMAKE_BINARY_DIR}/resources)
-list(APPEND EXAMPLE_LIBS Resources)
+list(APPEND EXAMPLE_LIBS ExampleResources)
 
 ###############################################################################
 #
@@ -227,6 +249,20 @@ list(APPEND EXAMPLE_LIBS Resources)
 add_subdirectory(source/common)
 include_directories(source/common)
 include_directories(${CMAKE_BINARY_DIR}/source/common)
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
+
+set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
+set_target_properties(glew PROPERTIES FOLDER "3rdparty")
+set_target_properties(jsoncpp PROPERTIES FOLDER "3rdparty")
+set_target_properties(ARToolkit PROPERTIES FOLDER "3rdparty")
+set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
+set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
+
+set_target_properties(gl PROPERTIES FOLDER "Examples/Shared")
+set_target_properties(ExampleCommon PROPERTIES FOLDER "Examples/Shared")
+set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
 
 ###############################################################################
 #

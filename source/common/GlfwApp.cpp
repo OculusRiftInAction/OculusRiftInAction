@@ -52,7 +52,7 @@ void compileAllShaders(const Resource * shaders,
     GLenum shaderType) {
   int i = 0;
   while (shaders[i] != Resource::NO_RESOURCE) {
-//    SAY("Compiling %s", shaderFile.c_str());
+    SAY("Compiling %s", Resources::getResourcePath(shaders[i]).c_str());
     std::string shaderSource = Platform::getResourceData(shaders[i]);
     gl::Shader s(shaderType, shaderSource);
     ++i;
@@ -178,7 +178,7 @@ void GlfwApp::preCreate() {
 #endif
 }
 
-void GlfwApp::createWindow(const glm::ivec2 & size, const glm::ivec2 & position) {
+void GlfwApp::createWindow(const glm::uvec2 & size, const glm::ivec2 & position) {
   windowSize = size;
   windowPosition = position;
   preCreate();
@@ -192,7 +192,7 @@ void GlfwApp::createWindow(const glm::ivec2 & size, const glm::ivec2 & position)
   onCreate();
 }
 
-void GlfwApp::createFullscreenWindow(const glm::ivec2 & size, GLFWmonitor * monitor) {
+void GlfwApp::createFullscreenWindow(const glm::uvec2 & size, GLFWmonitor * monitor) {
   windowSize = size;
   preCreate();
   const GLFWvidmode * currentMode = glfwGetVideoMode(monitor);
@@ -206,6 +206,7 @@ void GlfwApp::initGl() {
   glCullFace(GL_BACK);
   glDisable(GL_DITHER);
   glEnable(GL_DEPTH_TEST);
+  query = gl::TimeQueryPtr(new gl::TimeQuery());
   GL_CHECK_ERROR;
 }
 

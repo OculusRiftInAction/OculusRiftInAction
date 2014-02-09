@@ -23,7 +23,6 @@ set(SIXENSE_POSSIBLE_PATHS
         /opt/
         )
 
-
 find_path(SIXENSE_INCLUDE_DIR sixense.h
         PATH_SUFFIXES
                 "include"
@@ -32,16 +31,18 @@ find_path(SIXENSE_INCLUDE_DIR sixense.h
         )
 
 find_library(SIXENSE_LIBRARY 
-        NAMES sixense sixense_x64
+        NAMES sixense_s_x64 
         PATH_SUFFIXES
+                "lib/x64/release_static"
                 "lib/linux_x64/release"
         PATHS
                 ${SIXENSE_POSSIBLE_PATHS}
         )
 
 find_library(SIXENSE_UTIL_LIBRARY 
-        NAMES sixense_utils sixense_utils_x64
+        NAMES sixense_utils_s_x64
         PATH_SUFFIXES
+                "lib/x64/release_static"
                 "lib/linux_x64/release"
         PATHS
                 ${SIXENSE_POSSIBLE_PATHS}

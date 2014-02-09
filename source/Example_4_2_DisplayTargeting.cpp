@@ -70,7 +70,7 @@ public:
 class Fullscreen : public DisplayTargeting {
 public:
   virtual void createRenderingTarget() {
-    createFullscreenWindow(glm::ivec2(hmdInfo.HResolution, hmdInfo.VResolution), monitor);
+    createFullscreenWindow(glm::uvec2(hmdInfo.HResolution, hmdInfo.VResolution), monitor);
     eyeSize = ivec2(hmdInfo.HResolution / 2, hmdInfo.VResolution);
   }
 };

@@ -19,23 +19,9 @@ find_path(STEAMWORKS_INCLUDE_DIR
     PATHS ${STEAMWORKS_POSSIBLE_PATHS}
 )
 
-set(STEAMWORKS_LIB_PATH "public/steam/lib")
-set(STEAMWORKS_LIB_NAME "sdkencryptedappticket")
-
-if(APPLE)
-    set(STEAMWORKS_LIB_PATH "${STEAMWORKS_LIB_PATH}/osx32")
-elseif(WIN32)
-    if (${CMAKE_GENERATOR} MATCHES ".*WIN64.*")
-        message(FATAL_ERROR "Found 64 bit" )
-    endif()
-    set(STEAMWORKS_LIB_PATH "${STEAMWORKS_LIB_PATH}/win32")
-else()
-    set(STEAMWORKS_LIB_PATH "${STEAMWORKS_LIB_PATH}/linux32")
-endif()
-
 find_library(STEAMWORKS_LIBRARY 
-    NAMES sdkencryptedappticket
-    PATH_SUFFIXES ${STEAMWORKS_LIB_PATH}
+    NAMES steam_api
+    PATH_SUFFIXES "redistributable_bin"
     PATHS ${STEAMWORKS_POSSIBLE_PATHS}
 )
 

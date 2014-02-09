@@ -4,7 +4,7 @@ using namespace std;
 using namespace gl;
 using namespace OVR;
 
-class PostProcessDistort : public RiftRenderApp {
+class PostProcessDistort : public RiftGlfwApp {
 protected:
   Texture2dPtr texture;
   GeometryPtr geometry;
@@ -13,7 +13,7 @@ protected:
 public:
 
   void initGl() {
-    GlfwApp::initGl();
+    RiftGlfwApp::initGl();
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -27,7 +27,6 @@ public:
       Resource::SHADERS_EXAMPLE_5_1_2_FS);
 
     program->use();
-    bindUniforms(program);
     Program::clear();
   }
 
@@ -38,13 +37,10 @@ public:
     texture->bind();
     geometry->bindVertexArray();
 
-    eye[0].viewport();
-    eye[0].bindUniforms(program);
-    geometry->draw();
-
-    eye[1].viewport();
-    eye[1].bindUniforms(program);
-    geometry->draw();
+    for (int i = 0; i < 2; ++i) {
+      viewport(i);
+      geometry->draw();
+    }
 
     VertexArray::unbind();
     texture->unbind();

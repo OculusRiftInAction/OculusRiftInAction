@@ -9,7 +9,7 @@ protected:
   Texture2dPtr texture;
   GeometryPtr quadGeometries[2];
   ProgramPtr program;
-  glm::ivec2 eyeSize;
+  glm::uvec2 eyeSize;
   float eyeAspect;
 
 public:
@@ -39,7 +39,7 @@ public:
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    glm::ivec2 imageSize;
+    glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(
         texture,
         Resource::IMAGES_TUSCANY_UNDISTORTED_PNG,
@@ -68,7 +68,7 @@ public:
     program->use();
     texture->bind();
 
-    glm::ivec2 position(0, 0);
+    glm::uvec2 position(0, 0);
     gl::viewport(position, eyeSize);
     quadGeometries[0]->bindVertexArray();
     quadGeometries[0]->draw();

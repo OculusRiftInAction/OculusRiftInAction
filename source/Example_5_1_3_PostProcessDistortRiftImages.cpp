@@ -4,7 +4,7 @@ using namespace std;
 using namespace gl;
 using namespace OVR;
 
-class PostProcessDistortRift : public RiftRenderApp {
+class PostProcessDistortRift : public RiftGlfwApp {
 protected:
   Texture2dPtr textures[2];
   GeometryPtr quadGeometry;
@@ -13,12 +13,12 @@ protected:
 public:
 
   void initGl() {
-    RiftRenderApp::initGl();
+    RiftGlfwApp::initGl();
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    glm::ivec2 imageSize;
+    glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(textures[0],
         Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
         imageSize);
@@ -36,14 +36,10 @@ public:
       Resource::SHADERS_EXAMPLE_5_1_3_VS,
       Resource::SHADERS_EXAMPLE_5_1_3_FS);
     program->use();
-    bindUniforms(program);
-//    program->setUniform("LensOffset", lensOffset);
-//    program->setUniform("ViewportAspectRatio", glm::aspect(eyeSize));
-    quadGeometry->bindVertexArray();
 
+    quadGeometry->bindVertexArray();
     for (int i = 0; i < 2; ++i) {
-      eye[i].viewport();
-      eye[i].bindUniforms(program);
+      viewport(i);
       textures[i]->bind();
       quadGeometry->draw();
     }

@@ -1,15 +1,15 @@
 
-function(make_example FILE)
+function(make_example FILE PROJECT_FOLDER)
     set(SOURCE_FILES ${FILE})
     file(RELATIVE_PATH FILE ${CMAKE_CURRENT_SOURCE_DIR} ${FILE})
     get_filename_component(NAME ${FILE} NAME_WE)
     string(REGEX REPLACE "^([^_]+(_[0-9]+)+).*\\.cpp$" "\\1" ROOT ${FILE} )
 
-    file(GLOB EXAMPLE_SHADERS "${ROOT}*.vs" "${ROOT}*.fs")
+    file(GLOB EXAMPLE_SHADERS "../resources/shaders/${ROOT}*.vs" "../resources/shaders/${ROOT}*.fs")
     list(APPEND SOURCE_FILES ${EXAMPLE_SHADERS})
     source_group("Shaders" FILES ${EXAMPLE_SHADERS})
 
-    file(GLOB_RECURSE COMMON_SHADERS "common/*.vs" "common/*.fs")
+    file(GLOB_RECURSE COMMON_SHADERS "../resources/shaders/*.vs" "../resources/shaders/*.fs")
     list(APPEND SOURCE_FILES ${COMMON_SHADERS})
     source_group("Common Shaders" FILES ${COMMON_SHADERS})
     set(EXECUTABLE "${NAME}")
@@ -31,22 +31,29 @@ function(make_example FILE)
     endif()
 
     target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS})
-
     if (RIFT_DEBUG)
         set_property(TARGET ${EXECUTABLE} PROPERTY DEBUG_OUTPUT_NAME ${EXECUTABLE}_d)
     endif()
+    set_target_properties(${EXECUTABLE} PROPERTIES FOLDER ${PROJECT_FOLDER})
 endfunction()
 
-file(GLOB EXAMPLE_APPS *.cpp)
-list(SORT EXAMPLE_APPS)
-foreach (FILE ${EXAMPLE_APPS})
-    make_example(${FILE})
-endforeach()
-
-if (OpenCV_FOUND) 
-    file(GLOB EXAMPLE_APPS opencv/*.cpp)
+function(make_examples GLOB PROJECT_FOLDER)
+    file(GLOB EXAMPLE_APPS ${GLOB})
     list(SORT EXAMPLE_APPS)
     foreach (FILE ${EXAMPLE_APPS})
-        make_example(${FILE})
+        make_example(${FILE} ${PROJECT_FOLDER})
     endforeach()
+endfunction() 
+
+make_examples(*.cpp "Examples")
+
+make_examples(scratch/*.cpp "Examples/Scratch")
+
+if (OpenCV_FOUND) 
+    make_examples(opencv/*.cpp "Examples/OpenCV")
 endif()
+
+if (STEAMWORKS_FOUND) 
+    make_examples(steamworks/*.cpp  "Examples/Steamworks")
+endif()
+

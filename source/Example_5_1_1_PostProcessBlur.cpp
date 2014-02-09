@@ -4,7 +4,7 @@ using namespace std;
 using namespace gl;
 using namespace OVR;
 
-class PostProcessBlur : public RiftRenderApp {
+class PostProcessBlur : public RiftGlfwApp {
 protected:
   Texture2dPtr texture;
   GeometryPtr quadGeometry;
@@ -17,12 +17,12 @@ public:
   }
 
   void initGl() {
-    RiftRenderApp::initGl();
+    RiftGlfwApp::initGl();
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    glm::ivec2 imageSize;
+    glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(
       texture,
       Resource::IMAGES_SHOULDER_CAT_PNG,
@@ -54,13 +54,10 @@ public:
     texture->bind();
     quadGeometry->bindVertexArray();
 
-    eye[0].viewport();
-    eye[0].bindUniforms(program);
-    quadGeometry->draw();
-
-    eye[1].viewport();
-    eye[1].bindUniforms(program);
-    quadGeometry->draw();
+    for (int i = 0; i < 2; ++i) {
+      viewport(i);
+      quadGeometry->draw();
+    }
 
     VertexArray::unbind();
     Texture2d::unbind();

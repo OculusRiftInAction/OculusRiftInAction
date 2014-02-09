@@ -236,8 +236,8 @@ CUBE_FACE_COUNT * TRIANGLES_PER_FACE * VERTICES_PER_TRIANGLE] = { //
 const unsigned int CUBE_WIRE_INDICES[CUBE_EDGE_COUNT * VERTICES_PER_EDGE] =
     { //
     0, 1, 1, 2, 2, 3, 3, 0, // square
-        4, 5, 5, 6, 6, 7, 7, 4, // facing square
-        0, 4, 1, 5, 2, 6, 3, 7, // transverse lines
+    4, 5, 5, 6, 6, 7, 7, 4, // facing square
+    0, 4, 1, 5, 2, 6, 3, 7, // transverse lines
     };
 
 //
@@ -445,7 +445,7 @@ void readPngToTexture(const void * data, size_t size,
 //  glTexImage2D(target, 0, GL_RGBA8, image.cols, image.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, image.data);
 //}
 
-void getOpenCvImageData(cv::Mat & image, glm::ivec2 & outSize, std::vector<unsigned char> & outData) {
+void getOpenCvImageData(cv::Mat & image, glm::uvec2 & outSize, std::vector<unsigned char> & outData) {
   // OpenCV uses upper left as the origin for the image data.  OpenGL
   // uses lower left, so we need to flip the image vertically before
   // we hand it to OpenGL
@@ -459,7 +459,7 @@ void getOpenCvImageData(cv::Mat & image, glm::ivec2 & outSize, std::vector<unsig
 
 void GlUtils::getImageData(
     Resource resource,
-    glm::ivec2 & outSize,
+    glm::uvec2 & outSize,
     std::vector<unsigned char> & outData,
     bool flip
 ) {
@@ -472,7 +472,7 @@ void GlUtils::getImageData(
 
 void GlUtils::getImageData(
   const std::vector<unsigned char> & indata,
-  glm::ivec2 & outSize,
+  glm::uvec2 & outSize,
   std::vector<unsigned char> & outData,
   bool flip
 ) {
@@ -501,7 +501,7 @@ void PngDataCallback(png_structp png_ptr, png_bytep outBytes,
 
 void getPngImageData(
     istream & in,
-    glm::ivec2 & outSize,
+    glm::uvec2 & outSize,
     std::vector<unsigned char> & outData,
     bool flip
 ) {
@@ -577,7 +577,7 @@ void getPngImageData(
 
 void GlUtils::getImageData(
   const std::vector<unsigned char> & indata,
-  glm::ivec2 & outSize,
+  glm::uvec2 & outSize,
   std::vector<unsigned char> & outData,
   bool flip
 ) {
@@ -587,7 +587,7 @@ void GlUtils::getImageData(
 
 void GlUtils::getImageData(
   Resource resource,
-  glm::ivec2 & outSize,
+  glm::uvec2 & outSize,
   std::vector<unsigned char> & outData,
   bool flip
   ) {
@@ -660,22 +660,22 @@ void GlUtils::renderArtificialHorizon(float alpha) {
     mesh.addMesh(hemi);
     {
       set<int> poleIndices;
-      for (int i = 0; i < mesh.positions.size(); ++i) {
+      for (size_t i = 0; i < mesh.positions.size(); ++i) {
         const glm::vec4 & v = mesh.positions[i];
         if (abs(v.x) < EPSILON && abs(v.z) < EPSILON) {
           poleIndices.insert(i);
         }
       }
-      for (int i = 0; i < mesh.indices.size(); i += 3) {
+      for (size_t i = 0; i < mesh.indices.size(); i += 3) {
         bool black = false;
-        for (int j = i; j < i + 3; ++j) {
+        for (size_t j = i; j < i + 3; ++j) {
           if (poleIndices.count(mesh.indices[j])) {
             black = true;
             break;
           }
         }
         if (black) {
-          for (int j = i; j < i + 3; ++j) {
+          for (size_t j = i; j < i + 3; ++j) {
             mesh.colors[mesh.indices[j]] = Colors::grey;
           }
         }
@@ -702,7 +702,7 @@ void GlUtils::renderRift() {
   }
   ProgramPtr program = getProgram(
       Resource::SHADERS_LIT_VS,
-      Resource::SHADERS_LIT_FS);
+      Resource::SHADERS_LITCOLORED_FS);
   GlUtils::renderGeometry(geometry, program);
 }
 
@@ -773,7 +773,7 @@ void GlUtils::drawColorCube() {
       */
 
   const gl::ProgramPtr & renderProgram = GlUtils::getProgram(
-      Resource::SHADERS_SIMPLECOLORED_VS, Resource::SHADERS_SIMPLE_FS);
+      Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
   GlUtils::renderGeometry(getColorCubeGeometry(), renderProgram);
 }
 
@@ -849,7 +849,7 @@ void GlUtils::draw3dGrid() {
     m.addVertex(-Z_AXIS);
     g = m.getGeometry(GL_LINES);
   }
-  ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_SIMPLE_FS);
+  ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
   GL_CHECK_ERROR;
   program->use();
   GL_CHECK_ERROR;
@@ -914,8 +914,8 @@ void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
   g->updateVertices(m.buildVertices());
 
   ProgramPtr program = getProgram(
-      Resource::SHADERS_SIMPLECOLORED_VS,
-      Resource::SHADERS_SIMPLE_FS);
+      Resource::SHADERS_COLORED_VS,
+      Resource::SHADERS_COLORED_FS);
   program->use();
   renderGeometry(g, program);
   gl::Program::clear();
@@ -980,7 +980,7 @@ void GlUtils::renderParagraph(const std::string & str) {
   Text::FontPtr font = getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
   rectf bounds;
   wstring wstr = toUtf16(str);
-  for (int i = 0; i < wstr.length(); ++i) {
+  for (size_t i = 0; i < wstr.length(); ++i) {
     uint16_t wchar = wstr.at(i);
     rectf letterBound = font->getBounds(wchar);
 //    extendLeft(bounds, letterBound);
@@ -1132,7 +1132,7 @@ gl::TextureCubeMapPtr GlUtils::getCubemapTextures(Resource firstResource) {
       GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
     };
 
-    glm::ivec2 size;
+    glm::uvec2 size;
     for (int i = 0; i < 6; ++i) {
       Resource image = static_cast<Resource>(firstResource + i);
       std::vector<unsigned char> data;
@@ -1172,7 +1172,7 @@ static void cubeRecurse(int elapsed, int depth) {
 
   const glm::vec3 & axis = AXES[rand() % 3];
   float angle = elapsed * 0.05f * ((rand() % 10) - 5);
-  float scale = 0.7;
+  float scale = 0.7f;
 
   mv.push().rotate(angle, axis).translate(translation).scale(scale);
   GlUtils::drawColorCube();

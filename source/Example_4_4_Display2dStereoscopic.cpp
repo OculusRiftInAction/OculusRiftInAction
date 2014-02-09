@@ -9,7 +9,7 @@ protected:
   Texture2dPtr texture;
   GeometryPtr quadGeometries[2];
   ProgramPtr program;
-  glm::ivec2 eyeSize;
+  glm::uvec2 eyeSize;
   float eyeAspect;
   float lensOffset;
   Resource imageResource;
@@ -69,8 +69,8 @@ public:
   }
 
   void loadImageAndGeometry() {
-    glm::ivec2 imageSize;
-    GlUtils::getImageAsTexture<GL_TEXTURE_2D>(texture, imageResource, imageSize);
+    glm::uvec2 imageSize;
+    GlUtils::getImageAsTexture(texture, imageResource, imageSize);
     if (!(imageResource >= IMAGES_STEREO_VLCSNAP_2_13_11_16_12H41M46S16__PNG &&
         imageResource <= IMAGES_STEREO_VLCSNAP_2_13_11_16_2_H_9M43S38_PNG)) {
       imageSize.x /= 2;
@@ -140,7 +140,7 @@ public:
     program->use();
     texture->bind();
 
-    glm::ivec2 position(0, 0);
+    glm::uvec2 position(0, 0);
     gl::viewport(position, eyeSize);
     program->setUniform("LensOffset", lensOffset);
     quadGeometries[0]->bindVertexArray();

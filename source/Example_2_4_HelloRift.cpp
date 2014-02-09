@@ -13,16 +13,14 @@ protected:
   gl::GeometryPtr               quadGeometry;
 
   gl::ProgramPtr                distortProgram;
-  glm::ivec2                    eyeSize;
+  glm::uvec2                    eyeSize;
   float                         eyeAspect;
-  glm::vec4                     distortionCoefficients;
-  float                         postDistortionScale;
   float                         ipd;
   struct EyeArg {
-    glm::ivec2                  viewportLocation;
+    RiftLookupTexturePtr        lookupTexture;
+    glm::uvec2                  viewportLocation;
     glm::mat4                   projectionOffset;
     glm::mat4                   modelviewOffset;
-    float                       lensOffset;
   } eyeArgs[2];
 
 public:
@@ -53,10 +51,6 @@ public:
       useTracker = sensorFusion.IsAttachedToSensor();
     }
 
-    ipd = hmdInfo.InterpupillaryDistance;
-    distortionCoefficients = glm::vec4(
-      hmdInfo.DistortionK[0], hmdInfo.DistortionK[1],
-      hmdInfo.DistortionK[2], hmdInfo.DistortionK[3]);
     windowPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
     // The HMDInfo gives us the position of the Rift in desktop 
     // coordinates as well as the native resolution of the Rift 
@@ -106,8 +100,7 @@ public:
     // post distortion scale.
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(hmdInfo);
-    // The overall distortion effect has a shrinking effect.  
-    postDistortionScale = 1.0f / stereoConfig.GetDistortionScale();
+
     // The projection offset and lens offset are both in normalized 
     // device coordinates, i.e. [-1, 1] on both the X and Y axis
     glm::vec3 projectionOffsetVector =
@@ -117,21 +110,16 @@ public:
     eyeArgs[1].projectionOffset =
         glm::translate(glm::mat4(), -projectionOffsetVector);
 
-    eyeArgs[0].lensOffset =
-      1.0f - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
-    eyeArgs[1].lensOffset = -eyeArgs[0].lensOffset;
-
-
+    ipd = stereoConfig.GetIPD();
     // The IPD and the modelview offset are in meters.  If you wish to have a 
     // different unit for  the scale of your world coordinates, you would need 
     // to apply the conversion factor here.
     glm::vec3 modelviewOffsetVector =
-        glm::vec3(stereoConfig.GetIPD() / 2.0f, 0, 0);
+        glm::vec3(ipd / 2.0f, 0, 0);
     eyeArgs[0].modelviewOffset =
         glm::translate(glm::mat4(), modelviewOffsetVector);
     eyeArgs[1].modelviewOffset =
         glm::translate(glm::mat4(), -modelviewOffsetVector);
-
 
     gl::Stacks::projection().top() = glm::perspective(
         stereoConfig.GetYFOVDegrees() * DEGREES_TO_RADIANS,
@@ -157,15 +145,19 @@ public:
     GlfwApp::initGl();
     frameBuffer.init(eyeSize);
     quadGeometry = GlUtils::getQuadGeometry();
-
     distortProgram = GlUtils::getProgram(
-        Resource::SHADERS_VERTEXTORIFT_VS,
-        Resource::SHADERS_DIRECTDISTORT_FS);
-    distortProgram->use();
-    distortProgram->setUniform("Aspect", eyeAspect);
-    distortProgram->setUniform("PostDistortionScale", postDistortionScale);
-    distortProgram->setUniform("K", distortionCoefficients);
+        Resource::SHADERS_TEXTURED_VS,
+        Resource::SHADERS_RIFTWARP_FS);
     gl::Program::clear();
+
+    OVR::HMDInfo hmdInfo;
+    Rift::getHmdInfo(ovrManager, hmdInfo);
+    RiftDistortionHelper helper(hmdInfo);
+    for (int i = 0; i < 2; ++i) {
+      eyeArgs[i].lookupTexture =
+        helper.createLookupTexture(glm::uvec2(512, 512), i);
+    }
+
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -226,10 +218,19 @@ public:
 
       gl::viewport(eyeArg.viewportLocation, eyeSize);
       distortProgram->use();
-      distortProgram->setUniform("LensOffset", eyeArg.lensOffset);
+
+      distortProgram->setUniform("Scene", 1);
+      glActiveTexture(GL_TEXTURE1);
       frameBuffer.color->bind();
+
+      distortProgram->setUniform("OffsetMap", 0);
+      glActiveTexture(GL_TEXTURE0);
+      eyeArg.lookupTexture->bind();
+
       quadGeometry->bindVertexArray();
       quadGeometry->draw();
+
+      gl::Texture2d::unbind();
       gl::Geometry::unbindVertexArray();
       gl::Program::clear();
     }
@@ -244,13 +245,14 @@ public:
     gl::MatrixStack & mv = gl::Stacks::modelview();
     pm.push().preMultiply(eyeArg.projectionOffset);
     mv.push().preMultiply(eyeArg.modelviewOffset);
-
+    {
       mv.push().translate(glm::vec3(0, 0, -1.5f)).
         rotate(glm::angleAxis(QUARTER_TAU, GlUtils::X_AXIS));
         GlUtils::draw3dGrid();
       mv.pop();
       mv.scale(ipd);
       GlUtils::drawColorCube();
+    }
     mv.pop();
     pm.pop();
   }

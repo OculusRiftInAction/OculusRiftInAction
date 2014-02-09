@@ -4,8 +4,8 @@ class SensorFusionExample : public GlfwApp {
   OVR::Ptr<OVR::DeviceManager> ovrManager;
   OVR::Ptr<OVR::SensorDevice> ovrSensor;
   OVR::SensorFusion sensorFusion;
+  OVR::Matrix4f currentOrientation;
 
-  glm::quat currentOrientation;
   bool renderSensors;
 
 public:
@@ -30,7 +30,7 @@ public:
   }
 
   void createRenderingTarget() {
-    createWindow(glm::ivec2(1280, 800), glm::ivec2(100, 100));
+    createWindow(glm::uvec2(1280, 800), glm::ivec2(100, 100));
   }
 
   void initGl() {
@@ -99,16 +99,22 @@ public:
   }
 
   void update() {
-    currentOrientation = Rift::fromOvr(sensorFusion.GetPredictedOrientation());
+    currentOrientation = sensorFusion.GetPredictedOrientation();
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    gl::MatrixStack & pr = gl::Stacks::projection();
+    gl::MatrixStack & mv = gl::Stacks::modelview().push();
+    gl::MatrixStack & pr = gl::Stacks::projection().push();
 
-    mv.push().rotate(glm::inverse(currentOrientation)).
-      rotate(glm::angleAxis(-QUARTER_TAU, GlUtils::X_AXIS));
+    
+    // Update the modelview to reflect the orientation of the Rift
+    glm::mat4 glm_mat = glm::make_mat4((float*)currentOrientation.M);
+    mv.transform(glm::inverse(glm_mat));
+
+    // Our rift model is aligned with the wrong axis, so we need to 
+    // rotate it by 1 quarter rotation
+    mv.push().rotate(glm::angleAxis(-QUARTER_TAU, GlUtils::X_AXIS));
     GlUtils::renderRift();
     mv.pop();
 
@@ -144,6 +150,7 @@ public:
       GlUtils::draw3dVector(rot, Colors::yellow);
       GlUtils::draw3dVector(mag, Colors::cyan);
     }
+    mv.pop(); 
 
 
     pr.pop();

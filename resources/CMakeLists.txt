@@ -104,20 +104,20 @@ endif()
 if(WIN32)
   configure_file( Resources.rc.in Resources.rc )
     list(APPEND SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/Resources.rc)
-    add_library(Resources SHARED ${SOURCE_FILES})
+    add_library(ExampleResources SHARED ${SOURCE_FILES})
 elseif(APPLE)
     # For OSX, until I can figure out how to create a framework, we're stuck 
     # with embedding all the resounces in every single application bundle.
-    add_library(Resources STATIC ${SOURCE_FILES})
+    add_library(ExampleResources STATIC ${SOURCE_FILES})
     find_library(COREFOUNDATION_LIBRARY CoreFoundation)
     list(APPEND RESOURCE_LIBRARIES ${COREFOUNDATION_LIBRARY})
 else()
-    add_library(Resources STATIC ${SOURCE_FILES})
+    add_library(ExampleResources STATIC ${SOURCE_FILES})
 endif()
 
-target_link_libraries(Resources ${RESOURCE_LIBRARIES})
+target_link_libraries(ExampleResources ${RESOURCE_LIBRARIES})
 
-GENERATE_EXPORT_HEADER( Resources
+GENERATE_EXPORT_HEADER( ExampleResources
              BASE_NAME Resources
              EXPORT_MACRO_NAME Resources_EXPORT
              EXPORT_FILE_NAME Resources_Export.h

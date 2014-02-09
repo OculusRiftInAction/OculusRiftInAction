@@ -9,7 +9,7 @@ protected:
   Texture2dPtr texture;
   GeometryPtr quadGeometry;
   ProgramPtr program;
-  glm::ivec2 eyeSize;
+  glm::uvec2 eyeSize;
   float eyeAspect;
 
 public:
@@ -39,7 +39,7 @@ public:
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 
-    glm::ivec2 imageSize;
+    glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(
       texture,
       Resource::IMAGES_SHOULDER_CAT_PNG,
@@ -74,7 +74,7 @@ public:
 
     quadGeometry->bindVertexArray();
 
-    glm::ivec2 position(0, 0);
+    glm::uvec2 position(0, 0);
     gl::viewport(position, eyeSize);
     quadGeometry->draw();
 

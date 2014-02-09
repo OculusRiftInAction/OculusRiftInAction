@@ -52,14 +52,14 @@ public:
 
   static void getImageData(
     const std::vector<unsigned char> & indata,
-    glm::ivec2 & outSize,
+    glm::uvec2 & outSize,
     std::vector<unsigned char> & outData,
     bool flip = true
   );
 
   static void getImageData(
     Resource resource,
-    glm::ivec2 & outSize,
+    glm::uvec2 & outSize,
     std::vector<unsigned char> & outData,
     bool flip = true
     );
@@ -68,7 +68,7 @@ public:
   static void getImageAsTexture(
     std::shared_ptr<gl::Texture<TextureType> > & texture,
     Resource resource,
-    glm::ivec2 & outSize,
+    glm::uvec2 & outSize,
     GLenum target = TextureType) {
     typedef gl::Texture<TextureType>
       Texture;
@@ -86,6 +86,18 @@ public:
     Texture::unbind();
   }
 
+  /**
+   * A convenience method for loading images into textures
+   * when you don't care about the dimensions of the image
+   */
+  template<GLenum TextureType>
+  static void getImageAsTexture(
+    std::shared_ptr<gl::Texture<TextureType> > & texture,
+    Resource resource,
+    GLenum target = TextureType) {
+    glm::uvec2 imageSize;
+    getImageAsTexture(texture, resource, imageSize, target);
+  }
 
   template<GLenum TextureType = GL_TEXTURE_2D>
   static void getImageAsGeometryAndTexture(
@@ -93,7 +105,7 @@ public:
     gl::GeometryPtr & geometry,
     std::shared_ptr<gl::Texture<TextureType> > & texture) {
 
-    glm::ivec2 imageSize;
+    glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(texture, resource, imageSize);
     float imageAspectRatio = glm::aspect(imageSize);
     glm::vec2 geometryMax(1.0f, 1.0f / imageAspectRatio);

@@ -1,0 +1,79 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>rifty</artifactId>
+  <packaging>jar</packaging>
+
+  <parent>
+    <groupId>org.saintandreas</groupId>
+    <artifactId>saintandreas-parent</artifactId>
+    <version>1.0.3</version>
+  </parent>
+
+  <repositories>
+    <repository>
+      <id>ec2</id>
+      <url>http://ec2.saintandreas.org/maven</url>
+    </repository>
+  </repositories>
+
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.googlecode.mavennatives</groupId>
+        <artifactId>maven-nativedependencies-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpacknatives</id>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+  <dependencies>
+    <dependency>
+      <groupId>org.saintandreas</groupId>
+      <artifactId>resources</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.saintandreas</groupId>
+      <artifactId>glamour-lwjgl</artifactId>
+      <version>[1,)</version>
+    </dependency>
+    <dependency>
+      <groupId>com.oculusvr</groupId>
+      <artifactId>jocular</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>uk.co.caprica</groupId>
+      <artifactId>vlcj</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.codeminders</groupId>
+      <artifactId>hidapi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-mapper-asl</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+    </dependency>
+  </dependencies>
+</project>

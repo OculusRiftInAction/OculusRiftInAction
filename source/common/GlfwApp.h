@@ -25,8 +25,9 @@
 
 class GlfwApp {
 protected:
+  gl::TimeQueryPtr query;
   GLFWwindow *  window;
-  glm::ivec2    windowSize;
+  glm::uvec2    windowSize;
   glm::ivec2    windowPosition;
   float         windowAspect;
   float         windowAspectInverse;
@@ -41,11 +42,11 @@ public:
   virtual int run();
 
   virtual void screenshot();
-  virtual void createWindow(const glm::ivec2 & size, const glm::ivec2 & position = glm::ivec2(INT_MIN));
+  virtual void createWindow(const glm::uvec2 & size, const glm::ivec2 & position = glm::ivec2(INT_MIN));
   virtual void createWindow(int w, int h, int x = INT_MIN, int y = INT_MIN) {
-    createWindow(glm::ivec2(w, h), glm::ivec2(x, y));
+    createWindow(glm::uvec2(w, h), glm::ivec2(x, y));
   }
-  virtual void createFullscreenWindow(const glm::ivec2 & size, GLFWmonitor * targetMonitor);
+  virtual void createFullscreenWindow(const glm::uvec2 & size, GLFWmonitor * targetMonitor);
   virtual void destroyWindow();
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw();

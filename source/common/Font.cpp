@@ -59,7 +59,7 @@ struct QuadBuilder {
 void readPngToTexture(const char * data, size_t size,
     gl::TexturePtr & texture,
     glm::vec2 & textureSize) {
-  glm::ivec2 imageSize;
+  glm::uvec2 imageSize;
 
   std::vector<unsigned char> pngData;
   pngData.resize(size);
