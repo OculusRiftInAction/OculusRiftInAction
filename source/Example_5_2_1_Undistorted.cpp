@@ -43,7 +43,7 @@ public:
 
     GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
-      Resource::SHADERS_TEXTURE_FS
+      Resource::SHADERS_TEXTURED_FS
     )->use();
 
     sceneTexture->bind();

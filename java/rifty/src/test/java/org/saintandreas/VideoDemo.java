@@ -21,8 +21,9 @@ import org.saintandreas.gl.textures.Texture;
 import org.saintandreas.math.Matrix4f;
 import org.saintandreas.math.Vector2f;
 import org.saintandreas.math.Vector3f;
-import org.saintandreas.vr.Hmd.Eye;
-import org.saintandreas.vr.RiftDK1;
+import org.saintandreas.vr.DistortionHelper;
+import org.saintandreas.vr.Eye;
+import org.saintandreas.vr.oculus.RiftDK1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,8 @@ public class VideoDemo extends LwjglApp implements BufferFormatCallback,
   // private static final String MEDIA_URL = "http://192.168.0.4/sc2a.mp4";
   // private static final String MEDIA_URL =
   // "http://192.168.0.4/Videos/South.Park.S17E09.HDTV.x264-ASAP.%5bVTV%5d.mp4";
-  //private static final String MEDIA_URL = "http://192.168.0.4/Download/Gravity.2013.1080p%203D.HDTV.x264.DTS-RARBG/Gravity.2013.1080p%203D.HDTV.x264.DTS-RARBG.mkv";
+  // private static final String MEDIA_URL =
+  // "http://192.168.0.4/Download/Gravity.2013.1080p%203D.HDTV.x264.DTS-RARBG/Gravity.2013.1080p%203D.HDTV.x264.DTS-RARBG.mkv";
   private static final String MEDIA_URL = "http://192.168.0.4/Videos/3D/TRON%20LEGACY%203D.mkv";
   private static final Logger LOG = LoggerFactory.getLogger(VideoDemo.class);
   IndexedGeometry cubeGeometry;
@@ -112,8 +114,9 @@ public class VideoDemo extends LwjglApp implements BufferFormatCallback,
     frameBuffer.getTexture().unbind();
     OpenGL.checkError();
 
-    eyeMeshes[0] = new RiftDK1().getDistortionMesh(Eye.LEFT, 128);
-    eyeMeshes[1] = new RiftDK1().getDistortionMesh(Eye.RIGHT, 128);
+    DistortionHelper helper = new DistortionHelper(new RiftDK1());
+    eyeMeshes[0] = helper.createDistortionMesh(128, 128, Eye.LEFT);
+    eyeMeshes[1] = helper.createDistortionMesh(128, 128, Eye.RIGHT);
 
     // glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
     coloredProgram = new Program("shaders/SimpleColored.vs",
@@ -256,13 +259,17 @@ public class VideoDemo extends LwjglApp implements BufferFormatCallback,
     float eyeAspect = aspect / 2f;
     {
       glTexCoord2f(texOffset, 1);
-      glVertex2f(-1 * scale + projectionOffset, -1 * scale / (videoAspect / eyeAspect));
+      glVertex2f(-1 * scale + projectionOffset, -1 * scale
+          / (videoAspect / eyeAspect));
       glTexCoord2f(texOffset + 0.5f, 1);
-      glVertex2f(1* scale + projectionOffset, -1 * scale/ (videoAspect / eyeAspect));
+      glVertex2f(1 * scale + projectionOffset, -1 * scale
+          / (videoAspect / eyeAspect));
       glTexCoord2f(texOffset, 0);
-      glVertex2f(-1* scale + projectionOffset, 1 * scale/ (videoAspect / eyeAspect));
+      glVertex2f(-1 * scale + projectionOffset, 1 * scale
+          / (videoAspect / eyeAspect));
       glTexCoord2f(texOffset + 0.5f, 0);
-      glVertex2f(1* scale + projectionOffset, 1 * scale/ (videoAspect / eyeAspect));
+      glVertex2f(1 * scale + projectionOffset, 1 * scale
+          / (videoAspect / eyeAspect));
     }
     glEnd();
     // videoGeometry.bindVertexArray();

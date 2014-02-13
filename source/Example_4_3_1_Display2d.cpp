@@ -46,8 +46,8 @@ public:
         glm::vec2(-1.0f, -1.0f),
         glm::vec2(1.0f, 1.0f));
     program = GlUtils::getProgram(
-		Resource::SHADERS_TEXTURE_VS,
-		Resource::SHADERS_TEXTURE_FS);
+		Resource::SHADERS_TEXTURED_VS,
+		Resource::SHADERS_TEXTURED_FS);
 
   }
 

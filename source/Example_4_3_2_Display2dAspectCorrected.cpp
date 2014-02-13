@@ -59,8 +59,8 @@ public:
       geometryMin, geometryMax);
 
     program = GlUtils::getProgram(
-		  Resource::SHADERS_TEXTURE_VS,
-		  Resource::SHADERS_TEXTURE_FS);
+		  Resource::SHADERS_TEXTURED_VS,
+		  Resource::SHADERS_TEXTURED_FS);
     program->use();
     program->setUniform("ViewportAspectRatio", viewportAspectRatio);
     Program::clear();

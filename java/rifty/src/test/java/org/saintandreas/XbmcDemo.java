@@ -65,8 +65,8 @@ public class XbmcDemo extends LwjglApp {
     glClearColor(.1f, .1f, .1f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     Program program = Programs.getProgram(
-        ExampleResource.SHADERS_SIMPLECOLORED_VS, 
-        ExampleResource.SHADERS_SIMPLE_FS);
+        ExampleResource.SHADERS_COLORED_VS, 
+        ExampleResource.SHADERS_COLORED_FS);
     program.link();
     program.use();
     MatrixStack.bind(program);

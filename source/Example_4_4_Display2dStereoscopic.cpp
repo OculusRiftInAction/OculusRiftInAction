@@ -4,44 +4,48 @@ using namespace std;
 using namespace gl;
 using namespace OVR;
 
-class Example_5_3_4 : public GlfwApp {
+const Resource STEREO_IMAGES[] = {
+  IMAGES_STEREO_VLCSNAP_2_13_11_16_12H41M46S16__PNG,
+  IMAGES_STEREO_VLCSNAP_2_13_11_16_19H47M52S211_PNG,
+  IMAGES_STEREO_VLCSNAP_2_13_11_16_2_H_8M17S111_PNG,
+  IMAGES_STEREO_VLCSNAP_2_13_11_16_2_H_9M17S243_PNG,
+  IMAGES_STEREO_VLCSNAP_2_13_11_16_2_H_9M43S38_PNG,
+};
+
+const int STEREO_IMAGE_COUNT = 5;
+
+class StereoscopicImages : public RiftGlfwApp {
 protected:
   Texture2dPtr texture;
   GeometryPtr quadGeometries[2];
+  glm::mat4 projections[2];
   ProgramPtr program;
-  glm::uvec2 eyeSize;
-  float eyeAspect;
-  float lensOffset;
-  Resource imageResource;
+  int imageIndex;
   bool stereo;
+  glm::uvec2 imageSize;
 
 public:
 
-  Example_5_3_4() {
-    OVR::Ptr<OVR::DeviceManager> ovrManager;
-    ovrManager = *OVR::DeviceManager::Create();
-    HMDInfo hmdInfo;
+  StereoscopicImages() {
+    imageIndex = 0;
+    stereo = true;
+
+    OVR::HMDInfo hmdInfo;
     Rift::getHmdInfo(ovrManager, hmdInfo);
-    Rift::getRiftPositionAndSize(hmdInfo, windowPosition, windowSize);
-    eyeSize = windowSize;
-    eyeSize.x /= 2;
-    eyeAspect = ((float)hmdInfo.HResolution / 2.0f) / (float)hmdInfo.VResolution;
+    float lensOffset = 1.0f
+      - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
+
     float lensDistance =
       hmdInfo.LensSeparationDistance /
       hmdInfo.HScreenSize;
     lensOffset =
       1.0f - (2.0f * lensDistance);
 
-
-    imageResource = Resource::IMAGES_STEREO_VLCSNAP_2_13_11_16_12H41M46S16__PNG;
-    stereo = true;
-  }
-
-  virtual void createRenderingTarget() {
-    glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(windowSize, windowPosition);
-    if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-      FAIL("Unable to create undecorated window");
+    for (int i = 0; i < 2; ++i) {
+      float eyeLensOffset = i == 0 ? -lensOffset : lensOffset;
+      projections[i] = glm::ortho(
+        -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
+        -1.0f / eyeAspect, 1.0f / eyeAspect);
     }
   }
 
@@ -51,51 +55,28 @@ public:
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    float viewportAspectRatio = eyeAspect;
-    glm::vec2 projectionMax(1.0f, 1.0f / viewportAspectRatio);
-    glm::vec2 projectionMin = projectionMax * -1.0f;
-    glm::mat4 projection = glm::ortho(
-        projectionMin.x, projectionMax.x,
-        projectionMin.y, projectionMax.y);
-
-    loadImageAndGeometry();
-
     program = GlUtils::getProgram(
-        Resource::SHADERS_TEXTURERIFT_VS,
-        Resource::SHADERS_TEXTURE_FS);
-    program->use();
-    program->setUniform("Projection", projection);
-    Program::clear();
-  }
+      Resource::SHADERS_TEXTURED_VS,
+      Resource::SHADERS_TEXTURED_FS);
 
-  void loadImageAndGeometry() {
-    glm::uvec2 imageSize;
-    GlUtils::getImageAsTexture(texture, imageResource, imageSize);
-    if (!(imageResource >= IMAGES_STEREO_VLCSNAP_2_13_11_16_12H41M46S16__PNG &&
-        imageResource <= IMAGES_STEREO_VLCSNAP_2_13_11_16_2_H_9M43S38_PNG)) {
-      imageSize.x /= 2;
-    }
+    GlUtils::getImageAsTexture(texture, STEREO_IMAGES[imageIndex], imageSize);
 
-    float viewportAspectRatio = eyeAspect;
-    float imageAspectRatio = (float) imageSize.x / (float) imageSize.y;
+    float imageAspectRatio = (float)imageSize.x / (float)imageSize.y;
     glm::vec2 geometryMax(1.0f, 1.0f / imageAspectRatio);
-
-    if (imageAspectRatio < viewportAspectRatio) {
-      float scale = imageAspectRatio / viewportAspectRatio;
-      geometryMax *= scale;
-    }
-
     glm::vec2 geometryMin = geometryMax * -1.0f;
+    glm::vec2 textureMin = glm::vec2(0, 0);
+    glm::vec2 textureMax = glm::vec2(0.5, 1.0);
     quadGeometries[0] =
-        GlUtils::getQuadGeometry(
-            geometryMin, geometryMax,
-            glm::vec2(0.0f, 0.0f), glm::vec2(0.5f, 1.0f));
+      GlUtils::getQuadGeometry(
+      geometryMin, geometryMax,
+      textureMin, textureMax);
 
-
+    textureMin = glm::vec2(0.5, 0.0);
+    textureMax = glm::vec2(1.0, 1.0);
     quadGeometries[1] =
-        GlUtils::getQuadGeometry(
-            geometryMin, geometryMax,
-            glm::vec2(0.5f, 0.0f), glm::vec2(1.0f, 1.0f));
+      GlUtils::getQuadGeometry(
+      geometryMin, geometryMax,
+      textureMin, textureMax);
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -103,14 +84,13 @@ public:
       return;
     }
 
-    int newResource = imageResource;
     switch (key) {
     case GLFW_KEY_O:
-      newResource++;
+      nextImage(1);
       break;
 
     case GLFW_KEY_P:
-      newResource--;
+      nextImage(-1);
       break;
 
     case GLFW_KEY_S:
@@ -121,41 +101,31 @@ public:
       GlfwApp::onKey(key, scancode, action, mods);
       break;
     }
-    if (newResource != imageResource) {
-      if (newResource > IMAGES_STEREO_VLCSNAP_2_13_11_16_2_H_9M43S38_PNG) {
-        newResource = IMAGES_STEREO_VLCSNAP_2_13_11_16_12H41M46S16__PNG;
-      }
-      if (newResource < IMAGES_STEREO_VLCSNAP_2_13_11_16_12H41M46S16__PNG) {
-        newResource = IMAGES_STEREO_VLCSNAP_2_13_11_16_2_H_9M43S38_PNG;
-      }
-      imageResource = static_cast<Resource>(newResource);
-      loadImageAndGeometry();
-    }
   }
 
+  void nextImage(int increment) {
+    imageIndex = (imageIndex + STEREO_IMAGE_COUNT + increment) % STEREO_IMAGE_COUNT;
+    GlUtils::getImageAsTexture(texture, STEREO_IMAGES[imageIndex], imageSize);
+  }
 
   virtual void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     program->use();
     texture->bind();
-
     glm::uvec2 position(0, 0);
     gl::viewport(position, eyeSize);
-    program->setUniform("LensOffset", lensOffset);
-    quadGeometries[0]->bindVertexArray();
-    quadGeometries[0]->draw();
-
-    position.x = eyeSize.x;
-    gl::viewport(position, eyeSize);
-    program->setUniform("LensOffset", -lensOffset);
-    quadGeometries[stereo ? 1 : 0]->bindVertexArray();
-    quadGeometries[stereo ? 1 : 0]->draw();
-
+    for (int i = 0; i < 2; ++i) {
+      viewport(i);
+      program->setUniform("Projection", projections[i]);
+      int eyeIndex = stereo ? i : 0;
+      quadGeometries[eyeIndex]->bindVertexArray();
+      quadGeometries[eyeIndex]->draw();
+    }
     VertexArray::unbind();
     Texture2d::unbind();
     Program::clear();
   }
 };
 
-RUN_OVR_APP(Example_5_3_4)
+RUN_OVR_APP(StereoscopicImages)

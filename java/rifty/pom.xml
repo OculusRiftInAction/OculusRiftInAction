@@ -1,24 +1,38 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>rifty</artifactId>
-  <packaging>jar</packaging>
-
   <parent>
     <groupId>org.saintandreas</groupId>
     <artifactId>saintandreas-parent</artifactId>
     <version>1.0.3</version>
   </parent>
+  <artifactId>rifty</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
 
   <repositories>
     <repository>
-      <id>ec2</id>
+      <id>saintandreas-org-mvn-repo</id>
       <url>http://ec2.saintandreas.org/maven</url>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
     </repository>
   </repositories>
 
-
   <build>
+    <resources>
+      <resource>
+        <directory>../../resources</directory>
+        <includes>
+          <include>images/**</include>
+          <include>shaders/**</include>
+          <include>meshes/**</include>
+          <include>fonts/**</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>com.googlecode.mavennatives</groupId>
@@ -37,13 +51,13 @@
   <dependencies>
     <dependency>
       <groupId>org.saintandreas</groupId>
-      <artifactId>resources</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <artifactId>glamour-lwjgl</artifactId>
+      <version>[1,)</version>
     </dependency>
     <dependency>
       <groupId>org.saintandreas</groupId>
-      <artifactId>glamour-lwjgl</artifactId>
-      <version>[1,)</version>
+      <artifactId>math</artifactId>
+      <version>1.0.2</version>
     </dependency>
     <dependency>
       <groupId>com.oculusvr</groupId>

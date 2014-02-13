@@ -214,7 +214,7 @@ public:
 
     ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
-        Resource::SHADERS_TEXTURE_FS);
+        Resource::SHADERS_TEXTURED_FS);
     distortProgram->use();
     sceneTextures[eyeIndex]->bind();
     distortionGeometry[eyeIndex]->bindVertexArray();
