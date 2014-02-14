@@ -18,9 +18,13 @@
  ************************************************************************************/
 
 #pragma once
+enum Eye {
+  LEFT, RIGHT
+};
 
 class Rift {
 public:
+  static Eye EYES[];
   static void getDk1HmdValues(OVR::HMDInfo & hmdInfo);
   static void getRiftPositionAndSize(const OVR::HMDInfo & hmdInfo,
       glm::ivec2 & windowPosition, glm::uvec2 & windowSize);
@@ -304,6 +308,18 @@ public:
     glm::uvec2 viewportPosition(eyeIndex == 0 ? 0 : eyeSize.x, 0);
     gl::viewport(viewportPosition, eyeSize);
   }
+
+  virtual void viewport(Eye eye) {
+    viewport((int)eye);
+  }
+
+  void leftEyeViewport() {
+    viewport(LEFT);
+  }
+
+  void rightEyeViewport() {
+    viewport(RIGHT);
+  }
 };
 
 class RiftApp : public RiftGlfwApp {
@@ -381,3 +397,6 @@ public:
         return -1; \
     }
 
+#define FOR_EACH_EYE(eye) \
+  for (Eye eye = LEFT; eye <= RIGHT; \
+    eye = static_cast<Eye>(eye + 1)) 

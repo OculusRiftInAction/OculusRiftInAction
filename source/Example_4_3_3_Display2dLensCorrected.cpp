@@ -1,100 +1,62 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
-class Display2dLensCorrected : public GlfwApp {
+class Display2d : public RiftGlfwApp {
 protected:
-  Texture2dPtr texture;
-  GeometryPtr quadGeometry;
-  ProgramPtr program;
-  glm::uvec2 eyeSize;
-  float eyeAspect;
-  float lensOffset;
+  gl::Texture2dPtr texture;
+  gl::GeometryPtr quadGeometry;
+  gl::ProgramPtr program;
+  glm::mat4 projections[2];
 
 public:
 
-  Display2dLensCorrected() {
-    OVR::Ptr<OVR::DeviceManager> ovrManager;
-    ovrManager = *OVR::DeviceManager::Create();
-    HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    Rift::getRiftPositionAndSize(hmdInfo, windowPosition, windowSize);
-    eyeSize = windowSize;
-    eyeSize.x /= 2;
-    eyeAspect = ((float)hmdInfo.HResolution / 2.0f) / (float)hmdInfo.VResolution;
-    float lensDistance =
-      hmdInfo.LensSeparationDistance /
-      hmdInfo.HScreenSize;
-    lensOffset =
-      1.0f - (2.0f * lensDistance);
-  }
-
-  void createRenderingTarget() {
-    glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(windowSize, windowPosition);
-    if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-      FAIL("Unable to create undecorated window");
-    }
-  }
-
   void initGl() {
-    GlfwApp::initGl();
+    RiftGlfwApp::initGl();
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
-    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glm::uvec2 imageSize;
-    GlUtils::getImageAsTexture(
-      texture,
-      Resource::IMAGES_SHOULDER_CAT_PNG,
-      imageSize);
+    GlUtils::getImageAsTexture(texture,
+        Resource::IMAGES_SHOULDER_CAT_PNG,
+        imageSize);
 
-    float viewportAspectRatio = eyeAspect;
-    float imageAspectRatio = (float)imageSize.x / (float)imageSize.y;
-    glm::vec2 geometryMax(1.0f, 1.0f / imageAspectRatio);
-
-    if (imageAspectRatio < viewportAspectRatio) {
-      float scale = imageAspectRatio / viewportAspectRatio;
-      geometryMax *= scale;
-    }
-
-    glm::vec2 geometryMin = geometryMax * -1.0f;
+    float imageAspect = (float)imageSize.x / (float)imageSize.y;
     quadGeometry = GlUtils::getQuadGeometry(
-        geometryMin, geometryMax);
+      glm::vec2(-1.0f, -1.0f / imageAspect),
+      glm::vec2(1.0f, 1.0f / imageAspect));
 
     program = GlUtils::getProgram(
-		  Resource::SHADERS_TEXTURERIFT_VS,
-		  Resource::SHADERS_TEXTURED_FS);
-    program->use();
-    program->setUniform("ViewportAspectRatio", viewportAspectRatio);
-    Program::clear();
+          Resource::SHADERS_TEXTURED_VS,
+          Resource::SHADERS_TEXTURED_FS);
+
+    OVR::HMDInfo hmdInfo;
+    Rift::getHmdInfo(ovrManager, hmdInfo);
+    float lensOffset = 1.0f
+      - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
+
+    FOR_EACH_EYE(eye) {
+      float eyeLensOffset = (eye == LEFT ? -lensOffset : lensOffset);
+      projections[eye] = glm::ortho(
+        -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
+        -1.0f / eyeAspect, 1.0f / eyeAspect);
+    }
   }
 
-  void draw() {
+  virtual void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
-
     program->use();
     texture->bind();
-
     quadGeometry->bindVertexArray();
 
-    glm::uvec2 position(0, 0);
-    gl::viewport(position, eyeSize);
-    program->setUniform("LensOffset", lensOffset);
-    quadGeometry->draw();
+    FOR_EACH_EYE(eye) {
+      viewport(eye);
+      program->setUniform("Projection", projections[eye]);
+      quadGeometry->draw();
+    }
 
-    position.x = eyeSize.x;
-    gl::viewport(position, eyeSize);
-    program->setUniform("LensOffset", -lensOffset);
-    quadGeometry->draw();
-
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 
-RUN_OVR_APP(Display2dLensCorrected)
-
+RUN_OVR_APP(Display2d)

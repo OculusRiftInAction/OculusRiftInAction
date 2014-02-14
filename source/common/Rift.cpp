@@ -12,6 +12,10 @@ const float Rift::ZNEAR = 0.01f;
 
 using namespace OVR;
 
+Eye Rift::EYES[] = {
+  LEFT, RIGHT
+};
+
 glm::quat parseQuaternion(const Json::Value & node) {
   glm::quat out;
   out.x = node.get("x", 0).asFloat();
