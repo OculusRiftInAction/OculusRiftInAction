@@ -231,7 +231,6 @@ void GlfwApp::renderStringAt(const std::string & str, float x, float y) {
   GlUtils::renderString(str, cursor, 18.0f);
   pr.pop();
   mv.pop();
-
 }
 
 void GlfwApp::screenshot() {

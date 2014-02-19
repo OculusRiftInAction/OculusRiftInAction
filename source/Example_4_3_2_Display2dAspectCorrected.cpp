@@ -5,7 +5,7 @@ protected:
   gl::Texture2dPtr texture;
   gl::GeometryPtr quadGeometry;
   gl::ProgramPtr program;
-  glm::mat4 projections[2];
+  glm::mat4 projection;
 
 public:
 
@@ -24,26 +24,25 @@ public:
       glm::vec2(-1.0f, -1.0f / imageAspect),
       glm::vec2(1.0f, 1.0f / imageAspect));
 
+    projection = glm::ortho(
+      -1.0f, 1.0f,
+      -1.0f / eyeAspect, 1.0f / eyeAspect);
+
     program = GlUtils::getProgram(
           Resource::SHADERS_TEXTURED_VS,
           Resource::SHADERS_TEXTURED_FS);
-
-    FOR_EACH_EYE(eye) {
-      projections[eye] = glm::ortho(
-        -1.0f, 1.0f,
-        -1.0f / eyeAspect, 1.0f / eyeAspect);
-    }
   }
 
   virtual void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
     program->use();
+    program->setUniform("Projection", projection);
+
     texture->bind();
     quadGeometry->bindVertexArray();
 
     FOR_EACH_EYE(eye) {
       viewport(eye);
-      program->setUniform("Projection", projections[eye]);
       quadGeometry->draw();
     }
 

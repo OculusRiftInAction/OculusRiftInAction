@@ -141,7 +141,9 @@ public:
     viewport(eyeIndex);
     ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
-      chroma ? Resource::SHADERS_RIFTWARPCHROMA_FS : Resource::SHADERS_RIFTWARP_FS);
+      chroma ? 
+        Resource::SHADERS_RIFTCHROMAWARP_FS : 
+        Resource::SHADERS_RIFTWARP_FS);
     distortProgram->use();
     distortProgram->setUniform1i("Scene", 1);
     distortProgram->setUniform1i("OffsetMap", 0);

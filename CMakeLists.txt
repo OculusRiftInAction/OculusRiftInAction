@@ -43,6 +43,7 @@ endif()
 
 # Verbosity is good, especially if a command fails
 set(CMAKE_VERBOSE_MAKEFILE ON)
+set(TARGET_ARCHITECTURE "x64")
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     # Ensure we use C++ 11 
@@ -64,12 +65,19 @@ endif()
 
 if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
+    set(TARGET_ARCHITECTURE "x86")
 endif()
 
 ###############################################################################
 #
 # Oculus VR SDK dependency 
 #
+set(OVR_DIR ${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR)
+# Check for the existence of the LibOVR project.  If it's missing, the 
+# submodule probably hasn't been checked out.
+if (NOT(EXISTS ${OVR_DIR} AND IS_DIRECTORY ${OVR_DIR}))
+    message(FATAL_ERROR "Can't find the OVR library at ${OVR_DIR}.  Perhaps you forgot to check out the git submodules?") 
+endif()
 
 # Add debug output from the Oculus SDK
 add_definitions(-DOVR_BUILD_DEBUG)
@@ -165,20 +173,28 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
 # Boost is a general purpose C++ library
 #set(Boost_DEBUG 1)
-set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME ON)
-find_package( Boost COMPONENTS filesystem system thread)
-if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
-    link_directories(${Boost_LIBRARY_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
-    set(HAVE_BOOST 1)
+if (!APPLE)
+    set(Boost_USE_STATIC_LIBS ON)
+    set(Boost_USE_MULTITHREADED ON)
+    set(Boost_USE_STATIC_RUNTIME ON)
+    find_package( Boost COMPONENTS filesystem system thread)
+    if(Boost_FOUND)
+        include_directories(${Boost_INCLUDE_DIRS})
+        link_directories(${Boost_LIBRARY_DIR}) 
+        list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
+        set(HAVE_BOOST 1)
+    endif()
 endif()
 
 set(SIXENSE_ROOT "c:/dev/SixenseSDK_062612")
-#find_package(Sixense)
+find_package(Sixense)
 if(SIXENSE_FOUND)
+    if (WIN32)
+        file(COPY ${SIXENSE_BINARY}
+            DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+        file(COPY ${SIXENSE_UTIL_BINARY}
+            DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+    endif()
     include_directories(${SIXENSE_INCLUDE_DIR}) 
     list(APPEND EXAMPLE_LIBS ${SIXENSE_LIBRARIES})
     set(HAVE_SIXENSE 1)
@@ -197,6 +213,17 @@ if(STEAMWORKS_FOUND)
     include_directories(${STEAMWORKS_INCLUDE_DIR}) 
     list(APPEND EXAMPLE_LIBS ${STEAMWORKS_LIBRARY})
     set(HAVE_STEAMWORKS 1)
+endif()
+
+#set(LEAP_SDK "/home/bdavis/src/LeapDeveloperKit/LeapSDK")
+set(LEAP_SDK "C:/dev/LeapDeveloperKit/LeapSDK")
+find_package( LeapMotion )
+if(LEAP_FOUND)
+    file(COPY ${LEAP_BINARY}
+        DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+    include_directories(${LEAP_INCLUDE_DIR}) 
+    list(APPEND EXAMPLE_LIBS ${LEAP_LIBRARY})
+    set(HAVE_LEAP 1)
 endif()
 
 find_package( PerceptualComputing )

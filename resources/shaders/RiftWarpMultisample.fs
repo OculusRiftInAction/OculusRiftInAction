@@ -1,6 +1,7 @@
 #version 330
 
-uniform sampler2D Scene;
+//uniform sampler2D Scene;
+uniform sampler2DMS Scene;
 uniform sampler2D OffsetMap;
 
 in vec2 vTexCoord;
@@ -19,5 +20,7 @@ void main() {
     if (all(equal(texCoord, ZERO))) {
         discard;
     }
-    FragColor =  texture(Scene, texCoord);
+
+    ivec2 Texcoord = ivec2(textureSize(Scene) * texCoord);
+    FragColor =  texelFetch(Scene, Texcoord, 0);
 }

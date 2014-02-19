@@ -4,10 +4,6 @@
 #include <sixense.h>
 #include <sixense_math.hpp>
 #include <sixense_utils/controller_manager/controller_manager.hpp>
-
-void controller_manager_setup_callback(
-    sixenseUtils::ControllerManager::setup_step step);
-
 #endif
 
 #ifdef HAVE_SPNAV
@@ -110,9 +106,31 @@ bool CameraControl::onKey(glm::mat4 & camera, int key, int scancode, int action,
   return eatKey;
 }
 
+#ifdef HAVE_SIXENSE
+const char * CURRENT_HYRDA_INSTRUCTION = nullptr;
+void controller_manager_setup_callback(sixenseUtils::ControllerManager::setup_step step) {
+  SAY("Step %d", step);
+  if (sixenseUtils::getTheControllerManager()->isMenuVisible()) {
+    // Draw the instruction.
+    CURRENT_HYRDA_INSTRUCTION = sixenseUtils::getTheControllerManager()->getStepString();
+    SAY(CURRENT_HYRDA_INSTRUCTION);
+  }
+  else {
+    CURRENT_HYRDA_INSTRUCTION = nullptr;
+  }
+}
+#endif
 
 void CameraControl::applyInteraction(glm::mat4 & camera) {
 #ifdef HAVE_SIXENSE
+  static bool hydraInitialized = false;
+  if (!hydraInitialized) {
+    int init = sixenseInit();
+    sixenseSetActiveBase(0);
+    sixenseUtils::getTheControllerManager()->setGameType(sixenseUtils::ControllerManager::ONE_PLAYER_TWO_CONTROLLER);
+    sixenseUtils::getTheControllerManager()->registerSetupCallback(controller_manager_setup_callback);
+    hydraInitialized = true;
+  }
   if (hydraEnabled) {
     sixenseSetActiveBase(0);
     static sixenseAllControllerData acd;
@@ -128,7 +146,7 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
         glm::vec3(left.joystick_x, right.joystick_y, -left.joystick_y)
             / 100.0f);
     rotateCamera(camera,
-        glm::angleAxis(-right.joystick_x, glm::vec3(0, 1, 0)));
+        glm::angleAxis(-right.joystick_x /100.0f, glm::vec3(0, 1, 0)));
   }
 #endif
 

@@ -19,10 +19,17 @@ public:
         Resource::IMAGES_SHOULDER_CAT_PNG,
         imageSize);
 
-    float imageAspect = (float)imageSize.x / (float)imageSize.y;
-    quadGeometry = GlUtils::getQuadGeometry(
-      glm::vec2(-1.0f, -1.0f / imageAspect),
-      glm::vec2(1.0f, 1.0f / imageAspect));
+    if (imageSize.x > imageSize.y) {
+      float imageAspect = (float)imageSize.x / (float)imageSize.y;
+      quadGeometry = GlUtils::getQuadGeometry(
+          glm::vec2(-1.0f, -1.0f / imageAspect),
+          glm::vec2(1.0f, 1.0f / imageAspect));
+    } else {
+      float imageAspect = (float)imageSize.y / (float)imageSize.x;
+      quadGeometry = GlUtils::getQuadGeometry(
+          glm::vec2(-1.0f / imageAspect, -1.0f),
+          glm::vec2(1.0f / imageAspect, 1.0f));
+    }
 
     program = GlUtils::getProgram(
           Resource::SHADERS_TEXTURED_VS,
@@ -30,14 +37,13 @@ public:
 
     OVR::HMDInfo hmdInfo;
     Rift::getHmdInfo(ovrManager, hmdInfo);
-    float lensOffset = 1.0f
-      - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
+    float lensOffset = 1.0f - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
 
     FOR_EACH_EYE(eye) {
       float eyeLensOffset = (eye == LEFT ? -lensOffset : lensOffset);
       projections[eye] = glm::ortho(
-        -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
-        -1.0f / eyeAspect, 1.0f / eyeAspect);
+          -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
+          -1.0f / eyeAspect, 1.0f / eyeAspect);
     }
   }
 

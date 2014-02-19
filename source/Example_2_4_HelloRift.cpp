@@ -153,9 +153,9 @@ public:
     OVR::HMDInfo hmdInfo;
     Rift::getHmdInfo(ovrManager, hmdInfo);
     RiftDistortionHelper helper(hmdInfo);
-    for (int i = 0; i < 2; ++i) {
-      eyeArgs[i].lookupTexture =
-        helper.createLookupTexture(glm::uvec2(512, 512), i);
+    FOR_EACH_EYE(eye) {
+      eyeArgs[eye].lookupTexture =
+        helper.createLookupTexture(glm::uvec2(512, 512), eye);
     }
 
   }

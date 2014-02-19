@@ -106,8 +106,8 @@ public:
     // The texture coordinates are actually from the center of the pixel, so thats what we need to use for the calculation.
     glm::vec2 texCenterOffset = glm::vec2(0.5f) / glm::vec2(lookupTextureSize);
     size_t rowSize = lookupTextureSize.x * 2;
-    for (int y = 0; y < lookupTextureSize.y; ++y) {
-      for (int x = 0; x < lookupTextureSize.x; ++x) {
+    for (size_t y = 0; y < lookupTextureSize.y; ++y) {
+      for (size_t x = 0; x < lookupTextureSize.x; ++x) {
         size_t offset = (y * rowSize) + (x * 2);
         glm::vec2 texCoord = (glm::vec2(x, y) / glm::vec2(lookupTextureSize)) + texCenterOffset;
         glm::vec2 sceneTexCoord = findSceneTextureCoords(eyeIndex, texCoord);

@@ -1,9 +1,5 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 const Resource STEREO_IMAGES[] = {
   IMAGES_STEREO_VLCSNAP_2_13_11_16_12H41M46S16__PNG,
   IMAGES_STEREO_VLCSNAP_2_13_11_16_19H47M52S211_PNG,
@@ -16,13 +12,12 @@ const int STEREO_IMAGE_COUNT = 5;
 
 class StereoscopicImages : public RiftGlfwApp {
 protected:
-  Texture2dPtr texture;
-  GeometryPtr quadGeometries[2];
+  gl::Texture2dPtr texture;
+  gl::GeometryPtr quadGeometries[2];
+  gl::ProgramPtr program;
   glm::mat4 projections[2];
-  ProgramPtr program;
   int imageIndex;
   bool stereo;
-  glm::uvec2 imageSize;
 
 public:
 
@@ -59,6 +54,7 @@ public:
       Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_TEXTURED_FS);
 
+    glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(texture, STEREO_IMAGES[imageIndex], imageSize);
 
     float imageAspectRatio = (float)imageSize.x / (float)imageSize.y;
@@ -105,26 +101,25 @@ public:
 
   void nextImage(int increment) {
     imageIndex = (imageIndex + STEREO_IMAGE_COUNT + increment) % STEREO_IMAGE_COUNT;
+    glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(texture, STEREO_IMAGES[imageIndex], imageSize);
   }
 
   virtual void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
-
     program->use();
     texture->bind();
-    glm::uvec2 position(0, 0);
-    gl::viewport(position, eyeSize);
-    for (int i = 0; i < 2; ++i) {
-      viewport(i);
-      program->setUniform("Projection", projections[i]);
-      int eyeIndex = stereo ? i : 0;
-      quadGeometries[eyeIndex]->bindVertexArray();
-      quadGeometries[eyeIndex]->draw();
+
+    FOR_EACH_EYE(eye) {
+      viewport(eye);
+      program->setUniform("Projection", projections[eye]);
+      Eye renderEye = stereo ? eye : LEFT;
+      quadGeometries[renderEye]->bindVertexArray();
+      quadGeometries[renderEye]->draw();
     }
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 
