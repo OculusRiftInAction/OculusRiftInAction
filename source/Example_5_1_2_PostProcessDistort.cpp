@@ -1,14 +1,10 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 class PostProcessDistort : public RiftGlfwApp {
 protected:
-  Texture2dPtr texture;
-  GeometryPtr geometry;
-  ProgramPtr program;
+  gl::Texture2dPtr texture;
+  gl::GeometryPtr geometry;
+  gl::ProgramPtr program;
 
 public:
 
@@ -25,9 +21,6 @@ public:
     program = GlUtils::getProgram(
       Resource::SHADERS_EXAMPLE_5_1_2_VS,
       Resource::SHADERS_EXAMPLE_5_1_2_FS);
-
-    program->use();
-    Program::clear();
   }
 
   virtual void draw() {
@@ -42,9 +35,9 @@ public:
       geometry->draw();
     }
 
-    VertexArray::unbind();
-    texture->unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 

@@ -23,6 +23,7 @@
 #include <cassert>
 #include <stdexcept>
 
+#undef HAVE_BOOST
 #ifdef HAVE_BOOST
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>

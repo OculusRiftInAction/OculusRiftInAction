@@ -8,10 +8,6 @@
 #include "Common.h"
 #include <openctmpp.h>
 
-using namespace glm;
-using namespace gl;
-using namespace std;
-
 void Mesh::clear() {
   positions.clear();
   normals.clear();
@@ -29,7 +25,7 @@ void Mesh::loadCtm(const std::string & data) {
   positions.resize(vertexCount);
   const float * ctmData = importer.GetFloatArray(CTM_VERTICES);
   for (int i = 0; i < vertexCount; ++i) {
-    positions[i] = glm::vec4(make_vec3(ctmData + (i * 3)), 1);
+    positions[i] = glm::vec4(glm::make_vec3(ctmData + (i * 3)), 1);
   }
 
   bool hasNormals = importer.GetInteger(CTM_HAS_NORMALS) ? true : false;
@@ -37,7 +33,7 @@ void Mesh::loadCtm(const std::string & data) {
     normals.resize(vertexCount);
     ctmData = importer.GetFloatArray(CTM_NORMALS);
     for (int i = 0; i < vertexCount; ++i) {
-      normals[i] = glm::vec4(make_vec3(ctmData + (i * 3)), 1);
+      normals[i] = glm::vec4(glm::make_vec3(ctmData + (i * 3)), 1);
     }
   }
 
@@ -49,9 +45,9 @@ void Mesh::loadCtm(const std::string & data) {
   }
 }
 
-vec3 transform(const mat4 & mat, const vec3 & vec) {
-  vec4 result = mat * vec4(vec, 1);
-  return vec3(result.x, result.y, result.z);
+glm::vec3 transform(const glm::mat4 & mat, const glm::vec3 & vec) {
+  glm::vec4 result = mat * glm::vec4(vec, 1);
+  return glm::vec3(result.x, result.y, result.z);
 }
 
 template<typename T>
@@ -61,7 +57,7 @@ void add_all(T & dest, const T & src) {
 }
 
 template<typename T>
-void add_all_transformed(const mat4 & xfm, T & dest, const T & src) {
+void add_all_transformed(const glm::mat4 & xfm, T & dest, const T & src) {
   int destSize = dest.size();
   dest.reserve(dest.size() + src.size());
   for (size_t i = 0; i < src.size(); ++i) {
@@ -120,7 +116,7 @@ void Mesh::addMesh(const Mesh & mesh, bool forceColor) {
 
   add_all(texCoords, mesh.texCoords);
   if (texCoords.size() && texCoords.size() != positions.size()) {
-    add_all(texCoords, VVec2(positions.size() - texCoords.size(), vec2()));
+    add_all(texCoords, VVec2(positions.size() - texCoords.size(), glm::vec2()));
   }
 
   // indices are copied and incremented
@@ -141,11 +137,12 @@ void Mesh::addQuad(float width, float height) {
   float y = height / 2.0f;
 
   VVec4 quad;
-  // C++11      { vec3(-x, -y, 0), vec3(x, -y, 0), vec3(x, y, 0), vec3(-x, y, 0),  });
-  quad.push_back(vec4(-x, -y, 0, 1));
-  quad.push_back(vec4(x, -y, 0, 1));
-  quad.push_back(vec4(x, y, 0, 1));
-  quad.push_back(vec4(-x, y, 0, 1));
+  // C++11      { glm::vec3(-x, -y, 0), glm::vec3(x, -y, 0), glm::vec3(x, y, 0), glm::vec3(-x, y, 0),  });
+  quad.push_back(glm::vec4(-x, -y, 0, 1));
+  quad.push_back(glm::vec4(x, -y, 0, 1));
+  quad.push_back(glm::vec4(x, y, 0, 1));
+  quad.push_back(glm::vec4(-x, y, 0, 1));
+
   // Positions are transformed
   add_all_transformed(model.top(), positions, quad);
   if (normals.size()) {
@@ -187,24 +184,24 @@ std::vector<glm::vec4> Mesh::buildVertices() const {
   int flags = getFlags();
   size_t attributeCount = getAttributeCount();
   size_t vertexCount = positions.size();
-  vector<vec4> vertices;
+  std::vector<glm::vec4> vertices;
   vertices.reserve(vertexCount * attributeCount);
   for (size_t i = 0; i < vertexCount; ++i) {
     vertices.push_back(positions[i]);
-    if (flags & Geometry::Flag::HAS_NORMAL) {
+    if (flags & gl::Geometry::Flag::HAS_NORMAL) {
       vertices.push_back(normals[i]);
     }
-    if (flags & Geometry::Flag::HAS_COLOR) {
-      vertices.push_back(vec4(colors[i], 1));
+    if (flags & gl::Geometry::Flag::HAS_COLOR) {
+      vertices.push_back(glm::vec4(colors[i], 1));
     }
-    if (flags & Geometry::Flag::HAS_TEXTURE) {
-      vertices.push_back(vec4(texCoords[i], 1, 1));
+    if (flags & gl::Geometry::Flag::HAS_TEXTURE) {
+      vertices.push_back(glm::vec4(texCoords[i], 1, 1));
     }
   }
   return vertices;
 }
 
-GeometryPtr Mesh::getGeometry(GLenum elementType) const {
+gl::GeometryPtr Mesh::getGeometry(GLenum elementType) const {
   validate();
   int flags = getFlags();
   size_t attributeCount = getAttributeCount();
@@ -226,7 +223,7 @@ GeometryPtr Mesh::getGeometry(GLenum elementType) const {
     verticesPerElement = 1;
     break;
   default:
-	  throw runtime_error("unsupported geometry type");
+	  throw std::runtime_error("unsupported geometry type");
   }
-  return GeometryPtr(new Geometry(vertices, indices, elements, flags, elementType, verticesPerElement));
+  return gl::GeometryPtr(new gl::Geometry(vertices, indices, elements, flags, elementType, verticesPerElement));
 }

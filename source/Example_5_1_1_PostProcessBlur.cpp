@@ -1,14 +1,10 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 class PostProcessBlur : public RiftGlfwApp {
 protected:
-  Texture2dPtr texture;
-  GeometryPtr quadGeometry;
-  ProgramPtr program;
+  gl::Texture2dPtr texture;
+  gl::GeometryPtr quadGeometry;
+  gl::ProgramPtr program;
   int eyeWidth;
 
 public:
@@ -44,7 +40,7 @@ public:
       Resource::SHADERS_EXAMPLE_5_1_1_FS);
     program->use();
     program->setUniform("ViewportAspectRatio", eyeAspect);
-    Program::clear();
+    gl::Program::clear();
   }
 
   virtual void draw() {
@@ -59,9 +55,9 @@ public:
       quadGeometry->draw();
     }
 
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 

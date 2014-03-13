@@ -7,6 +7,7 @@ public:
   Display() {
     OVR::Ptr<OVR::DeviceManager> ovrManager =
       *OVR::DeviceManager::Create();
+
     if (!ovrManager) {
       FAIL("Unable to create Rift device manager");
     }
@@ -17,12 +18,12 @@ public:
       FAIL("Unable to detect Rift display");
     }
 
-    OVR::HMDInfo hmdInfo;
-    ovrHmd->GetDeviceInfo(&hmdInfo);
+    OVR::HMDInfo ovrHmdInfo;
+    ovrHmd->GetDeviceInfo(&ovrHmdInfo);
     ovrHmd = nullptr;
 
     windowPosition = glm::ivec2(
-      hmdInfo.DesktopX, hmdInfo.DesktopY);
+      ovrHmdInfo.DesktopX, ovrHmdInfo.DesktopY);
 
     GLFWmonitor * hmdMonitor =
       GlfwApp::getMonitorAtPosition(windowPosition);

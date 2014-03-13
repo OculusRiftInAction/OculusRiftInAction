@@ -28,8 +28,8 @@ enum Eye {
 class Rift {
 public:
   static Eye EYES[];
-  static void getDk1HmdValues(OVR::HMDInfo & hmdInfo);
-  static void getRiftPositionAndSize(const OVR::HMDInfo & hmdInfo,
+  static void getDefaultDk1HmdValues(OVR::HMDInfo & hmdInfo);
+  static void getRiftPositionAndSize(const OVR::HMDInfo & ovrHmdInfo,
       glm::ivec2 & windowPosition, glm::uvec2 & windowSize);
 
   static glm::quat getStrabismusCorrection();
@@ -37,7 +37,7 @@ public:
 
   static void getHmdInfo(
     const OVR::Ptr<OVR::DeviceManager> & ovrManager,
-    OVR::HMDInfo & out);
+    OVR::HMDInfo & ovrHmdInfoOut);
 
   // Fetch a glm style quaternion from an OVR sensor fusion object
   static glm::quat getQuaternion(OVR::SensorFusion & sensorFusion);
@@ -63,10 +63,10 @@ typedef gl::Texture<GL_TEXTURE_2D, GL_RG16F> RiftLookupTexture;
 typedef RiftLookupTexture::Ptr RiftLookupTexturePtr;
 
 class RiftDistortionHelper {
-  glm::dvec4 K;
-  glm::dvec4 chromaK;
-  double lensOffset;
-  double eyeAspect;
+  glm::dvec4 K{ 1, 0, 0, 0 };
+  glm::dvec4 chromaK{ 1, 0, 1, 0 };
+  double lensOffset{ 0 };
+  double eyeAspect{ 0.06 };
 
   double getLensOffset(Eye eye) const;
   static glm::dvec2 screenToTexture(const glm::dvec2 & v);
@@ -93,10 +93,23 @@ public:
 class RiftManagerApp {
 protected:
   OVR::Ptr<OVR::DeviceManager> ovrManager;
+  OVR::HMDInfo ovrHmdInfo;
+  glm::uvec2 hmdNativeResolution;
+  glm::ivec2 hmdDesktopPosition;
+  glm::uvec2 eyeSize;
+  float eyeAspect{1};
+  float eyeAspectInverse{1};
 
 public:
   RiftManagerApp() {
     ovrManager = *OVR::DeviceManager::Create();
+    Rift::getHmdInfo(ovrManager, ovrHmdInfo);
+    hmdNativeResolution = glm::ivec2(ovrHmdInfo.HResolution, ovrHmdInfo.VResolution);
+    eyeAspect = glm::aspect(hmdNativeResolution) / 2.0f;
+    eyeAspectInverse = 1.0f / eyeAspect;
+    hmdDesktopPosition = glm::ivec2(ovrHmdInfo.DesktopX, ovrHmdInfo.DesktopY);
+    eyeSize = hmdNativeResolution;
+    eyeSize.x /= 2;
   }
 };
 
@@ -108,33 +121,18 @@ through the Rift.
 class RiftGlfwApp : public GlfwApp, public RiftManagerApp {
 protected:
   GLFWmonitor * hmdMonitor;
-  glm::uvec2 hmdNativeResolution;
-  glm::ivec2 hmdDesktopPosition;
-  glm::uvec2 eyeSize;
   const bool fullscreen;
-  float eyeAspect;
-  float eyeAspectInverse;
 
 public:
   RiftGlfwApp(bool fullscreen = false) :
-    fullscreen(fullscreen),
-    eyeAspect(1)
+    fullscreen(fullscreen)
   {
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    hmdNativeResolution = glm::ivec2(hmdInfo.HResolution, hmdInfo.VResolution);
-    eyeAspect = glm::aspect(hmdNativeResolution) / 2.0f;
-    eyeAspectInverse = 1.0f / eyeAspect;
-    hmdDesktopPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
     hmdMonitor = GlfwApp::getMonitorAtPosition(hmdDesktopPosition);
-    if (fullscreen || !hmdMonitor) {
-      eyeSize = hmdNativeResolution;
-    }
-    else {
+    if (!fullscreen && !hmdMonitor) {
       const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
       eyeSize = glm::uvec2(videoMode->width, videoMode->height);
+      eyeSize.x /= 2;
     }
-    eyeSize.x /= 2;
   }
 
   virtual void createRenderingTarget() {
@@ -220,7 +218,7 @@ protected:
   glm::mat4 getProjection() const {
     return glm::perspective(fov, eyeAspect, Rift::ZNEAR, Rift::ZFAR);
   }
-  
+
   virtual void createRenderingTarget();
   virtual void initGl();
   virtual void onKey(int key, int scancode, int action, int mods);

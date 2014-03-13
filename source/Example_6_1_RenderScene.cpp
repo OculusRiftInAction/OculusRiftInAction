@@ -5,11 +5,25 @@ struct PerEyeArg {
   glm::mat4 projectionOffset;
   glm::mat4 modelviewOffset;
 
-  PerEyeArg(Eye eye)
-    : eye(eye) { }
+  PerEyeArg(Eye eye, const OVR::HMDInfo & ovrHmdInfo)
+    : eye(eye) { 
+    OVR::Ptr<OVR::ProfileManager> profileManager = *OVR::ProfileManager::Create();
+    OVR::Ptr<OVR::Profile> profile = *(profileManager->GetDeviceDefaultProfile(OVR::ProfileType::Profile_RiftDK1));
+    float ipd = profile->GetIPD();
+    modelviewOffset = glm::translate(glm::mat4(),
+      glm::vec3(ipd / 2.0f, 0, 0));
+    if (eye == RIGHT) {
+      modelviewOffset = glm::inverse(modelviewOffset);
+    }
+    profileManager.Clear();
 
-  glm::mat4 getProjection() const {
-    return projectionOffset;
+    OVR::Util::Render::StereoConfig config;
+    config.SetHMDInfo(ovrHmdInfo);
+    projectionOffset = glm::translate(glm::mat4(),
+      glm::vec3(config.GetProjectionCenterOffset(), 0, 0));
+    if (eye == RIGHT) {
+      projectionOffset = glm::inverse(projectionOffset);
+    }
   }
 };
 
@@ -17,40 +31,24 @@ class SimpleScene: public RiftGlfwApp {
   glm::mat4 player;
   glm::mat4 projection;
   gl::TextureCubeMapPtr skyboxTexture;
-  gl::GeometryPtr treeGeometry;
-  float ipd;
-  float eyeHeight;
-  bool applyProjectionOffset;
-  bool applyModelviewOffset;
-  std::array<PerEyeArg, 2> eyes;
+  float ipd{ 0.06f };
+  float eyeHeight{ 1.0f };
+  bool applyProjectionOffset{ true };
+  bool applyModelviewOffset{ true };
+  const std::array<PerEyeArg, 2> eyes;
   
 public:
-  SimpleScene() : eyes({ { PerEyeArg(LEFT), PerEyeArg(RIGHT) } }) {
-    eyeHeight = 1.0f;
-    applyProjectionOffset = true;
-    applyModelviewOffset = true;
-    {
-      OVR::Ptr<OVR::ProfileManager> profileManager = *OVR::ProfileManager::Create();
-      OVR::Ptr<OVR::Profile> profile = *(profileManager->GetDeviceDefaultProfile(OVR::ProfileType::Profile_RiftDK1));
-      ipd = profile->GetIPD();
-      eyeHeight = profile->GetEyeHeight();
-      glm::mat4 modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(ipd / 2.0f, 0, 0));
-      eyes[LEFT].modelviewOffset = modelviewOffset;
-      eyes[RIGHT].modelviewOffset = glm::inverse(modelviewOffset);
-    }
+  SimpleScene() : eyes({ { PerEyeArg(LEFT, ovrHmdInfo), PerEyeArg(RIGHT, ovrHmdInfo) } }) {
+    OVR::Ptr<OVR::ProfileManager> profileManager = *OVR::ProfileManager::Create();
+    OVR::Ptr<OVR::Profile> profile = *(profileManager->GetDeviceDefaultProfile(OVR::ProfileType::Profile_RiftDK1));
+    ipd = profile->GetIPD();
+    eyeHeight = profile->GetEyeHeight();
 
     {
-      OVR::HMDInfo hmdInfo;
-      Rift::getHmdInfo(ovrManager, hmdInfo);
       OVR::Util::Render::StereoConfig config;
-      config.SetHMDInfo(hmdInfo);
-      gl::Stacks::projection().top() = 
+      config.SetHMDInfo(ovrHmdInfo);
+      gl::Stacks::projection().top() =
         glm::perspective(config.GetYFOVRadians(), eyeAspect, 0.01f, 1000.0f);
-      glm::mat4 projectionOffset = glm::translate(glm::mat4(),
-        glm::vec3(config.GetProjectionCenterOffset(), 0, 0));
-      eyes[LEFT].projectionOffset = projectionOffset;
-      eyes[RIGHT].projectionOffset = glm::inverse(projectionOffset);
     }
 
     glm::vec3 playerPosition(0, eyeHeight, ipd * 4.0f);
@@ -72,19 +70,22 @@ public:
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
+    // Handles WASD keys for movement, as well as Razer Hydra, joystick & spacemouse
+    if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+      return;
+    }
+
     if (action == GLFW_PRESS) switch (key) {
     case GLFW_KEY_P:
       applyProjectionOffset = !applyProjectionOffset;
       return;
+
     case GLFW_KEY_M:
       applyModelviewOffset = !applyModelviewOffset;
       return;
+
     case GLFW_KEY_R:
       player = glm::inverse(glm::lookAt(glm::vec3(0, eyeHeight, ipd * 4.0f), glm::vec3(0, eyeHeight, 0), GlUtils::Y_AXIS));
-      return;
-    }
-
-    if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
       return;
     }
 
@@ -119,8 +120,9 @@ public:
 
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     GlUtils::renderFloorGrid(player);
+
     mv.push().translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
-    GlUtils::drawColorCube();
+    GlUtils::drawColorCube(true);
     mv.pop();
 
     mv.pop();

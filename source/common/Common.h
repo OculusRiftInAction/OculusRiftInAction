@@ -21,6 +21,7 @@
 
 
 #ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #if !defined(_DEBUG)
 #undef RIFT_DEBUG
@@ -102,13 +103,6 @@ public:
 #ifndef TWO_PI
 #define TWO_PI (PI * 2.0f)
 #endif
-
-// What is Tau?
-// http://tauday.com/
-// http://www.youtube.com/watch?v=jG7vhMMXagQ
-#define TAU TWO_PI
-#define HALF_TAU PI
-#define QUARTER_TAU HALF_PI
 
 #ifndef RADIANS_TO_DEGREES
 #define RADIANS_TO_DEGREES (180.0f / PI)

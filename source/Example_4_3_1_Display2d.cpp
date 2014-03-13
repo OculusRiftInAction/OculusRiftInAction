@@ -18,12 +18,12 @@ public:
         Resource::IMAGES_SHOULDER_CAT_PNG,
         imageSize);
     quadGeometry = GlUtils::getQuadGeometry(
-      glm::vec2(-1.0f, -1.0f),
-      glm::vec2(1.0f, 1.0f));
+        glm::vec2(-1.0f, -1.0f),
+        glm::vec2(1.0f, 1.0f));
 
     program = GlUtils::getProgram(
-          Resource::SHADERS_TEXTURED_VS,
-          Resource::SHADERS_TEXTURED_FS);
+        Resource::SHADERS_TEXTURED_VS,
+        Resource::SHADERS_TEXTURED_FS);
   }
 
   virtual void draw() {
@@ -32,7 +32,7 @@ public:
     texture->bind();
     quadGeometry->bindVertexArray();
 
-    FOR_EACH_EYE(eye) {
+    for (int eye = 0; eye <= 1; eye++) {
       viewport(eye);
       quadGeometry->draw();
     }

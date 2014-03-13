@@ -8,9 +8,6 @@ const float DISPLACEMENT_MAP_SCALE = 0.02f;
 const float Rift::ZFAR = 10000.0f;
 const float Rift::ZNEAR = 0.01f;
 
-
-using namespace OVR;
-
 Eye Rift::EYES[] = {
   LEFT, RIGHT
 };
@@ -73,7 +70,7 @@ void Rift::setStrabismusCorrection(const glm::quat & q) {
 }
 
 
-void Rift::getDk1HmdValues(OVR::HMDInfo & hmdInfo) {
+void Rift::getDefaultDk1HmdValues(OVR::HMDInfo & hmdInfo) {
   hmdInfo.HResolution = 1280;
   hmdInfo.VResolution = 800;
   hmdInfo.HScreenSize = 0.14976f;
@@ -103,7 +100,7 @@ void Rift::getHmdInfo(
   OVR::Ptr<OVR::HMDDevice> ovrHmd = *ovrManager->
       EnumerateDevices<OVR::HMDDevice>().CreateDevice();
   if (!ovrHmd) {
-    getDk1HmdValues(out);
+    getDefaultDk1HmdValues(out);
     return;
   }
   ovrHmd->GetDeviceInfo(&out);

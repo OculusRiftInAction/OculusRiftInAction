@@ -47,7 +47,6 @@ endfunction()
 
 make_examples(*.cpp "Examples")
 
-make_examples(scratch/*.cpp "Examples/Scratch")
 
 if (OpenCV_FOUND) 
     make_examples(opencv/*.cpp "Examples/OpenCV")
@@ -57,3 +56,7 @@ if (STEAMWORKS_FOUND)
     make_examples(steamworks/*.cpp  "Examples/Steamworks")
 endif()
 
+if ("$ENV{USERNAME}" STREQUAL "bdavis" OR "$ENV{USER}" STREQUAL "bdavis" OR "$ENV{USER}" STREQUAL "bradd")
+    message("Building scratch examples") 
+    make_examples(scratch/*.cpp "Examples/Scratch")
+endif()

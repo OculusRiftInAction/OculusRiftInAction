@@ -35,9 +35,6 @@
 
 #endif
 
-using namespace gl;
-using namespace std;
-
 // Adapted (totally different from 'stolen') from OpenFrameworks
 const glm::vec3 Colors::gray(1.0f / 2, 1.0f / 2, 1.0f / 2);
 const glm::vec3 Colors::white(1.0f, 1.0f, 1.0f);
@@ -279,8 +276,8 @@ const glm::vec3 GlUtils::UP = glm::vec3(0.0f, 1.0f, 0.0f);
 //  return result;
 //}
 //
-VertexBufferPtr getCubeVertices() {
-  VertexBufferPtr result(new VertexBuffer());
+gl::VertexBufferPtr getCubeVertices() {
+  gl::VertexBufferPtr result(new gl::VertexBuffer());
   // Create the buffers for the texture quad we will draw
   result->bind();
   GL_CHECK_ERROR;
@@ -291,8 +288,8 @@ VertexBufferPtr getCubeVertices() {
   return result;
 }
 
-IndexBufferPtr getCubeIndices() {
-  IndexBufferPtr result(new IndexBuffer());
+gl::IndexBufferPtr getCubeIndices() {
+  gl::IndexBufferPtr result(new gl::IndexBuffer());
   result->bind();
   (*result) << gl::makeArrayLoader(CUBE_INDICES);
   result->unbind();
@@ -300,8 +297,8 @@ IndexBufferPtr getCubeIndices() {
   return result;
 }
 
-IndexBufferPtr getCubeWireIndices() {
-  IndexBufferPtr result(new IndexBuffer());
+gl::IndexBufferPtr getCubeWireIndices() {
+  gl::IndexBufferPtr result(new gl::IndexBuffer());
   result->bind();
   (*result) << gl::makeArrayLoader(CUBE_WIRE_INDICES);
   result->unbind();
@@ -320,50 +317,24 @@ void GlUtils::tumble(const glm::vec3 & camera) {
       Platform::elapsedMillis() * Z_ROTATION_RATE, GlUtils::Z_AXIS);
 }
 
-//    void ArtificialHorizon::customDraw() {
-//        ofPushMatrix();
-//            ofRotateX(90);
-//            ofSetColor(255, 100, 0);
-//            hemi.draw();
-//            ofSetColor(20);
-//            ofTranslate(0, 0, 1.02);
-//            ofCircle(0, 0, 0.25);
-//        ofPopMatrix();
-//
-//        ofPushMatrix();
-//            ofRotateX(-90);
-//            ofSetColor(100, 100, 255);
-//            hemi.draw();
-//            ofSetColor(20);
-//            ofTranslate(0, 0, 1.02);
-//            ofCircle(0, 0, 0.25);
-//        ofPopMatrix();
-//
-//        ofSetColor(20);
-//
-//        ofPushMatrix();
-//            ofTranslate(0, 0, 1.02);
-//            ofRect(-0.50, -0.02, 1.0, 0.04);
-//        ofPopMatrix();
-
 void GlUtils::renderGeometry(
-    const GeometryPtr & geometry,
+  const gl::GeometryPtr & geometry,
     gl::ProgramPtr program) {
   program->use();
-  Stacks::lights().apply(program);
-  Stacks::projection().apply(program);
-  Stacks::modelview().apply(program);
+  gl::Stacks::lights().apply(program);
+  gl::Stacks::projection().apply(program);
+  gl::Stacks::modelview().apply(program);
   geometry->bindVertexArray();
   geometry->draw();
 
-  VertexArray::unbind();
-  Program::clear();
+  gl::VertexArray::unbind();
+  gl::Program::clear();
 }
 
 void GlUtils::renderBunny() {
-  static GeometryPtr bunnyGeometry =
+  static gl::GeometryPtr bunnyGeometry =
       getMesh(Resource::MESHES_BUNNY2_CTM).getGeometry();
-  ProgramPtr program = GlUtils::getProgram(
+  gl::ProgramPtr program = GlUtils::getProgram(
       Resource::SHADERS_LITCOLORED_VS,
       Resource::SHADERS_LITCOLORED_FS);
   program->use();
@@ -546,7 +517,10 @@ void getPngImageData(
   outSize.x = width;
   outSize.y = height;
 
-  const ::uint32_t bytesPerRow = png_get_rowbytes(png_ptr, info_ptr);
+  uint32_t bytesPerRow = png_get_rowbytes(png_ptr, info_ptr);
+  if (bytesPerRow % 4) {
+    bytesPerRow += (4 - (bytesPerRow % 4));
+  }
   outData.resize(bytesPerRow * height);
   ::uint8_t * textureData = &outData[0];
 
@@ -601,10 +575,10 @@ void GlUtils::getImageData(
 #define EPSILON 0.002
 
 void GlUtils::renderArtificialHorizon(float alpha) {
-  static GeometryPtr geometry;
+  static gl::GeometryPtr geometry;
   if (!geometry) {
     Mesh mesh;
-    MatrixStack & m = mesh.getModel();
+    gl::MatrixStack & m = mesh.getModel();
 
     m.push();
     {
@@ -616,32 +590,32 @@ void GlUtils::renderArtificialHorizon(float alpha) {
       glm::vec2 bar(0.5, 0.025);
       glm::vec2 smallBar(0.3, 0.015);
       for (int i = 1; i <= 4; ++i) {
-        float angle = i * (TAU / 18.0f);
+        float angle = i * (TWO_PI / 18.0f);
         m.identity().rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(bar);
-        m.identity().rotate(HALF_TAU, GlUtils::Y_AXIS).rotate(angle,
+        m.identity().rotate(PI, GlUtils::Y_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(bar);
-        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(angle,
+        m.identity().rotate(PI, GlUtils::Z_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(bar);
-        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(HALF_TAU,
+        m.identity().rotate(PI, GlUtils::Z_AXIS).rotate(PI,
             GlUtils::Y_AXIS).rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(bar);
 
-        angle -= (TAU / 36.0f);
+        angle -= (TWO_PI / 36.0f);
         m.identity().rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
-        m.identity().rotate(HALF_TAU, GlUtils::Y_AXIS).rotate(angle,
+        m.identity().rotate(PI, GlUtils::Y_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
-        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(angle,
+        m.identity().rotate(PI, GlUtils::Z_AXIS).rotate(angle,
             GlUtils::X_AXIS).translate(GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
-        m.identity().rotate(HALF_TAU, GlUtils::Z_AXIS).rotate(HALF_TAU,
+        m.identity().rotate(PI, GlUtils::Z_AXIS).rotate(PI,
             GlUtils::Y_AXIS).rotate(angle, GlUtils::X_AXIS).translate(
             GlUtils::Z_AXIS);
         mesh.addQuad(smallBar);
@@ -651,15 +625,15 @@ void GlUtils::renderArtificialHorizon(float alpha) {
     mesh.fillNormals(true);
 
     const Mesh & hemi = getMesh(Resource::MESHES_HEMI_CTM);
-    m.top() = glm::rotate(glm::mat4(), -QUARTER_TAU, GlUtils::X_AXIS);
+    m.top() = glm::rotate(glm::mat4(), -PI / 2.0f, GlUtils::X_AXIS);
     mesh.getColor() = Colors::cyan;
     mesh.addMesh(hemi, true);
 
-    m.top() = glm::rotate(glm::mat4(), QUARTER_TAU, GlUtils::X_AXIS);
+    m.top() = glm::rotate(glm::mat4(), PI / 2.0f, GlUtils::X_AXIS);
     mesh.getColor() = Colors::orange;
     mesh.addMesh(hemi);
     {
-      set<int> poleIndices;
+      std::set<int> poleIndices;
       for (size_t i = 0; i < mesh.positions.size(); ++i) {
         const glm::vec4 & v = mesh.positions[i];
         if (abs(v.x) < EPSILON && abs(v.z) < EPSILON) {
@@ -683,7 +657,7 @@ void GlUtils::renderArtificialHorizon(float alpha) {
     }
     geometry = mesh.getGeometry();
   }
-  ProgramPtr program = getProgram(
+  gl::ProgramPtr program = getProgram(
       Resource::SHADERS_LITCOLORED_VS,
       Resource::SHADERS_LITCOLORED_FS);
   program->use();
@@ -700,10 +674,16 @@ void GlUtils::renderRift() {
     mesh.addMesh(sourceMesh);
     geometry = mesh.getGeometry();
   }
-  ProgramPtr program = getProgram(
+  gl::ProgramPtr program = getProgram(
       Resource::SHADERS_LIT_VS,
       Resource::SHADERS_LITCOLORED_FS);
+
+  // The Rift model is aligned with the wrong axis, so we
+  // rotate it by 90 degrees
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.push().rotate(glm::angleAxis(-HALF_PI, GlUtils::X_AXIS));
   GlUtils::renderGeometry(geometry, program);
+  mv.pop();
 }
 
 
@@ -717,19 +697,19 @@ void GlUtils::drawQuad(const glm::vec2 & min, const glm::vec2 & max) {
 }
 
 gl::GeometryPtr GlUtils::getColorCubeGeometry() {
-  static GeometryPtr  geometry;
+  static gl::GeometryPtr  geometry;
   if (!geometry) {
     Mesh mesh;
     glm::vec3 move(0, 0, 0.5f);
     gl::MatrixStack & m = mesh.model;
 
-    m.push().rotate(glm::angleAxis(QUARTER_TAU, Y_AXIS)).translate(move);
+    m.push().rotate(glm::angleAxis(PI / 2.0f, Y_AXIS)).translate(move);
     mesh.color = Colors::red;
     mesh.addQuad(glm::vec2(1.0));
     mesh.fillColors(true);
     m.pop();
 
-    m.push().rotate(glm::angleAxis(-QUARTER_TAU, X_AXIS)).translate(move);
+    m.push().rotate(glm::angleAxis(-PI / 2.0f, X_AXIS)).translate(move);
     mesh.color = Colors::green;
     mesh.addQuad(glm::vec2(1.0));
     m.pop();
@@ -739,17 +719,17 @@ gl::GeometryPtr GlUtils::getColorCubeGeometry() {
     mesh.addQuad(glm::vec2(1.0));
     m.pop();
 
-    m.push().rotate(glm::angleAxis(-QUARTER_TAU, Y_AXIS)).translate(move);
+    m.push().rotate(glm::angleAxis(-PI / 2.0f, Y_AXIS)).translate(move);
     mesh.color = Colors::cyan;
     mesh.addQuad(glm::vec2(1.0));
     m.pop();
 
-    m.push().rotate(glm::angleAxis(QUARTER_TAU, X_AXIS)).translate(move);
+    m.push().rotate(glm::angleAxis(PI / 2.0f, X_AXIS)).translate(move);
     mesh.color = Colors::yellow;
     mesh.addQuad(glm::vec2(1.0));
     m.pop();
 
-    m.push().rotate(glm::angleAxis(-HALF_TAU, X_AXIS)).translate(move);
+    m.push().rotate(glm::angleAxis(-PI / 2.0f, X_AXIS)).translate(move);
     mesh.color = Colors::magenta;
     mesh.addQuad(glm::vec2(1.0));
     m.pop();
@@ -760,7 +740,7 @@ gl::GeometryPtr GlUtils::getColorCubeGeometry() {
 }
 
 
-void GlUtils::drawColorCube() {
+void GlUtils::drawColorCube(bool lit) {
   // These hold the vertices, indices and the binding between the
   // Shader variable names and the values loaded into video memory
   /*
@@ -771,6 +751,10 @@ void GlUtils::drawColorCube() {
       new Geometry(getCubeVertices(), getCubeWireIndices(),
       CUBE_EDGE_COUNT * VERTICES_PER_EDGE, 0));
       */
+  Resource vertexShader = lit ? Resource::SHADERS_LITCOLORED_VS :
+    Resource::SHADERS_COLORED_VS;
+  Resource fragmentShader = lit ? Resource::SHADERS_LITCOLORED_FS :
+    Resource::SHADERS_COLORED_FS;
 
   const gl::ProgramPtr & renderProgram = GlUtils::getProgram(
       Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
@@ -778,56 +762,49 @@ void GlUtils::drawColorCube() {
 }
 
 void GlUtils::drawAngleTicks() {
-// Only necessary if you're using the fixed function pipeline
-// Fix the modelview at exactly 1 unit away from the origin, no rotation
-//  gl::Stacks::modelview().push(glm::mat4(1)).translate(glm::vec3(0, 0, -1));
-//  glMatrixMode(GL_MODELVIEW);
-//  glLoadMatrixf(glm::value_ptr(gl::Stacks::modelview().top()));
-//  glMatrixMode(GL_PROJECTION);
-//  glLoadMatrixf(glm::value_ptr(gl::Stacks::projection().top()));
-//
-//  float offsets[] = { //
-//      (float) tan( PI / 6.0f), // 30 degrees
-//      (float) tan( PI / 4.0f), // 45 degrees
-//      (float) tan( PI / 3.0f) // 60 degrees
-//      };
-// 43.9 degrees puts tick on the inner edge of the screen
-//           tan( PI / 4.22f ), // 42.6 degrees is the effective fov for wide screen
-//                             // 43.9 degrees puts tick on the inner edge of the screen
+  using namespace gl;
+  static GeometryPtr g;
+  if (!g) {
+    float offsets[] = { //
+      (float) tan( PI / 6.0f), // 30 degrees
+      (float) tan( PI / 4.0f), // 45 degrees
+      (float) tan( PI / 3.0f) // 60 degrees
+    };
+    Mesh m;
+    // 43.9 degrees puts tick on the inner edge of the screen
+    // 42.6 degrees is the effective fov for wide screen
+    // 43.9 degrees puts tick on the inner edge of the screen
+    m.addVertex(glm::vec3(-2, 0, 0));
+    m.addVertex(glm::vec3(2, 0, 0));
+    m.addVertex(glm::vec3(0, -2, 0));
+    m.addVertex(glm::vec3(0, 2, 0));
+    // By keeping the camera locked at 1 unit away from the origin, all our
+    // distances can be computed as tan(angle)
+    for (float offset : offsets) {
+      m.addVertex(glm::vec3(offset, -0.05, 0));
+      m.addVertex(glm::vec3(offset, 0.05, 0));
+      m.addVertex(glm::vec3(-offset, -0.05, 0));
+      m.addVertex(glm::vec3(-offset, 0.05, 0));
+    }
+    for (float offset : offsets) {
+      m.addVertex(glm::vec3(-0.05, offset, 0));
+      m.addVertex(glm::vec3(0.05, offset, 0));
+      m.addVertex(glm::vec3(-0.05, -offset, 0));
+      m.addVertex(glm::vec3(0.05, -offset, 0));
+    }
+    g = m.getGeometry(GL_LINES);
+  }
 
-//  glLineWidth(4.0);
-//  glBegin(GL_LINES);
-//  glColor3f(1, 1, 1);
-//  gl::vertex(glm::vec3(-2, 0, 0));
-//  gl::vertex(glm::vec3(2, 0, 0));
-//  gl::vertex(glm::vec3(0, -2, 0));
-//  gl::vertex(glm::vec3(0, 2, 0));
-//
-//// By keeping the camera locked at 1 unit away from the origin, all our
-//// distances can be computer as tan(angle)
-//  for (float offset : offsets) {
-//    glColor3f(0, 1, 1);
-//  gl::vertex(glm::vec3(offset, -0.05, 0));
-//  gl::vertex(glm::vec3(offset, 0.05, 0));
-//  gl::vertex(glm::vec3(-offset, -0.05, 0));
-//  gl::vertex(glm::vec3(-offset, 0.05, 0));
-//  }
-//  for (float offset : offsets) {
-//    glColor3f(0, 1, 1);
-//  gl::vertex(glm::vec3(-0.05, offset, 0));
-//  gl::vertex(glm::vec3(0.05, offset, 0));
-//  gl::vertex(glm::vec3(-0.05, -offset, 0));
-//  gl::vertex(glm::vec3(0.05, -offset, 0));
-//  }
-//  glEnd();
-//  gl::Stacks::modelview().pop();
+  // Fix the modelview at exactly 1 unit away from the origin, no rotation
+  gl::Stacks::modelview().push(glm::mat4(1)).translate(glm::vec3(0, 0, -1));
+  ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
+  program->use();
+  renderGeometry(g, program);
+  gl::Stacks::modelview().pop();
 }
 
 void GlUtils::draw3dGrid() {
-  using namespace gl;
-
-  GL_CHECK_ERROR;
-  static GeometryPtr g;
+  static gl::GeometryPtr g;
   if (!g) {
     Mesh m;
     for (int i = 0; i < 5; ++i) {
@@ -849,7 +826,7 @@ void GlUtils::draw3dGrid() {
     m.addVertex(-Z_AXIS);
     g = m.getGeometry(GL_LINES);
   }
-  ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
+  gl::ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
   GL_CHECK_ERROR;
   program->use();
   GL_CHECK_ERROR;
@@ -876,22 +853,6 @@ void GlUtils::draw3dGrid() {
 //}
 //
 
-namespace gl {
-  void color(const glm::vec3 & color) {
-    glColor3f(color.r, color.g, color.b);
-  }
-  void vertex(const glm::vec3 & v) {
-    glVertex3f(v.x, v.y, v.z);
-  }
-
-  template <size_t SIZE>
-  void vertices(glm::vec3 vs[SIZE]) {
-    for (int i = 0; i < SIZE; ++i) {
-      vertex(vs[i]);
-    }
-  }
-}
-//  vertex(glm::vec3(0));
 
 
 void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
@@ -910,45 +871,20 @@ void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
   m.addVertex(glm::vec3());
 
   m.fillColors();
-  static GeometryPtr g = m.getGeometry(GL_LINES);
+  static gl::GeometryPtr g = m.getGeometry(GL_LINES);
   g->updateVertices(m.buildVertices());
 
-  ProgramPtr program = getProgram(
+  gl::ProgramPtr program = getProgram(
       Resource::SHADERS_COLORED_VS,
       Resource::SHADERS_COLORED_FS);
   program->use();
   renderGeometry(g, program);
   gl::Program::clear();
-
-
-//  lineWidth(1.0f);
-//  float len = glm::length(vec);
-//  if (len > 1.0f) {
-//    vec /= len;
-//  }
-//  gl::Program::clear();
-//
-//  glLineWidth(2.0f + len);
-//  glBegin(GL_LINES);
-//  gl::color(col);
-//  gl::vertex();
-//  gl::vertex();
-//  glEnd();
-//
-//  glLineWidth(1.0f);
-//  glBegin(GL_LINE_STRIP);
-//  gl::color(Colors::gray);
-//  gl::vertex(glm::vec3());
-//  gl::vertex(glm::vec3(vec.x, 0, vec.z));
-//  gl::vertex(vec);
-//  glEnd();
 }
 
-using namespace Text;
-
-wstring toUtf16(const string & text) {
+std::wstring toUtf16(const std::string & text) {
 //    wstring_convert<codecvt_utf8_utf16<wchar_t>> converter;
-  wstring wide(text.begin(), text.end()); //= converter.from_bytes(narrow.c_str());
+  std::wstring wide(text.begin(), text.end()); //= converter.from_bytes(narrow.c_str());
   return wide;
 }
 
@@ -970,7 +906,7 @@ wstring toUtf16(const string & text) {
 //  renderGeometry(line, lineProgram);
 //}
 
-void GlUtils::renderString(const string & cstr, glm::vec2 & cursor,
+void GlUtils::renderString(const std::string & cstr, glm::vec2 & cursor,
     float fontSize, Resource fontResource) {
   getFont(fontResource)->renderString(toUtf16(cstr), cursor, fontSize);
 }
@@ -979,7 +915,7 @@ void GlUtils::renderParagraph(const std::string & str) {
   glm::vec2 cursor;
   Text::FontPtr font = getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
   rectf bounds;
-  wstring wstr = toUtf16(str);
+  std::wstring wstr = toUtf16(str);
   for (size_t i = 0; i < wstr.length(); ++i) {
     uint16_t wchar = wstr.at(i);
     rectf letterBound = font->getBounds(wchar);
@@ -989,7 +925,7 @@ void GlUtils::renderParagraph(const std::string & str) {
   renderString(str, cursor);
 }
 
-void GlUtils::renderString(const string & str, glm::vec3 & cursor3d,
+void GlUtils::renderString(const std::string & str, glm::vec3 & cursor3d,
     float fontSize, Resource fontResource) {
   glm::vec4 target = glm::vec4(cursor3d, 0);
   target = gl::Stacks::projection().top() * gl::Stacks::modelview().top() * target;
@@ -998,10 +934,10 @@ void GlUtils::renderString(const string & str, glm::vec3 & cursor3d,
 }
 
 Text::FontPtr GlUtils::getFont(Resource fontName) {
-  static map<Resource, FontPtr> fonts;
+  static std::map<Resource, Text::FontPtr> fonts;
   if (fonts.find(fontName) == fonts.end()) {
     std::string fontData = Platform::getResourceData(fontName);
-    FontPtr result(new Font());
+    Text::FontPtr result(new Text::Font());
     result->read((const void*)fontData.data(), fontData.size());
     fonts[fontName] = result;
   }
@@ -1028,7 +964,7 @@ template<GLenum TYPE> struct ShaderInfo {
     std::string shaderSource =
       Platform::getResourceData(resource);
     modified = Resources::getResourceModified(resource);
-    shader = ShaderPtr(new Shader(TYPE, shaderSource));
+    shader = gl::ShaderPtr(new gl::Shader(TYPE, shaderSource));
   }
 
   bool update(Resource resource) {
@@ -1040,39 +976,39 @@ template<GLenum TYPE> struct ShaderInfo {
   }
 };
 
-const ProgramPtr & GlUtils::getProgram(Resource vs, Resource fs) {
+const gl::ProgramPtr & GlUtils::getProgram(Resource vs, Resource fs) {
   typedef ShaderInfo<GL_VERTEX_SHADER> VShader;
   typedef ShaderInfo<GL_FRAGMENT_SHADER> FShader;
-  typedef unordered_map<Resource, VShader> VMap;
-  typedef unordered_map<Resource, FShader> FMap;
+  typedef std::unordered_map<Resource, VShader> VMap;
+  typedef std::unordered_map<Resource, FShader> FMap;
   static VMap vShaders;
   static FMap fShaders;
-  typedef unordered_map<string, ProgramPtr> ProgramMap;
+  typedef std::unordered_map<std::string, gl::ProgramPtr> ProgramMap;
   static ProgramMap programs;
-  shader_error lastError(0, "none");
+  gl::shader_error lastError(0, "none");
   VShader & vsi = vShaders[vs];
   FShader & fsi = fShaders[fs];
-  string key = Resources::getResourcePath(vs) + ":" +
+  std::string key = Resources::getResourcePath(vs) + ":" +
     Resources::getResourcePath(fs);
   try {
     bool relink = vsi.update(vs) | fsi.update(fs);
     if (relink || programs.end() == programs.find(key)) {
-      cerr << "Relinking " + key << endl;
-      programs[key] = ProgramPtr(new Program(vsi.shader, fsi.shader));
+      std::cerr << "Relinking " + key << std::endl;
+      programs[key] = gl::ProgramPtr(new gl::Program(vsi.shader, fsi.shader));
     }
-  } catch (const shader_error & error) {
+  } catch (const gl::shader_error & error) {
     lastError = error;
   }
   if (!programs[key]) {
     throw lastError;
   }
-  const ProgramPtr & ptr = programs[key];
+  const gl::ProgramPtr & ptr = programs[key];
   //GL_CHECK_ERROR;
   return ptr;
 }
 
 const Mesh & GlUtils::getMesh(Resource res) {
-  typedef map<Resource, MeshPtr> MeshMap;
+  typedef std::map<Resource, MeshPtr> MeshMap;
   static MeshMap meshes;
   if (0 == meshes.count(res)) {
     std::string meshData = Platform::getResourceData(res);
@@ -1088,7 +1024,7 @@ void GlUtils::renderSkybox(Resource firstResource) {
     Resource::SHADERS_CUBEMAP_FS);
 
   // Skybox texture
-  MatrixStack & mv = gl::Stacks::modelview();
+  gl::MatrixStack & mv = gl::Stacks::modelview();
   mv.push().untranslate();
 
   // TODO better state management
@@ -1114,7 +1050,7 @@ gl::TextureCubeMapPtr GlUtils::getCubemapTextures(Resource firstResource) {
     GL_CHECK_ERROR;
     //glEnable(GL_TEXTURE_CUBE_MAP);
     GL_CHECK_ERROR;
-    TextureCubeMapPtr texture(new TextureCubeMap());
+    gl::TextureCubeMapPtr texture(new gl::TextureCubeMap());
     texture->bind();
     texture->parameter(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     texture->parameter(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1142,7 +1078,7 @@ gl::TextureCubeMapPtr GlUtils::getCubemapTextures(Resource firstResource) {
       GL_CHECK_ERROR;
     }
 
-    TextureCubeMap::unbind();
+    gl::TextureCubeMap::unbind();
     skyboxMap[firstResource] = texture;
     return texture;
   }
@@ -1150,9 +1086,9 @@ gl::TextureCubeMapPtr GlUtils::getCubemapTextures(Resource firstResource) {
 }
 
 gl::GeometryPtr GlUtils::getCubeGeometry() {
-  static GeometryPtr cube;
+  static gl::GeometryPtr cube;
   if (!cube) {
-    cube = GeometryPtr(new Geometry(
+    cube = gl::GeometryPtr(new gl::Geometry(
         getCubeVertices(),
         getCubeIndices(),
         12, 0, GL_TRIANGLES, 3));
@@ -1165,7 +1101,7 @@ static void cubeRecurse(int elapsed, int depth) {
   if (0 == depth) {
     return;
   }
-  MatrixStack & mv = Stacks::modelview();
+  gl::MatrixStack & mv = gl::Stacks::modelview();
   static glm::vec3 AXES[] = { GlUtils::X_AXIS, GlUtils::Y_AXIS,
                               GlUtils::Z_AXIS };
   static glm::vec3 translation(0, 0, 1.5);
@@ -1186,7 +1122,7 @@ static void cubeRecurse(int elapsed, int depth) {
 }
 
 static void dancingCubes(int elapsed, int elements = 8) {
-  MatrixStack & mv = Stacks::modelview();
+  gl::MatrixStack & mv = gl::Stacks::modelview();
 
   mv.push().scale(0.2f);
   GlUtils::drawColorCube();

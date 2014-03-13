@@ -1,10 +1,7 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 #define DISTORTION_TIMING 1
+
 class DistortionHelper {
   glm::dvec4 K;
   double lensOffset;
@@ -100,10 +97,10 @@ class DistortionHelper {
   }
 
 public:
-  DistortionHelper(const OVR::HMDInfo & hmdInfo) {
+  DistortionHelper(const OVR::HMDInfo & ovrHmdInfo) {
     OVR::Util::Render::DistortionConfig Distortion;
     OVR::Util::Render::StereoConfig stereoConfig;
-    stereoConfig.SetHMDInfo(hmdInfo);
+    stereoConfig.SetHMDInfo(ovrHmdInfo);
     Distortion = stereoConfig.GetDistortionConfig();
 
     // The Rift examples use a post-distortion scale to resize the
@@ -117,15 +114,15 @@ public:
       K[i] = Distortion.K[i] * postDistortionScale;
     }
     lensOffset = 1.0f
-        - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
-    eyeAspect = hmdInfo.HScreenSize / 2.0f / hmdInfo.VScreenSize;
+        - (2.0f * ovrHmdInfo.LensSeparationDistance / ovrHmdInfo.HScreenSize);
+    eyeAspect = ovrHmdInfo.HScreenSize / 2.0f / ovrHmdInfo.VScreenSize;
   }
 
-  TexturePtr createLookupTexture() {
-    return TexturePtr();
+  gl::TexturePtr createLookupTexture() {
+    return gl::TexturePtr();
   }
 
-  GeometryPtr createDistortionMesh(
+  gl::GeometryPtr createDistortionMesh(
       const glm::uvec2 & distortionMeshResolution, int eyeIndex) {
     std::vector<glm::vec4> vertexData;
     vertexData.reserve(
@@ -158,10 +155,9 @@ public:
       indexData.push_back(UINT_MAX);
 
     }
-    return GeometryPtr(
-        new Geometry(vertexData, indexData, indexData.size(),
-            Geometry::Flag::HAS_TEXTURE,
-            GL_TRIANGLE_STRIP));
+    return gl::GeometryPtr(
+      new gl::Geometry(vertexData, indexData, indexData.size(),
+        gl::Geometry::Flag::HAS_TEXTURE, GL_TRIANGLE_STRIP));
   }
 };
 
@@ -171,8 +167,8 @@ const Resource SCENE_IMAGES[2] = {
 
 class PostProcessDistortRift : public RiftGlfwApp {
 protected:
-  Texture2dPtr sceneTextures[2];
-  GeometryPtr distortionGeometry[2];
+  gl::Texture2dPtr sceneTextures[2];
+  gl::GeometryPtr distortionGeometry[2];
 
 public:
 
@@ -184,9 +180,7 @@ public:
     glPrimitiveRestartIndex(UINT_MAX);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    DistortionHelper distortionHelper(hmdInfo);
+    DistortionHelper distortionHelper(ovrHmdInfo);
 
     for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
       // load the scene textures
@@ -212,7 +206,7 @@ public:
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     viewport(eyeIndex);
 
-    ProgramPtr distortProgram = GlUtils::getProgram(
+    gl::ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
         Resource::SHADERS_TEXTURED_FS);
     distortProgram->use();
@@ -234,9 +228,9 @@ public:
     SAY("%d ns", accumulator / count);
 #endif
 
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 

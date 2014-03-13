@@ -19,18 +19,24 @@ public:
         Resource::IMAGES_SHOULDER_CAT_PNG,
         imageSize);
 
-    float imageAspect = (float)imageSize.x / (float)imageSize.y;
-    quadGeometry = GlUtils::getQuadGeometry(
-      glm::vec2(-1.0f, -1.0f / imageAspect),
-      glm::vec2(1.0f, 1.0f / imageAspect));
+    float imageAspect = (float) imageSize.x / (float) imageSize.y;
+    if (imageAspect > eyeAspect) {
+      quadGeometry = GlUtils::getQuadGeometry(
+          glm::vec2(-1.0f, -1.0f / imageAspect),
+          glm::vec2( 1.0f,  1.0f / imageAspect));
+    } else {
+      quadGeometry = GlUtils::getQuadGeometry(
+          glm::vec2(-imageAspect / eyeAspect, -1.0f / eyeAspect),
+          glm::vec2( imageAspect / eyeAspect,  1.0f / eyeAspect));
+    }
 
     projection = glm::ortho(
-      -1.0f, 1.0f,
-      -1.0f / eyeAspect, 1.0f / eyeAspect);
+        -1.0f, 1.0f,
+        -1.0f / eyeAspect, 1.0f / eyeAspect);
 
     program = GlUtils::getProgram(
-          Resource::SHADERS_TEXTURED_VS,
-          Resource::SHADERS_TEXTURED_FS);
+        Resource::SHADERS_TEXTURED_VS,
+        Resource::SHADERS_TEXTURED_FS);
   }
 
   virtual void draw() {
@@ -41,7 +47,7 @@ public:
     texture->bind();
     quadGeometry->bindVertexArray();
 
-    FOR_EACH_EYE(eye) {
+    for (int eye = 0; eye <= 1; eye++) {
       viewport(eye);
       quadGeometry->draw();
     }

@@ -1,33 +1,28 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 const Resource SCENE_IMAGES[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
   Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
 };
 
 #define DISTORTION_TIMING 1
+
 class ShaderLookupDistort : public RiftGlfwApp {
 protected:
-  typedef Texture<GL_TEXTURE_2D, GL_RG16F> LookupTexture;
+  typedef gl::Texture<GL_TEXTURE_2D, GL_RG16F> LookupTexture;
   typedef LookupTexture::Ptr LookupTexturePtr;
 
   glm::uvec2 lookupTextureSize;
-  Texture2dPtr sceneTextures[2];
+  gl::Texture2dPtr sceneTextures[2];
   LookupTexturePtr lookupTextures[2];
-  GeometryPtr quadGeometry;
+  gl::GeometryPtr quadGeometry;
   float K[4];
   float lensOffset;
 
 public:
   ShaderLookupDistort() : lookupTextureSize(512, 512) {
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
     OVR::Util::Render::StereoConfig stereoConfig;
-    stereoConfig.SetHMDInfo(hmdInfo);
+    stereoConfig.SetHMDInfo(ovrHmdInfo);
     const OVR::Util::Render::DistortionConfig & distortion = 
       stereoConfig.GetDistortionConfig();
 
@@ -42,8 +37,8 @@ public:
       K[i] = (float)(distortion.K[i] * postDistortionScale);
     }
     lensOffset = 1.0f - (2.0f *
-      hmdInfo.LensSeparationDistance /
-      hmdInfo.HScreenSize);
+      ovrHmdInfo.LensSeparationDistance /
+      ovrHmdInfo.HScreenSize);
   }
 
   glm::vec2 findSceneTextureCoords(int eyeIndex, glm::vec2 texCoord) {
@@ -151,7 +146,7 @@ public:
 
   void renderEye(int eyeIndex) {
     viewport(eyeIndex);
-    ProgramPtr distortProgram = GlUtils::getProgram(
+    gl::ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_RIFTWARP_FS);
     distortProgram->use();
@@ -178,9 +173,9 @@ public:
     SAY("%d ns", accumulator / count);
 #endif
 
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 

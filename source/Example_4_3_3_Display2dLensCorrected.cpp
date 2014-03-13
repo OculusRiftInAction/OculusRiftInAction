@@ -19,27 +19,24 @@ public:
         Resource::IMAGES_SHOULDER_CAT_PNG,
         imageSize);
 
-    if (imageSize.x > imageSize.y) {
-      float imageAspect = (float)imageSize.x / (float)imageSize.y;
+    float imageAspect = (float) imageSize.x / (float) imageSize.y;
+    if (imageAspect > eyeAspect) {
       quadGeometry = GlUtils::getQuadGeometry(
           glm::vec2(-1.0f, -1.0f / imageAspect),
-          glm::vec2(1.0f, 1.0f / imageAspect));
+          glm::vec2( 1.0f,  1.0f / imageAspect));
     } else {
-      float imageAspect = (float)imageSize.y / (float)imageSize.x;
       quadGeometry = GlUtils::getQuadGeometry(
-          glm::vec2(-1.0f / imageAspect, -1.0f),
-          glm::vec2(1.0f / imageAspect, 1.0f));
+          glm::vec2(-imageAspect / eyeAspect, -1.0f / eyeAspect),
+          glm::vec2( imageAspect / eyeAspect,  1.0f / eyeAspect));
     }
 
     program = GlUtils::getProgram(
-          Resource::SHADERS_TEXTURED_VS,
-          Resource::SHADERS_TEXTURED_FS);
+        Resource::SHADERS_TEXTURED_VS,
+        Resource::SHADERS_TEXTURED_FS);
 
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    float lensOffset = 1.0f - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
+    float lensOffset = 1.0f - (2.0f * ovrHmdInfo.LensSeparationDistance / ovrHmdInfo.HScreenSize);
 
-    FOR_EACH_EYE(eye) {
+    for (int eye = 0; eye <= 1; eye++) {
       float eyeLensOffset = (eye == LEFT ? -lensOffset : lensOffset);
       projections[eye] = glm::ortho(
           -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
@@ -53,7 +50,7 @@ public:
     texture->bind();
     quadGeometry->bindVertexArray();
 
-    FOR_EACH_EYE(eye) {
+    for (int eye = 0; eye <= 1; eye++) {
       viewport(eye);
       program->setUniform("Projection", projections[eye]);
       quadGeometry->draw();

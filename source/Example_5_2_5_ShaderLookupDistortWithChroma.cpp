@@ -1,9 +1,5 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 const Resource SCENE_IMAGES[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
   Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
@@ -12,13 +8,13 @@ const Resource SCENE_IMAGES[2] = {
 #define DISTORTION_TIMING 1
 class ShaderLookupDistort : public RiftGlfwApp {
 protected:
-  typedef Texture<GL_TEXTURE_2D, GL_RGBA16F> LookupTexture;
+  typedef gl::Texture<GL_TEXTURE_2D, GL_RGBA16F> LookupTexture;
   typedef LookupTexture::Ptr LookupTexturePtr;
 
   glm::uvec2 lookupTextureSize;
-  Texture2dPtr sceneTextures[2];
+  gl::Texture2dPtr sceneTextures[2];
   LookupTexturePtr lookupTextures[2];
-  GeometryPtr quadGeometry;
+  gl::GeometryPtr quadGeometry;
   glm::vec4 K;
   glm::vec2 chromaK[2];
   float lensOffset;
@@ -26,10 +22,8 @@ protected:
 
 public:
   ShaderLookupDistort() : lookupTextureSize(512, 512), chroma(true) {
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
     OVR::Util::Render::StereoConfig stereoConfig;
-    stereoConfig.SetHMDInfo(hmdInfo); 
+    stereoConfig.SetHMDInfo(ovrHmdInfo);
     const OVR::Util::Render::DistortionConfig & distortion = 
       stereoConfig.GetDistortionConfig();
 
@@ -43,17 +37,21 @@ public:
     for (int i = 0; i < 4; ++i) {
       K[i] = (float)(distortion.K[i] * postDistortionScale);
     }
-    // red channel fix
-    chromaK[0] = glm::vec2(hmdInfo.ChromaAbCorrection[0], hmdInfo.ChromaAbCorrection[1]);
-    // blue channel fix
-    chromaK[1] = glm::vec2(hmdInfo.ChromaAbCorrection[2], hmdInfo.ChromaAbCorrection[3]);
+    // red channel correction
+    chromaK[0] = glm::vec2(
+        ovrHmdInfo.ChromaAbCorrection[0],
+        ovrHmdInfo.ChromaAbCorrection[1]);
+    // blue channel correction
+    chromaK[1] = glm::vec2(
+        ovrHmdInfo.ChromaAbCorrection[2],
+        ovrHmdInfo.ChromaAbCorrection[3]);
     for (int i = 0; i < 2; ++i) {
       chromaK[i][0] = ((1.0f - chromaK[i][0]) * postDistortionScale) + 1.0f;
       chromaK[i][1] *= postDistortionScale;
     }
     lensOffset = 1.0f - (2.0f *
-      hmdInfo.LensSeparationDistance /
-      hmdInfo.HScreenSize);
+      ovrHmdInfo.LensSeparationDistance /
+      ovrHmdInfo.HScreenSize);
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -139,7 +137,7 @@ public:
 
   void renderEye(int eyeIndex) {
     viewport(eyeIndex);
-    ProgramPtr distortProgram = GlUtils::getProgram(
+    gl::ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
       chroma ? 
         Resource::SHADERS_RIFTCHROMAWARP_FS : 
@@ -168,9 +166,9 @@ public:
     SAY("%d ns", accumulator / count);
 #endif
 
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 

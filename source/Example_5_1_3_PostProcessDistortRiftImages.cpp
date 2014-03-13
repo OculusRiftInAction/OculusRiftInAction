@@ -1,14 +1,10 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 class PostProcessDistortRift : public RiftGlfwApp {
 protected:
-  Texture2dPtr textures[2];
-  GeometryPtr quadGeometry;
-  ProgramPtr program;
+  gl::Texture2dPtr textures[2];
+  gl::GeometryPtr quadGeometry;
+  gl::ProgramPtr program;
 
 public:
 
@@ -44,9 +40,9 @@ public:
       quadGeometry->draw();
     }
 
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 

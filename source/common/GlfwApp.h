@@ -51,7 +51,10 @@ public:
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw();
   virtual void update();
-  virtual void renderStringAt(const std::string & str, float x, float y);
+  virtual void renderStringAt(const std::string & string, float x, float y) {
+    renderStringAt(string, glm::vec2(x, y));
+  }
+  virtual void renderStringAt(const std::string & string, const glm::vec2 & position);
 
   static GLFWmonitor * getMonitorAtPosition(const glm::ivec2 & position);
 

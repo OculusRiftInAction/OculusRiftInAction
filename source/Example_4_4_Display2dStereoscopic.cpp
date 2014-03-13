@@ -16,31 +16,19 @@ protected:
   gl::GeometryPtr quadGeometries[2];
   gl::ProgramPtr program;
   glm::mat4 projections[2];
-  int imageIndex;
-  bool stereo;
+  int imageIndex{0};
+  bool stereo{true};
 
 public:
 
   StereoscopicImages() {
-    imageIndex = 0;
-    stereo = true;
-
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    float lensOffset = 1.0f
-      - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
-
-    float lensDistance =
-      hmdInfo.LensSeparationDistance /
-      hmdInfo.HScreenSize;
-    lensOffset =
-      1.0f - (2.0f * lensDistance);
-
+    float lensDistance = ovrHmdInfo.LensSeparationDistance / ovrHmdInfo.HScreenSize;
+    float lensOffset = 1.0f - (2.0f * lensDistance);
     for (int i = 0; i < 2; ++i) {
       float eyeLensOffset = i == 0 ? -lensOffset : lensOffset;
       projections[i] = glm::ortho(
-        -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
-        -1.0f / eyeAspect, 1.0f / eyeAspect);
+          -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
+          -1.0f / eyeAspect, 1.0f / eyeAspect);
     }
   }
 
@@ -51,8 +39,8 @@ public:
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
     program = GlUtils::getProgram(
-      Resource::SHADERS_TEXTURED_VS,
-      Resource::SHADERS_TEXTURED_FS);
+        Resource::SHADERS_TEXTURED_VS,
+        Resource::SHADERS_TEXTURED_FS);
 
     glm::uvec2 imageSize;
     GlUtils::getImageAsTexture(texture, STEREO_IMAGES[imageIndex], imageSize);
@@ -62,17 +50,15 @@ public:
     glm::vec2 geometryMin = geometryMax * -1.0f;
     glm::vec2 textureMin = glm::vec2(0, 0);
     glm::vec2 textureMax = glm::vec2(0.5, 1.0);
-    quadGeometries[0] =
-      GlUtils::getQuadGeometry(
-      geometryMin, geometryMax,
-      textureMin, textureMax);
+    quadGeometries[0] = GlUtils::getQuadGeometry(
+        geometryMin, geometryMax,
+        textureMin, textureMax);
 
     textureMin = glm::vec2(0.5, 0.0);
     textureMax = glm::vec2(1.0, 1.0);
-    quadGeometries[1] =
-      GlUtils::getQuadGeometry(
-      geometryMin, geometryMax,
-      textureMin, textureMax);
+    quadGeometries[1] = GlUtils::getQuadGeometry(
+        geometryMin, geometryMax,
+        textureMin, textureMax);
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -110,10 +96,10 @@ public:
     program->use();
     texture->bind();
 
-    FOR_EACH_EYE(eye) {
+    for (int eye = 0; eye <= 1; eye++) {
       viewport(eye);
       program->setUniform("Projection", projections[eye]);
-      Eye renderEye = stereo ? eye : LEFT;
+      int renderEye = stereo ? eye : LEFT;
       quadGeometries[renderEye]->bindVertexArray();
       quadGeometries[renderEye]->draw();
     }

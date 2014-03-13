@@ -1,9 +1,5 @@
 #include "Common.h"
 
-using namespace std;
-using namespace gl;
-using namespace OVR;
-
 const Resource SCENE_IMAGES[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
   Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
@@ -12,18 +8,16 @@ const Resource SCENE_IMAGES[2] = {
 #define DISTORTION_TIMING 1
 class PostProcessDistortRift : public RiftGlfwApp {
 protected:
-  Texture2dPtr sceneTextures[2];
-  GeometryPtr quadGeometry;
+  gl::Texture2dPtr sceneTextures[2];
+  gl::GeometryPtr quadGeometry;
   glm::vec4 K;
   float lensOffset;
 
 public:
   PostProcessDistortRift() {
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
     OVR::Util::Render::DistortionConfig Distortion;
     OVR::Util::Render::StereoConfig stereoConfig;
-    stereoConfig.SetHMDInfo(hmdInfo);
+    stereoConfig.SetHMDInfo(ovrHmdInfo);
     Distortion = stereoConfig.GetDistortionConfig();
 
     float postDistortionScale = 1.0 / stereoConfig.GetDistortionScale();
@@ -31,8 +25,8 @@ public:
       K[i] = Distortion.K[i] * postDistortionScale;
     }
     lensOffset = 1.0f - (2.0f *
-      hmdInfo.LensSeparationDistance /
-      hmdInfo.HScreenSize);
+      ovrHmdInfo.LensSeparationDistance /
+      ovrHmdInfo.HScreenSize);
   }
 
   void initGl() {
@@ -58,7 +52,7 @@ public:
 
   void renderEye(int eyeIndex) {
     viewport(eyeIndex);
-    ProgramPtr distortProgram = GlUtils::getProgram(
+    gl::ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_EXAMPLE_5_2_4_WARP_FS);
 
@@ -84,9 +78,9 @@ public:
     SAY("%d ns", accumulator / count);
 #endif
 
-    VertexArray::unbind();
-    Texture2d::unbind();
-    Program::clear();
+    gl::VertexArray::unbind();
+    gl::Texture2d::unbind();
+    gl::Program::clear();
   }
 };
 

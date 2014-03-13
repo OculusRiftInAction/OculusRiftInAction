@@ -27,7 +27,7 @@
 
 class GlUtils {
 public:
-  static void drawColorCube();
+  static void drawColorCube(bool lit = false);
   static void drawQuad(const glm::vec2 & min = glm::vec2(-1),
       const glm::vec2 & max = glm::vec2(1));
   static void drawAngleTicks();

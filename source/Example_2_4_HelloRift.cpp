@@ -1,13 +1,12 @@
 #include "Common.h"
 
-using namespace OVR::Util::Render;
-
 class HelloRift : public GlfwApp {
 protected:
   OVR::Ptr<OVR::DeviceManager>  ovrManager;
   OVR::Ptr<OVR::SensorDevice>   ovrSensor;
-  OVR::SensorFusion             sensorFusion;
-  bool                          useTracker;
+  OVR::SensorFusion             ovrSensorFusion;
+  OVR::HMDInfo                  ovrHmdInfo;
+  bool                          useTracker{false};
 
   gl::FrameBufferWrapper        frameBuffer;
   gl::GeometryPtr               quadGeometry;
@@ -24,7 +23,7 @@ protected:
   } eyeArgs[2];
 
 public:
-  HelloRift() : useTracker(false) {
+  HelloRift() {
     ovrManager = *OVR::DeviceManager::Create();
     if (!ovrManager) {
       FAIL("Unable to initialize OVR Device Manager");
@@ -32,12 +31,11 @@ public:
 
     OVR::Ptr<OVR::HMDDevice> ovrHmd =
         *ovrManager->EnumerateDevices<OVR::HMDDevice>().CreateDevice();
-    OVR::HMDInfo hmdInfo;
     if (ovrHmd) {
-      ovrHmd->GetDeviceInfo(&hmdInfo);
+      ovrHmd->GetDeviceInfo(&ovrHmdInfo);
       ovrSensor = *ovrHmd->GetSensor();
     } else {
-      Rift::getDk1HmdValues(hmdInfo);
+      Rift::getDefaultDk1HmdValues(ovrHmdInfo);
     }
     ovrHmd.Clear();
 
@@ -47,11 +45,11 @@ public:
     }
 
     if (ovrSensor) {
-      sensorFusion.AttachToSensor(ovrSensor);
-      useTracker = sensorFusion.IsAttachedToSensor();
+      ovrSensorFusion.AttachToSensor(ovrSensor);
+      useTracker = ovrSensorFusion.IsAttachedToSensor();
     }
 
-    windowPosition = glm::ivec2(hmdInfo.DesktopX, hmdInfo.DesktopY);
+    windowPosition = glm::ivec2(ovrHmdInfo.DesktopX, ovrHmdInfo.DesktopY);
     // The HMDInfo gives us the position of the Rift in desktop 
     // coordinates as well as the native resolution of the Rift 
     // display panel, but NOT the current resolution of the signal
@@ -91,26 +89,26 @@ public:
     // 1920x1080 output to the rift and an conventional monitor of those 
     // dimensions the conventional monitor's image will appear a bit 
     // squished.  This is expected and correct.
-    eyeAspect = (float)(hmdInfo.HResolution / 2) /
-      (float)hmdInfo.VResolution;
+    eyeAspect = (float)(ovrHmdInfo.HResolution / 2) /
+      (float)ovrHmdInfo.VResolution;
 
     // Some of the values needed by the rendering or distortion need some 
     // calculation to find, but the OVR SDK includes a utility class to
     // do them, so we use it here to get the ProjectionOffset and the 
     // post distortion scale.
-    OVR::Util::Render::StereoConfig stereoConfig;
-    stereoConfig.SetHMDInfo(hmdInfo);
+    OVR::Util::Render::StereoConfig ovrStereoConfig;
+    ovrStereoConfig.SetHMDInfo(ovrHmdInfo);
 
     // The projection offset and lens offset are both in normalized 
     // device coordinates, i.e. [-1, 1] on both the X and Y axis
     glm::vec3 projectionOffsetVector =
-        glm::vec3(stereoConfig.GetProjectionCenterOffset() / 2.0f, 0, 0);
+        glm::vec3(ovrStereoConfig.GetProjectionCenterOffset() / 2.0f, 0, 0);
     eyeArgs[0].projectionOffset =
         glm::translate(glm::mat4(), projectionOffsetVector);
     eyeArgs[1].projectionOffset =
         glm::translate(glm::mat4(), -projectionOffsetVector);
 
-    ipd = stereoConfig.GetIPD();
+    ipd = ovrStereoConfig.GetIPD();
     // The IPD and the modelview offset are in meters.  If you wish to have a 
     // different unit for  the scale of your world coordinates, you would need 
     // to apply the conversion factor here.
@@ -122,13 +120,13 @@ public:
         glm::translate(glm::mat4(), -modelviewOffsetVector);
 
     gl::Stacks::projection().top() = glm::perspective(
-        stereoConfig.GetYFOVDegrees() * DEGREES_TO_RADIANS,
+        ovrStereoConfig.GetYFOVDegrees() * DEGREES_TO_RADIANS,
         eyeAspect,
         Rift::ZNEAR, Rift::ZFAR);
   }
 
   ~HelloRift() {
-    sensorFusion.AttachToSensor(nullptr);
+    ovrSensorFusion.AttachToSensor(nullptr);
     ovrSensor = nullptr;
     ovrManager = nullptr;
   }
@@ -150,14 +148,11 @@ public:
         Resource::SHADERS_RIFTWARP_FS);
     gl::Program::clear();
 
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    RiftDistortionHelper helper(hmdInfo);
+    RiftDistortionHelper helper(ovrHmdInfo);
     FOR_EACH_EYE(eye) {
       eyeArgs[eye].lookupTexture =
-        helper.createLookupTexture(glm::uvec2(512, 512), eye);
+          helper.createLookupTexture(glm::uvec2(512, 512), eye);
     }
-
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -167,7 +162,7 @@ public:
 
     switch (key) {
     case GLFW_KEY_R:
-      sensorFusion.Reset();
+      ovrSensorFusion.Reset();
       break;
 
     case GLFW_KEY_T:
@@ -181,14 +176,13 @@ public:
   }
 
   virtual void update() {
-    static const glm::vec3 CAMERA =
-        glm::vec3(0.0f, 0.0f, 0.2f);
+    static const glm::vec3 CAMERA = glm::vec3(0.0f, 0.0f, 0.2f);
 
     glm::mat4 & modelview = gl::Stacks::modelview().top();
     modelview = glm::lookAt(CAMERA, GlUtils::ORIGIN, GlUtils::Y_AXIS);
 
     if (useTracker) {
-      glm::quat riftOrientation = Rift::getQuaternion(sensorFusion);
+      glm::quat riftOrientation = Rift::getQuaternion(ovrSensorFusion);
       modelview = modelview * glm::mat4_cast(riftOrientation);
     } else {
       static const float Y_ROTATION_RATE = 0.01f;
@@ -242,17 +236,21 @@ public:
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     gl::MatrixStack & pm = gl::Stacks::projection();
-    gl::MatrixStack & mv = gl::Stacks::modelview();
     pm.push().preMultiply(eyeArg.projectionOffset);
+
+    gl::MatrixStack & mv = gl::Stacks::modelview();
     mv.push().preMultiply(eyeArg.modelviewOffset);
-    {
-      mv.push().translate(glm::vec3(0, 0, -1.5f)).
-        rotate(glm::angleAxis(QUARTER_TAU, GlUtils::X_AXIS));
-        GlUtils::draw3dGrid();
-      mv.pop();
-      mv.scale(ipd);
-      GlUtils::drawColorCube();
-    }
+
+    mv.push()
+        .translate(glm::vec3(0, 0, -1.5f))
+        .rotate(glm::angleAxis(PI / 2.0f, GlUtils::X_AXIS));
+    GlUtils::draw3dGrid();
+    mv.pop();
+
+    mv.push().scale(ipd);
+    GlUtils::drawColorCube();
+    mv.pop();
+
     mv.pop();
     pm.pop();
   }

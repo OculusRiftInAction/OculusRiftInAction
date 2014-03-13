@@ -264,7 +264,7 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
 //curOrient = camera.getOrientation() * curOrient;
 //
 //
-//  curOrient = glm::angleAxis(HALF_TAU, GlUtils::Z_AXIS) * curOrient;
+//  curOrient = glm::angleAxis(PI, GlUtils::Z_AXIS) * curOrient;
 //  curPos = glm::vec3(
 //      left.pos[0],
 //      left.pos[1],

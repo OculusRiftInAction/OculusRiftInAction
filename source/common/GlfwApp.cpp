@@ -219,7 +219,7 @@ GlfwApp::~GlfwApp() {
   glfwTerminate();
 }
 
-void GlfwApp::renderStringAt(const std::string & str, float x, float y) {
+void GlfwApp::renderStringAt(const std::string & str, const glm::vec2 & pos) {
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pr = gl::Stacks::projection();
   mv.push().identity();
@@ -227,7 +227,7 @@ void GlfwApp::renderStringAt(const std::string & str, float x, float y) {
     -1.0f, 1.0f,
     -windowAspectInverse, windowAspectInverse,
     -100.0f, 100.0f);
-  glm::vec2 cursor(x, windowAspectInverse * y);
+  glm::vec2 cursor(pos.x, windowAspectInverse * pos.y);
   GlUtils::renderString(str, cursor, 18.0f);
   pr.pop();
   mv.pop();

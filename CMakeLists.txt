@@ -132,7 +132,7 @@ list(APPEND EXAMPLE_LIBS jsoncpp)
 
 # OpenCV is a computer vision library with advanced
 # image loading and manipulation functionality
-# find_package( OpenCV )
+find_package( OpenCV )
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
@@ -173,7 +173,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
 # Boost is a general purpose C++ library
 #set(Boost_DEBUG 1)
-if (!APPLE)
+if (NOT APPLE)
     set(Boost_USE_STATIC_LIBS ON)
     set(Boost_USE_MULTITHREADED ON)
     set(Boost_USE_STATIC_RUNTIME ON)
@@ -200,14 +200,13 @@ if(SIXENSE_FOUND)
     set(HAVE_SIXENSE 1)
 endif()
 
-#find_package(SpaceNavigator)
+find_package( SpaceNavigator )
 if(SPNAV_FOUND)
     include_directories(${SPNAV_INCLUDE_DIR}) 
     list(APPEND EXAMPLE_LIBS ${SPNAV_LIBRARIES})
     set(HAVE_SPNAV 1)
 endif()
 
-set(STEAMWORKS_SDK "c:/dev/steamworks/sdk")
 find_package( Steamworks )
 if(STEAMWORKS_FOUND)
     include_directories(${STEAMWORKS_INCLUDE_DIR}) 
@@ -215,8 +214,6 @@ if(STEAMWORKS_FOUND)
     set(HAVE_STEAMWORKS 1)
 endif()
 
-#set(LEAP_SDK "/home/bdavis/src/LeapDeveloperKit/LeapSDK")
-set(LEAP_SDK "C:/dev/LeapDeveloperKit/LeapSDK")
 find_package( LeapMotion )
 if(LEAP_FOUND)
     file(COPY ${LEAP_BINARY}
