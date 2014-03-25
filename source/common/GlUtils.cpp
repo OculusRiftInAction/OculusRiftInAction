@@ -458,20 +458,20 @@ void GlUtils::getImageData(
 
 void PngDataCallback(png_structp png_ptr, png_bytep outBytes,
     png_size_t byteCountToRead) {
-  istream * pIn = (istream*) png_get_io_ptr(png_ptr);
+  std::istream * pIn = (std::istream*)png_get_io_ptr(png_ptr);
   if (pIn == nullptr)
-    throw runtime_error("PNG: missing stream pointer");
+    throw std::runtime_error("PNG: missing stream pointer");
 
-  istream & in = *pIn; // png_ptr->io_ptr;
-  const ios::pos_type start = in.tellg();
+  std::istream & in = *pIn; // png_ptr->io_ptr;
+  const std::ios::pos_type start = in.tellg();
   readStream(in, outBytes, byteCountToRead);
-  const ios::pos_type bytesRead = in.tellg() - start;
+  const std::ios::pos_type bytesRead = in.tellg() - start;
   if ((png_size_t) bytesRead != byteCountToRead)
-    throw runtime_error("PNG: short read");
+    throw std::runtime_error("PNG: short read");
 }
 
 void getPngImageData(
-    istream & in,
+  std::istream & in,
     glm::uvec2 & outSize,
     std::vector<unsigned char> & outData,
     bool flip
@@ -482,20 +482,20 @@ void getPngImageData(
   uint8_t pngSignature[kPngSignatureLength];
   readStream(in, pngSignature);
   if (!png_check_sig(pngSignature, kPngSignatureLength))
-    throw runtime_error("bad png sig");
+    throw std::runtime_error("bad png sig");
 
   // get PNG file info struct (memory is allocated by libpng)
   png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL,
     NULL, NULL);
   if (png_ptr == nullptr)
-    throw runtime_error("PNG: bad signature");
+    throw std::runtime_error("PNG: bad signature");
 
   // get PNG image data info struct (memory is allocated by libpng)
   png_infop info_ptr = png_create_info_struct(png_ptr);
   if (info_ptr == nullptr) {
     // libpng must free file info struct memory before we bail
     png_destroy_read_struct(&png_ptr, NULL, NULL);
-    throw runtime_error("PNG: failed to allocate header");
+    throw std::runtime_error("PNG: failed to allocate header");
   }
 
   png_set_read_fn(png_ptr, &in, PngDataCallback);
@@ -511,7 +511,7 @@ void getPngImageData(
 
   if (retval != 1) {
     png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-    throw runtime_error("PNG: failed to read header");
+    throw std::runtime_error("PNG: failed to read header");
   }
 
   outSize.x = width;
@@ -1096,59 +1096,102 @@ gl::GeometryPtr GlUtils::getCubeGeometry() {
   return cube;
 }
 
+static glm::vec3 AXES[] = { 
+  GlUtils::X_AXIS, 
+  GlUtils::Y_AXIS,
+  GlUtils::Z_AXIS };
 
-static void cubeRecurse(int elapsed, int depth) {
+void cubeRecurseDraw(gl::GeometryPtr & cubeGeometry, gl::ProgramPtr & renderProgram, int depth, float elapsed, int axisIndex) {
   if (0 == depth) {
     return;
   }
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  static glm::vec3 AXES[] = { GlUtils::X_AXIS, GlUtils::Y_AXIS,
-                              GlUtils::Z_AXIS };
+
   static glm::vec3 translation(0, 0, 1.5);
 
-  const glm::vec3 & axis = AXES[rand() % 3];
-  float angle = elapsed * 0.05f * ((rand() % 10) - 5);
+  const glm::vec3 & axis = AXES[axisIndex % 3];
+
+  float angle = elapsed * 0.2f * ((rand() % 10) - 5);
+
   float scale = 0.7f;
-
-  mv.push().rotate(angle, axis).translate(translation).scale(scale);
-  GlUtils::drawColorCube();
-  cubeRecurse(elapsed, depth - 1);
-
-  mv.pop().push().rotate(angle + 180, axis).translate(translation).scale(
-      scale);
-  GlUtils::drawColorCube();
-  cubeRecurse(elapsed, depth - 1);
-  mv.pop();
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.with_push([&]{
+    mv.rotate(angle, axis).translate(translation).scale(scale).apply(renderProgram);
+    cubeGeometry->draw();
+    cubeRecurseDraw(cubeGeometry, renderProgram, depth - 1, elapsed, axisIndex + 1);
+  });
+  mv.with_push([&]{
+    mv.rotate(angle + PI, axis).translate(translation).scale(scale).apply(renderProgram);
+    cubeGeometry->draw();
+    cubeRecurseDraw(cubeGeometry, renderProgram, depth - 1, elapsed, axisIndex + 1);
+  });
 }
 
-static void dancingCubes(int elapsed, int elements = 8) {
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+void GlUtils::cubeRecurse(int depth, float elapsed) {
+  srand(4);
+  gl::ProgramPtr renderProgram = GlUtils::getProgram(
+    Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
+  renderProgram->use();
+  gl::Stacks::projection().apply(renderProgram);
 
-  mv.push().scale(0.2f);
-  GlUtils::drawColorCube();
-  mv.pop();
+  gl::GeometryPtr cubeGeometry = GlUtils::getColorCubeGeometry();
+  cubeGeometry->bindVertexArray();
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.with_push([&]{
+    mv.scale(0.4f);
+    mv.apply(renderProgram);
+    cubeGeometry->draw();
+    cubeRecurseDraw(cubeGeometry, renderProgram, depth - 1, elapsed, 1);
+  });
+  gl::VertexArray::unbind();
+  gl::Program::clear();
+}
+
+void GlUtils::dancingCubes(int elements, float elapsed) {
+  gl::ProgramPtr renderProgram = GlUtils::getProgram(
+    Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
+  renderProgram->use();
+  gl::Stacks::projection().apply(renderProgram);
+
+  gl::GeometryPtr cubeGeometry = getColorCubeGeometry();
+  cubeGeometry->bindVertexArray();
 
   static glm::vec3 AXES[] = { GlUtils::X_AXIS, GlUtils::Y_AXIS,
-                              GlUtils::Z_AXIS };
+    GlUtils::Z_AXIS };
+
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.with_push([&]{
+    mv.scale(0.2f);
+    gl::Stacks::modelview().apply(renderProgram);
+    cubeGeometry->draw();
+  });
+
   srand(4);
   for (int i = 0; i < elements; ++i) {
-    float angle = elapsed * 0.05f * (float) ((rand() % 6) - 2);
-    float angle2 = elapsed * 0.05f * (float) ((rand() % 3) - 1);
+    float angle = elapsed * 0.05f * (float)((rand() % 6) - 2);
+    float angle2 = elapsed * 0.05f * (float)((rand() % 3) - 1);
     int axisRotate = rand();
     const glm::vec3 & axis = AXES[axisRotate % 3];
     const glm::vec3 & axis2 = AXES[(1 + axisRotate) % 3];
     int axisTranslate = axisRotate + rand() % 2;
-    float sc = 1.0f / (float) (5 + rand() % 8);
+    float sc = 1.0f / (float)(5 + rand() % 8);
     glm::vec3 tr = AXES[axisTranslate % 3];
-    tr = tr / (float) (1 + (rand() % 6)) + (tr * 0.4f);
+    tr = tr / (float)(1 + (rand() % 6)) + (tr * 0.4f);
     mv.push().rotate(angle, axis).rotate(angle2, axis2);
-    mv.push().translate(tr).scale(sc);
-    GlUtils::drawColorCube();
-    mv.pop().push().translate(-tr).scale(sc);
-    GlUtils::drawColorCube();
-    mv.pop();
+
+    mv.with_push([&]{
+      mv.translate(tr).scale(sc);
+      gl::Stacks::modelview().apply(renderProgram);
+      cubeGeometry->draw();
+    });
+    mv.with_push([&]{
+      mv.translate(-tr).scale(sc);
+      gl::Stacks::modelview().apply(renderProgram);
+      cubeGeometry->draw();
+    });
   }
   for (int i = 0; i < elements; ++i) {
     mv.pop();
   }
+
+
 }

@@ -1,43 +1,35 @@
 project(ExampleResources)
 include (GenerateExportHeader)
 
-file(GLOB MESHES meshes/*.ctm)
+set(RESOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+
 file(GLOB FONTS fonts/*.sdff)
 file(GLOB_RECURSE IMAGES images/*.png)
-file(GLOB_RECURSE VERTEX_SHADERS shaders/*.vs)
-file(GLOB_RECURSE FRAGMENT_SHADERS shaders/*.fs)
-file(GLOB_RECURSE COMMON_SHADERS shaders/*.glsl)
+file(GLOB MESHES meshes/*.ctm)
+file(GLOB_RECURSE MISC misc/*)
+file(GLOB_RECURSE SHADERS shaders/*)
 
-set(ALL_SHADERS
-    ${VERTEX_SHADERS} 
-    ${FRAGMENT_SHADERS}
-    ${COMMON_SHADERS}
-) 
 
 list(SORT MESHES )
+list(SORT MISC )
 list(SORT FONTS )
 list(SORT IMAGES )
-list(SORT VERTEX_SHADERS )
-list(SORT FRAGMENT_SHADERS )
-list(SORT COMMON_SHADERS )
-list(SORT ALL_SHADERS)
+list(SORT SHADERS)
 
-source_group("Common Shaders" FILES 
-    ${COMMON_VERTEX_SHADERS} 
-    ${COMMON_FRAGMENT_SHADERS}
-    ${COMMON_LIB_SHADERS}
-)
+source_group("Common Shaders" FILES ${SHADERS})
 
 set(ALL_RESOURCES 
-    ${MESHES}
     ${FONTS}
     ${IMAGES}
-    ${ALL_SHADERS}
+    ${MESHES}
+    ${MISC}
+    ${SHADERS}
 )
 
 set(ALL_RESOURCES
   ${ALL_RESOURCES}
   PARENT_SCOPE)
+
 set(RESOURCE_ROOT
   ${CMAKE_CURRENT_SOURCE_DIR}
   PARENT_SCOPE)
@@ -78,11 +70,19 @@ function(files_to_enum SOURCE_FILES RESULT_HEADER)
     endif()
 endfunction()
 
+files_to_enum("${ALL_RESOURCES}" "RESOURCE_ENUM" "RESOURCE_MAP" "RESOURCE_RC")
+
+file(GLOB_RECURSE VERTEX_SHADERS shaders/*.vs)
+file(GLOB_RECURSE FRAGMENT_SHADERS shaders/*.fs)
+file(GLOB_RECURSE COMMON_SHADERS shaders/*.glsl)
+
+list(SORT VERTEX_SHADERS )
+list(SORT FRAGMENT_SHADERS )
+list(SORT COMMON_SHADERS )
+
 files_to_enum("${VERTEX_SHADERS}" "VERTEX_SHADER_ENUM")
 files_to_enum("${FRAGMENT_SHADERS}" "FRAGMENT_SHADER_ENUM" )
 files_to_enum("${COMMON_SHADERS}" "COMMON_SHADER_ENUM")
-files_to_enum("${ALL_RESOURCES}" "RESOURCE_ENUM" "RESOURCE_MAP" "RESOURCE_RC")
-set(RESOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 configure_file( ResourceEnums.h.in ResourceEnums.h )
 configure_file( ResourceEnums.cpp.in ResourceEnums.cpp )
@@ -115,11 +115,13 @@ else()
     add_library(ExampleResources STATIC ${SOURCE_FILES})
 endif()
 
+generate_export_header( 
+    ExampleResources
+    BASE_NAME Resources
+    EXPORT_MACRO_NAME Resources_EXPORT
+    EXPORT_FILE_NAME Resources_Export.h
+    STATIC_DEFINE Resources_STATIC
+)
+
 target_link_libraries(ExampleResources ${RESOURCE_LIBRARIES})
 
-GENERATE_EXPORT_HEADER( ExampleResources
-             BASE_NAME Resources
-             EXPORT_MACRO_NAME Resources_EXPORT
-             EXPORT_FILE_NAME Resources_Export.h
-             STATIC_DEFINE Resources_STATIC
-)

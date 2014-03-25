@@ -27,6 +27,12 @@ struct Mesh {
     model.push();
   }
 
+  Mesh(const Mesh & other)
+    : model(other.model), color(other.color),
+      positions(other.positions), normals(other.normals), colors(other.colors), texCoords(other.texCoords), indices(other.indices)
+  {
+  }
+
   Mesh(const std::string & file)
       : model(""), color(1) {
     model.push();

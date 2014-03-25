@@ -46,12 +46,10 @@ public:
         ovrHmdInfo.ChromaAbCorrection[2],
         ovrHmdInfo.ChromaAbCorrection[3]);
     for (int i = 0; i < 2; ++i) {
-      chromaK[i][0] = ((1.0f - chromaK[i][0]) * postDistortionScale) + 1.0f;
+      chromaK[i][0] = ((1.0 - chromaK[i][0]) * postDistortionScale) + 1.0;
       chromaK[i][1] *= postDistortionScale;
     }
-    lensOffset = 1.0f - (2.0f *
-      ovrHmdInfo.LensSeparationDistance /
-      ovrHmdInfo.HScreenSize);
+    lensOffset = 1.0f - (2.0f * ovrHmdInfo.LensSeparationDistance / ovrHmdInfo.HScreenSize);
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -93,8 +91,8 @@ public:
     // The texture coordinates are actually from the center of the pixel, so thats what we need to use for the calculation.
     glm::vec2 texCenterOffset = glm::vec2(0.5f) / glm::vec2(lookupTextureSize);
     size_t rowSize = lookupTextureSize.x * 4;
-    for (int y = 0; y < lookupTextureSize.y; ++y) {
-      for (int x = 0; x < lookupTextureSize.x; ++x) {
+    for (size_t y = 0; y < lookupTextureSize.y; ++y) {
+      for (size_t x = 0; x < lookupTextureSize.x; ++x) {
         size_t offset = (y * rowSize) + (x * 4);
         glm::vec2 texCoord = (glm::vec2(x, y) / glm::vec2(lookupTextureSize)) + texCenterOffset;
         glm::vec4 sceneTexCoord = findSceneTextureCoords(eyeIndex, texCoord);
@@ -161,7 +159,7 @@ public:
     query->end();
     static long accumulator = 0;
     static long count = 0;
-    accumulator += query->getReult();
+    accumulator += query->getResult();
     count++;
     SAY("%d ns", accumulator / count);
 #endif

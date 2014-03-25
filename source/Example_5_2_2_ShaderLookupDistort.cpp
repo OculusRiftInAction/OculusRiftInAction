@@ -5,9 +5,8 @@ const Resource SCENE_IMAGES[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
 };
 
-#define DISTORTION_TIMING 1
+class ShaderLookupDistortionExample : public RiftGlfwApp {
 
-class ShaderLookupDistort : public RiftGlfwApp {
 protected:
   typedef gl::Texture<GL_TEXTURE_2D, GL_RG16F> LookupTexture;
   typedef LookupTexture::Ptr LookupTexturePtr;
@@ -16,29 +15,22 @@ protected:
   gl::Texture2dPtr sceneTextures[2];
   LookupTexturePtr lookupTextures[2];
   gl::GeometryPtr quadGeometry;
+  gl::ProgramPtr program;
   float K[4];
   float lensOffset;
 
 public:
-  ShaderLookupDistort() : lookupTextureSize(512, 512) {
+  ShaderLookupDistortionExample() : lookupTextureSize(512, 512) {
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(ovrHmdInfo);
     const OVR::Util::Render::DistortionConfig & distortion = 
-      stereoConfig.GetDistortionConfig();
+        stereoConfig.GetDistortionConfig();
 
-    // The Rift examples use a post-distortion scale to resize the
-    // image upward after distorting it because their K values have
-    // been chosen such that they always result in a scale > 1.0, and
-    // thus shrink the image.  However, we can correct for that by
-    // finding the distortion scale the same way the OVR examples do,
-    // and then pre-multiplying the constants by it.
     double postDistortionScale = 1.0 / stereoConfig.GetDistortionScale();
     for (int i = 0; i < 4; ++i) {
-      K[i] = (float)(distortion.K[i] * postDistortionScale);
+      K[i] = (float) (distortion.K[i] * postDistortionScale);
     }
-    lensOffset = 1.0f - (2.0f *
-      ovrHmdInfo.LensSeparationDistance /
-      ovrHmdInfo.HScreenSize);
+    lensOffset = distortion.XCenterOffset;
   }
 
   glm::vec2 findSceneTextureCoords(int eyeIndex, glm::vec2 texCoord) {
@@ -83,7 +75,7 @@ public:
     // need to reverse all the work we did to move from
     // texture space into Rift space.  So we apply the
     // inverse operations in reverse order.
-    texCoord.x -= (eyeIndex == 0) ? -lensOffset : lensOffset;;
+    texCoord.x -= (eyeIndex == 0) ? -lensOffset : lensOffset;
     texCoord.y *= eyeAspect;
     texCoord += 1.0;
     texCoord /= 2.0;
@@ -127,9 +119,17 @@ public:
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    quadGeometry = GlUtils::getQuadGeometry();
+    program = GlUtils::getProgram(
+        Resource::SHADERS_TEXTURED_VS,
+        Resource::SHADERS_RIFTWARP_FS);
+    program->use();
+    program->setUniform1i("Scene", 1);
+    program->setUniform1i("OffsetMap", 0);
 
-    // Generate the lookup textures and load the scene textures
+    quadGeometry = GlUtils::getQuadGeometry();
+    quadGeometry->bindVertexArray();
+
+    // Load scene textures and generate lookup textures
     for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
       GlUtils::getImageAsTexture(sceneTextures[eyeIndex], SCENE_IMAGES[eyeIndex]);
       createLookupTexture(lookupTextures[eyeIndex], eyeIndex);
@@ -141,42 +141,18 @@ public:
     for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
       renderEye(eyeIndex);
     }
-    GL_CHECK_ERROR;
   }
 
   void renderEye(int eyeIndex) {
     viewport(eyeIndex);
-    gl::ProgramPtr distortProgram = GlUtils::getProgram(
-      Resource::SHADERS_TEXTURED_VS,
-      Resource::SHADERS_RIFTWARP_FS);
-    distortProgram->use();
-    distortProgram->setUniform1i("Scene", 1);
-    distortProgram->setUniform1i("OffsetMap", 0);
 
-    glActiveTexture(GL_TEXTURE1);
-    sceneTextures[eyeIndex]->bind();
     glActiveTexture(GL_TEXTURE0);
     lookupTextures[eyeIndex]->bind();
+    glActiveTexture(GL_TEXTURE1);
+    sceneTextures[eyeIndex]->bind();
 
-    quadGeometry->bindVertexArray();
-#ifdef DISTORTION_TIMING
-    query->begin();
-#endif
     quadGeometry->draw();
-
-#ifdef DISTORTION_TIMING
-    query->end();
-    static long accumulator = 0;
-    static long count = 0;
-    accumulator += query->getReult();
-    count++;
-    SAY("%d ns", accumulator / count);
-#endif
-
-    gl::VertexArray::unbind();
-    gl::Texture2d::unbind();
-    gl::Program::clear();
   }
 };
 
-RUN_OVR_APP(ShaderLookupDistort)
+RUN_OVR_APP(ShaderLookupDistortionExample)

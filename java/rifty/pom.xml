@@ -60,7 +60,7 @@
       <version>1.0.2</version>
     </dependency>
     <dependency>
-      <groupId>org.saintandreas</groupId>
+      <groupId>com.oculusvr</groupId>
       <artifactId>jocular</artifactId>
       <version>[0.0.2,)</version>
     </dependency>

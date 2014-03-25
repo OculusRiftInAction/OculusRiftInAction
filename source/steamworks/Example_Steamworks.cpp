@@ -1,8 +1,6 @@
 #include "Common.h"
 #include "steamvr.h"
 
-using namespace OVR::Util::Render;
-
 typedef gl::Texture<GL_TEXTURE_2D, GL_RG32F> DispTex;
 typedef DispTex::Ptr DispTexPtr;
 

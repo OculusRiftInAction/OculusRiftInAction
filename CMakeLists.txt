@@ -14,8 +14,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
 set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
 set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
-# Second, for multi-config builds (e.g. msvc)
 
+# Second, for multi-config builds (e.g. msvc)
 foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
     set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
@@ -26,6 +26,30 @@ endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 # Comment out to disable the debug build
 set(CMAKE_BUILD_TYPE DEBUG)
 set(CMAKE_DEBUG_POSTFIX "d")
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
+
+
+macro(ADD_MSVC_PRECOMPILED_HEADER PrecompiledHeader PrecompiledSource SourcesVar)
+  IF(MSVC)
+    GET_FILENAME_COMPONENT(PrecompiledBasename ${PrecompiledHeader} NAME_WE)
+    SET(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${PrecompiledBasename}.pch")
+    LIST(REMOVE_ITEM ${SourcesVar} "${CMAKE_CURRENT_SOURCE_DIR}/${PrecompiledSource}")
+    SET(Sources ${${SourcesVar}})
+
+    SET_SOURCE_FILES_PROPERTIES(${PrecompiledSource}
+                                PROPERTIES COMPILE_FLAGS "/Yc\"${PrecompiledHeader}\" /Fp\"${PrecompiledBinary}\""
+                                           OBJECT_OUTPUTS "${PrecompiledBinary}")
+    SET_SOURCE_FILES_PROPERTIES(${Sources}
+                                PROPERTIES COMPILE_FLAGS "/Yu\"${PrecompiledHeader}\" /FI\"${PrecompiledHeader}\" /Fp\"${PrecompiledBinary}\""
+                                           OBJECT_DEPENDS "${PrecompiledBinary}")  
+    # Add precompiled header to SourcesVar
+    LIST(APPEND ${SourcesVar} ${PrecompiledSource})
+  ENDIF(MSVC)
+ENDMACRO(ADD_MSVC_PRECOMPILED_HEADER)
+
+
+option(RIFT_BUILD_SCRATCH_EXAMPLES OFF)
 
 string( TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER )
 
@@ -84,6 +108,7 @@ add_definitions(-DOVR_BUILD_DEBUG)
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(libraries/OculusSDK/LibOVR)
+set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
 
 # Make sure to set up the OVR include paths
 include_directories(libraries/OculusSDK/LibOVR/Include)
@@ -98,14 +123,10 @@ set(EXAMPLE_LIBS OculusVR )
 # Non-Oculus third party dependencies 
 #
 
-# Augmented reality tracking library
-add_subdirectory(libraries/ARToolkit/lib)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/ARToolkit/lib/include)
-list(APPEND EXAMPLE_LIBS ARToolkit)
-
 # Cross platform access to shader functionality
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
+set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND EXAMPLE_LIBS glew)
 
@@ -115,11 +136,13 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
 set(GLFW_INSTALL OFF CACHE BOOL "Generate installation target")
 add_subdirectory(libraries/glfw)
+set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
 list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 
 # OpenCTM - a 3D mesh compression
 add_subdirectory(libraries/OpenCTM)
+set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
@@ -127,6 +150,7 @@ list(APPEND EXAMPLE_LIBS OpenCTM)
 set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables")
 set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step")
 add_subdirectory(libraries/jsoncpp)
+set_target_properties(jsoncpp PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
 list(APPEND EXAMPLE_LIBS jsoncpp)
 
@@ -134,6 +158,12 @@ list(APPEND EXAMPLE_LIBS jsoncpp)
 # image loading and manipulation functionality
 find_package( OpenCV )
 if (OpenCV_FOUND) 
+    # Augmented reality tracking library
+    add_subdirectory(libraries/ARToolkit/lib)
+    set_target_properties(ARToolkit PROPERTIES FOLDER "3rdparty")
+    include_directories(${CMAKE_SOURCE_DIR}/libraries/ARToolkit/lib/include)
+    list(APPEND EXAMPLE_LIBS ARToolkit)
+
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
@@ -177,7 +207,7 @@ if (NOT APPLE)
     set(Boost_USE_STATIC_LIBS ON)
     set(Boost_USE_MULTITHREADED ON)
     set(Boost_USE_STATIC_RUNTIME ON)
-    find_package( Boost COMPONENTS filesystem system thread)
+    find_package( Boost QUIET COMPONENTS filesystem system thread )
     if(Boost_FOUND)
         include_directories(${Boost_INCLUDE_DIRS})
         link_directories(${Boost_LIBRARY_DIR}) 
@@ -186,7 +216,6 @@ if (NOT APPLE)
     endif()
 endif()
 
-set(SIXENSE_ROOT "c:/dev/SixenseSDK_062612")
 find_package(Sixense)
 if(SIXENSE_FOUND)
     if (WIN32)
@@ -200,43 +229,12 @@ if(SIXENSE_FOUND)
     set(HAVE_SIXENSE 1)
 endif()
 
-find_package( SpaceNavigator )
+find_package( SpaceNavigator QUIET)
 if(SPNAV_FOUND)
     include_directories(${SPNAV_INCLUDE_DIR}) 
     list(APPEND EXAMPLE_LIBS ${SPNAV_LIBRARIES})
     set(HAVE_SPNAV 1)
 endif()
-
-find_package( Steamworks )
-if(STEAMWORKS_FOUND)
-    include_directories(${STEAMWORKS_INCLUDE_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${STEAMWORKS_LIBRARY})
-    set(HAVE_STEAMWORKS 1)
-endif()
-
-find_package( LeapMotion )
-if(LEAP_FOUND)
-    file(COPY ${LEAP_BINARY}
-        DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-    include_directories(${LEAP_INCLUDE_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${LEAP_LIBRARY})
-    set(HAVE_LEAP 1)
-endif()
-
-find_package( PerceptualComputing )
-if (PERC_FOUND) 
-    include_directories(${PERC_INCLUDE_DIR})
-    list(APPEND EXAMPLE_LIBS ${PERC_LIBRARY})
-    set(HAVE_PERC 1)
-endif()
-
-find_package( Depthsense )
-if (DEPTHSENSE_FOUND) 
-    include_directories(${DEPTHSENSE_INCLUDE_DIR})
-    list(APPEND EXAMPLE_LIBS ${DEPTHSENSE_LIBRARY})
-    set(HAVE_DEPTHSENSE 1)
-endif()
-
 
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
@@ -246,6 +244,7 @@ list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 # Common GL code, using only headers.  
 #
 add_subdirectory(libraries/gl)
+set_target_properties(gl PROPERTIES FOLDER "Examples/Shared")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
 
 ###############################################################################
@@ -262,6 +261,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
 # source location at runtime.  
 #
 add_subdirectory(resources)
+set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
 include_directories(resources)
 include_directories(${CMAKE_BINARY_DIR}/resources)
 list(APPEND EXAMPLE_LIBS ExampleResources)
@@ -271,22 +271,10 @@ list(APPEND EXAMPLE_LIBS ExampleResources)
 # Shared codebase for all the examples and demos
 #
 add_subdirectory(source/common)
+set_target_properties(ExampleCommon PROPERTIES FOLDER "Examples/Shared")
 include_directories(source/common)
 include_directories(${CMAKE_BINARY_DIR}/source/common)
 
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
-
-set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
-set_target_properties(glew PROPERTIES FOLDER "3rdparty")
-set_target_properties(jsoncpp PROPERTIES FOLDER "3rdparty")
-set_target_properties(ARToolkit PROPERTIES FOLDER "3rdparty")
-set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
-set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
-
-set_target_properties(gl PROPERTIES FOLDER "Examples/Shared")
-set_target_properties(ExampleCommon PROPERTIES FOLDER "Examples/Shared")
-set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
 
 ###############################################################################
 #

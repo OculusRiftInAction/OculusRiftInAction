@@ -47,6 +47,10 @@ long Platform::elapsedMillis() {
 #endif
 }
 
+float Platform::elapsedSeconds() {
+  return (float)elapsedMillis() / 1000.0f;
+}
+
 static const size_t BUFFER_SIZE = 8192;
 
 void Platform::fail(const char * file, int line, const char * message, ...) {

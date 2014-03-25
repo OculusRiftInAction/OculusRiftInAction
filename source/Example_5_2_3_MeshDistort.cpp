@@ -1,8 +1,13 @@
 #include "Common.h"
 
-#define DISTORTION_TIMING 1
+const Resource SCENE_IMAGES[2] = {
+  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
+  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
+};
 
 class DistortionHelper {
+
+protected:
   glm::dvec4 K;
   double lensOffset;
   double eyeAspect;
@@ -27,38 +32,18 @@ class DistortionHelper {
     return glm::dvec2(v.x - getLensOffset(eyeIndex), v.y * eyeAspect);
   }
 
-  glm::dvec2 textureToRift(const glm::dvec2 & v, int eyeIndex) {
-    return screenToRift(textureToScreen(v), eyeIndex);
-  }
-
-  glm::dvec2 riftToTexture(const glm::dvec2 & v, int eyeIndex) {
-    return screenToTexture(riftToScreen(v, eyeIndex));
-  }
-
   double getUndistortionScaleForRadiusSquared(double rSq) {
-    double distortionScale = K[0]
-        + rSq * (K[1] + rSq * (K[2] + rSq * K[3]));
-    return distortionScale;
-  }
-
-  double getUndistortionScale(const glm::dvec2 & v) {
-    double rSq = glm::length2(v);
-    return getUndistortionScaleForRadiusSquared(rSq);
-  }
-
-  double getUndistortionScaleForRadius(double r) {
-    return getUndistortionScaleForRadiusSquared(r * r);
+    return K[0] + rSq * (K[1] + rSq * (K[2] + rSq * K[3]));
   }
 
   glm::dvec2 getUndistortedPosition(const glm::dvec2 & v) {
-    return v * getUndistortionScale(v);
+    return v * getUndistortionScaleForRadiusSquared(glm::length2(v));
   }
 
   glm::dvec2 getTextureLookupValue(const glm::dvec2 & texCoord, int eyeIndex) {
-    glm::dvec2 riftPos = textureToRift(texCoord, eyeIndex);
+    glm::dvec2 riftPos = screenToRift(textureToScreen(texCoord), eyeIndex);
     glm::dvec2 distorted = getUndistortedPosition(riftPos);
-    glm::dvec2 result = riftToTexture(distorted, eyeIndex);
-    return result;
+    return screenToTexture(riftToScreen(distorted, eyeIndex));
   }
 
   bool closeEnough(double a, double b, double epsilon = 1e-5) {
@@ -71,8 +56,7 @@ class DistortionHelper {
     double distortionScale;
     while (true) {
       double rSource = ((max - min) / 2.0) + min;
-      distortionScale = getUndistortionScaleForRadiusSquared(
-          rSource * rSource);
+      distortionScale = getUndistortionScaleForRadiusSquared(rSource * rSource);
       double rResult = distortionScale * rSource;
       if (closeEnough(rResult, rTarget)) {
         break;
@@ -86,8 +70,7 @@ class DistortionHelper {
     return 1.0 / distortionScale;
   }
 
-  glm::dvec2 findDistortedVertexPosition(const glm::dvec2 & source,
-      int eyeIndex) {
+  glm::dvec2 findDistortedVertexPosition(const glm::dvec2 & source, int eyeIndex) {
     const glm::dvec2 rift = screenToRift(source, eyeIndex);
     double rTarget = glm::length(rift);
     double distortionScale = getDistortionScaleForRadius(rTarget);
@@ -98,41 +81,28 @@ class DistortionHelper {
 
 public:
   DistortionHelper(const OVR::HMDInfo & ovrHmdInfo) {
-    OVR::Util::Render::DistortionConfig Distortion;
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(ovrHmdInfo);
-    Distortion = stereoConfig.GetDistortionConfig();
+    const OVR::Util::Render::DistortionConfig & distortion = 
+        stereoConfig.GetDistortionConfig();
 
-    // The Rift examples use a post-distortion scale to resize the
-    // image upward after distorting it because their K values have
-    // been chosen such that they always result in a scale > 1.0, and
-    // thus shrink the image.  However, we can correct for that by
-    // finding the distortion scale the same way the OVR examples do,
-    // and then pre-multiplying the constants by it.
     double postDistortionScale = 1.0 / stereoConfig.GetDistortionScale();
     for (int i = 0; i < 4; ++i) {
-      K[i] = Distortion.K[i] * postDistortionScale;
+      K[i] = distortion.K[i] * postDistortionScale;
     }
-    lensOffset = 1.0f
-        - (2.0f * ovrHmdInfo.LensSeparationDistance / ovrHmdInfo.HScreenSize);
+    lensOffset = distortion.XCenterOffset;
     eyeAspect = ovrHmdInfo.HScreenSize / 2.0f / ovrHmdInfo.VScreenSize;
-  }
-
-  gl::TexturePtr createLookupTexture() {
-    return gl::TexturePtr();
   }
 
   gl::GeometryPtr createDistortionMesh(
       const glm::uvec2 & distortionMeshResolution, int eyeIndex) {
     std::vector<glm::vec4> vertexData;
-    vertexData.reserve(
-        distortionMeshResolution.x * distortionMeshResolution.y * 2);
+    vertexData.reserve(distortionMeshResolution.x * distortionMeshResolution.y * 2);
     // The texture coordinates are actually from the center of the pixel, so thats what we need to use for the calculation.
     for (size_t y = 0; y < distortionMeshResolution.y; ++y) {
       for (size_t x = 0; x < distortionMeshResolution.x; ++x) {
         // Create a texture coordinate that goes from [0, 1]
-        glm::dvec2 texCoord = (glm::dvec2(x, y)
-            / glm::dvec2(distortionMeshResolution - glm::uvec2(1)));
+        glm::dvec2 texCoord = glm::dvec2(x, y) / glm::dvec2(distortionMeshResolution - glm::uvec2(1));
         // Create the vertex coordinate in the range [-1, 1]
         glm::dvec2 vertexPos = (texCoord * 2.0) - 1.0;
 
@@ -153,22 +123,19 @@ public:
         indexData.push_back(rowStart + x);
       }
       indexData.push_back(UINT_MAX);
-
     }
+
     return gl::GeometryPtr(
       new gl::Geometry(vertexData, indexData, indexData.size(),
-        gl::Geometry::Flag::HAS_TEXTURE, GL_TRIANGLE_STRIP));
+          gl::Geometry::Flag::HAS_TEXTURE, GL_TRIANGLE_STRIP));
   }
 };
 
-const Resource SCENE_IMAGES[2] = {
-    Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
-    Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG };
-
-class PostProcessDistortRift : public RiftGlfwApp {
+class MeshDistortionExample : public RiftGlfwApp {
 protected:
-  gl::Texture2dPtr sceneTextures[2];
+  gl::Texture2dPtr textures[2];
   gl::GeometryPtr distortionGeometry[2];
+  gl::ProgramPtr program;
 
 public:
 
@@ -180,58 +147,37 @@ public:
     glPrimitiveRestartIndex(UINT_MAX);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
+    program = GlUtils::getProgram(
+        Resource::SHADERS_TEXTURED_VS,
+        Resource::SHADERS_TEXTURED_FS);
+    program->use();
+
     DistortionHelper distortionHelper(ovrHmdInfo);
 
+    // Load scene textures and generate distortion meshes
     for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      // load the scene textures
-      GlUtils::getImageAsTexture(sceneTextures[eyeIndex], SCENE_IMAGES[eyeIndex]);
-      // Generate the distortion meshes
-      distortionGeometry[eyeIndex] = 
-        distortionHelper.createDistortionMesh(
-        glm::uvec2(64, 64), eyeIndex);
+      GlUtils::getImageAsTexture(textures[eyeIndex], SCENE_IMAGES[eyeIndex]);
+      distortionGeometry[eyeIndex] = distortionHelper.createDistortionMesh(glm::uvec2(64, 64), eyeIndex);
     }
   }
 
   void draw() {
-    glClearColor(0.2f, 0.2f, 0.2f, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
       renderEye(eyeIndex);
     }
-    GL_CHECK_ERROR;
   }
 
   void renderEye(int eyeIndex) {
     // Enable this to see the mesh itself
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    viewport(eyeIndex);
 
-    gl::ProgramPtr distortProgram = GlUtils::getProgram(
-      Resource::SHADERS_TEXTURED_VS,
-        Resource::SHADERS_TEXTURED_FS);
-    distortProgram->use();
-    sceneTextures[eyeIndex]->bind();
+    viewport(eyeIndex);
+    textures[eyeIndex]->bind();
     distortionGeometry[eyeIndex]->bindVertexArray();
 
-#ifdef DISTORTION_TIMING
-    query->begin();
-#endif
-
     distortionGeometry[eyeIndex]->draw();
-
-#ifdef DISTORTION_TIMING
-    query->end();
-    static long accumulator = 0;
-    static long count = 0;
-    accumulator += query->getReult();
-    count++;
-    SAY("%d ns", accumulator / count);
-#endif
-
-    gl::VertexArray::unbind();
-    gl::Texture2d::unbind();
-    gl::Program::clear();
   }
 };
 
-RUN_OVR_APP(PostProcessDistortRift)
+RUN_OVR_APP(MeshDistortionExample)

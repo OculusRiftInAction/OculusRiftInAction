@@ -28,6 +28,14 @@ void Mesh::loadCtm(const std::string & data) {
     positions[i] = glm::vec4(glm::make_vec3(ctmData + (i * 3)), 1);
   }
 
+  if (importer.GetInteger(CTM_UV_MAP_COUNT) > 0) {
+    const float * ctmData = importer.GetFloatArray(CTM_UV_MAP_1);
+    texCoords.resize(vertexCount);
+    for (int i = 0; i < vertexCount; ++i) {
+      texCoords[i] = glm::make_vec2(ctmData + (i * 2));
+    }
+  }
+
   bool hasNormals = importer.GetInteger(CTM_HAS_NORMALS) ? true : false;
   if (hasNormals) {
     normals.resize(vertexCount);

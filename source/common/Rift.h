@@ -50,6 +50,7 @@ public:
   static glm::vec3 getEulerAngles(OVR::SensorFusion & sensorFusion);
   static glm::vec3 getEulerAngles(const OVR::Quatf & in);
 
+  static glm::vec4 Rift::fromOvr(const OVR::Color & in);
   static glm::vec3 fromOvr(const OVR::Vector3f & in);
   static glm::quat fromOvr(const OVR::Quatf & in);
 
@@ -124,11 +125,10 @@ protected:
   const bool fullscreen;
 
 public:
-  RiftGlfwApp(bool fullscreen = false) :
-    fullscreen(fullscreen)
+  RiftGlfwApp(bool fullscreen = false) : fullscreen(fullscreen)
   {
     hmdMonitor = GlfwApp::getMonitorAtPosition(hmdDesktopPosition);
-    if (!fullscreen && !hmdMonitor) {
+    if (hmdMonitor && !fullscreen) {
       const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
       eyeSize = glm::uvec2(videoMode->width, videoMode->height);
       eyeSize.x /= 2;
@@ -136,7 +136,6 @@ public:
   }
 
   virtual void createRenderingTarget() {
-
 #ifdef RIFT_MULTISAMPLE
     glfwWindowHint(GLFW_SAMPLES, 4);
 #endif
@@ -172,33 +171,29 @@ public:
   }
 };
 
+struct RiftPerEyeArg {
+  Eye eye;
+  glm::mat4 strabsimusCorrection;
+  glm::mat4 projectionOffset;
+  glm::mat4 modelviewOffset;
+  glm::uvec2 viewportPosition;
+  RiftLookupTexturePtr distortionTexture;
+
+  RiftPerEyeArg(Eye eye)
+    : eye(eye) { }
+};
+
 class RiftApp : public RiftGlfwApp {
 public:
-  struct PerEyeArg {
-  private:
-    const RiftApp & parent;
-  public:
-    Eye eye;
-    glm::mat4 strabsimusCorrection;
-    glm::mat4 projectionOffset;
-    glm::mat4 modelviewOffset;
-    RiftLookupTexturePtr lookupTexture;
-
-    PerEyeArg(const RiftApp & parent, Eye eye)
-      : parent(parent), eye(eye) { }
-
-    glm::mat4 getProjection() const {
-      return projectionOffset * parent.getProjection();
-    }
-  };
 
 protected:
   OVR::SensorFusion sensorFusion;
+  glm::mat4 player;
+  glm::mat4 riftOrientation;
 
 private:
-  OVR::Util::Render::StereoMode renderMode;
+  float distortionScale;
   OVR::Ptr<OVR::SensorDevice> ovrSensor;
-  gl::Texture<GL_TEXTURE_2D, GL_RG16>::Ptr offsetTexture;
   gl::GeometryPtr quadGeometry;
 
 #ifdef RIFT_MULTISAMPLE
@@ -208,23 +203,17 @@ private:
 #endif
 
   gl::ProgramPtr distortProgram;
-  std::array<PerEyeArg, 2> eyes;
-  glm::mat4 currentProjectionOffset;
-  float fov;
+  std::array<RiftPerEyeArg, 2> eyes{ { RiftPerEyeArg(LEFT), RiftPerEyeArg(RIGHT) } };
 
 protected:
   void renderStringAt(const std::string & str, float x, float y);
-
-  glm::mat4 getProjection() const {
-    return glm::perspective(fov, eyeAspect, Rift::ZNEAR, Rift::ZFAR);
-  }
 
   virtual void createRenderingTarget();
   virtual void initGl();
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw() final;
-
-  virtual void renderScene(const PerEyeArg & eyeArgs) = 0;
+  virtual void update();
+  virtual void renderScene() = 0;
 
 public:
   RiftApp(bool fullscreen = false);

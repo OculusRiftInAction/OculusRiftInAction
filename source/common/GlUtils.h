@@ -188,6 +188,10 @@ public:
     renderFloorGrid(glm::vec2(camera[3].x, camera[3].z));
   }
 
+  static void cubeRecurse(int depth = 6, float elapsed = Platform::elapsedSeconds());
+  static void dancingCubes(int elements = 8, float elapsed = Platform::elapsedSeconds());
+
+
   static const glm::vec3 X_AXIS;
   static const glm::vec3 Y_AXIS;
   static const glm::vec3 Z_AXIS;

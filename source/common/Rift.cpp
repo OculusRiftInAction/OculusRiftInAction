@@ -122,6 +122,12 @@ glm::vec3 Rift::getEulerAngles(OVR::SensorFusion & sensorFusion) {
   return getEulerAngles(sensorFusion.GetPredictedOrientation());
 }
 
+glm::vec4 Rift::fromOvr(const OVR::Color & in) {
+  glm::vec4 result;
+  in.GetRGBA(&result.r, &result.g, &result.b, &result.a);
+  return result;
+}
+
 glm::vec3 Rift::fromOvr(const OVR::Vector3f & in) {
   return glm::vec3(in.x, in.y, in.z);
 }
@@ -244,10 +250,10 @@ glm::dvec2 RiftDistortionHelper::findDistortedVertexPosition(const glm::dvec2 & 
   }
 
 RiftDistortionHelper::RiftDistortionHelper(const OVR::HMDInfo & hmdInfo) {
-    OVR::Util::Render::DistortionConfig Distortion;
+    OVR::Util::Render::DistortionConfig distortion;
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(hmdInfo);
-    Distortion = stereoConfig.GetDistortionConfig();
+    distortion = stereoConfig.GetDistortionConfig();
 
     // The Rift examples use a post-distortion scale to resize the
     // image upward after distorting it because their K values have
@@ -257,10 +263,9 @@ RiftDistortionHelper::RiftDistortionHelper(const OVR::HMDInfo & hmdInfo) {
     // and then pre-multiplying the constants by it.
     double postDistortionScale = 1.0 / stereoConfig.GetDistortionScale();
     for (int i = 0; i < 4; ++i) {
-      K[i] = Distortion.K[i] * postDistortionScale;
+      K[i] = distortion.K[i] * postDistortionScale;
     }
-    lensOffset = 1.0f
-      - (2.0f * hmdInfo.LensSeparationDistance / hmdInfo.HScreenSize);
+    lensOffset = distortion.XCenterOffset;
     eyeAspect = hmdInfo.HScreenSize / 2.0f / hmdInfo.VScreenSize;
   }
 
@@ -333,49 +338,63 @@ gl::GeometryPtr RiftDistortionHelper::createDistortionMesh(
   }
 
 
-RiftApp::RiftApp(bool fullscreen) : 
-  RiftGlfwApp(fullscreen),
-  renderMode(OVR::Util::Render::Stereo_LeftRight_Multipass), 
-  eyes({ { PerEyeArg(*this, LEFT), PerEyeArg(*this, RIGHT) } }) {
+RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
 
-  ///////////////////////////////////////////////////////////////////////////
-  // Initialize the head tracker
-  bool attached = false;
-  if (ovrManager) {
-    ovrSensor =
-        *ovrManager->EnumerateDevices<OVR::SensorDevice>().CreateDevice();
-    if (ovrSensor) {
-      sensorFusion.AttachToSensor(ovrSensor);
-      attached = sensorFusion.IsAttachedToSensor();
-    }
-  }
-
-  OVR::HMDInfo hmdInfo;
-  Rift::getHmdInfo(ovrManager, hmdInfo);
-  OVR::Util::Render::StereoConfig stereoConfig;
-  stereoConfig.SetHMDInfo(hmdInfo);
-  fov = stereoConfig.GetYFOVDegrees() * DEGREES_TO_RADIANS;
-
+  OVR::Util::Render::StereoConfig ovrStereoConfig;
+  ovrStereoConfig.SetHMDInfo(ovrHmdInfo);
   {
-    float projectionOffset = stereoConfig.GetProjectionCenterOffset();
-    glm::vec3 v = glm::vec3(projectionOffset, 0, 0);
-    eyes[0].projectionOffset = glm::translate(glm::mat4(), v);
-    eyes[1].projectionOffset = glm::translate(glm::mat4(), -v);
+    OVR::Ptr<OVR::ProfileManager> profileManager =
+      *OVR::ProfileManager::Create();
+    OVR::Ptr<OVR::Profile> profile =
+      *(profileManager->GetDeviceDefaultProfile(
+      OVR::ProfileType::Profile_RiftDK1));
+    float ipd = profile->GetIPD();
+    ovrStereoConfig.SetIPD(ipd);
   }
 
-  {
-    float modelviewOffset = stereoConfig.GetIPD() / 2.0f;
-    glm::vec3 v = glm::vec3(modelviewOffset, 0, 0);
-    eyes[0].modelviewOffset = glm::translate(glm::mat4(), v);
-    eyes[1].modelviewOffset = glm::translate(glm::mat4(), -v);
-  }
+  gl::Stacks::projection().top() =
+    glm::perspective(ovrStereoConfig.GetYFOVRadians(),
+    glm::aspect(eyeSize), 0.01f, 1000.0f);
+  ovrStereoConfig.GetIPD();
+
+  eyes[LEFT].viewportPosition =
+    glm::uvec2(0, 0);
+  eyes[LEFT].modelviewOffset = glm::translate(glm::mat4(),
+    glm::vec3(ovrStereoConfig.GetIPD() / 2.0f, 0, 0));
+  eyes[LEFT].projectionOffset = glm::translate(glm::mat4(),
+    glm::vec3(ovrStereoConfig.GetProjectionCenterOffset(), 0, 0));
+
+  eyes[RIGHT].viewportPosition =
+    glm::uvec2(hmdNativeResolution.x / 2, 0);
+  eyes[RIGHT].modelviewOffset = glm::translate(glm::mat4(),
+    glm::vec3(-ovrStereoConfig.GetIPD() / 2.0f, 0, 0));
+  eyes[RIGHT].projectionOffset = glm::translate(glm::mat4(),
+    glm::vec3(-ovrStereoConfig.GetProjectionCenterOffset(), 0, 0));
 
   {
     glm::quat strabismusCorrection = Rift::getStrabismusCorrection();
-    eyes[0].strabsimusCorrection = glm::mat4_cast(strabismusCorrection);
-    eyes[1].strabsimusCorrection = glm::mat4_cast(glm::inverse(strabismusCorrection));
+    eyes[LEFT].strabsimusCorrection = glm::mat4_cast(strabismusCorrection);
+    eyes[RIGHT].strabsimusCorrection = glm::mat4_cast(glm::inverse(strabismusCorrection));
   }
 
+  distortionScale = ovrStereoConfig.GetDistortionScale();
+
+  ovrSensor =
+    *ovrManager->EnumerateDevices<OVR::SensorDevice>().
+    CreateDevice();
+  if (ovrSensor) {
+    sensorFusion.AttachToSensor(ovrSensor);
+  }
+
+  if (!sensorFusion.IsAttachedToSensor()) {
+    SAY_ERR("Could not attach to sensor device");
+  }
+
+  float eyeHeight = 1.5f;
+  player = glm::inverse(glm::lookAt(
+    glm::vec3(0, eyeHeight, 4), 
+    glm::vec3(0, eyeHeight, 0), 
+    glm::vec3(0, 1, 0)));
 }
 
 void RiftApp::createRenderingTarget() {
@@ -404,8 +423,9 @@ void RiftApp::initGl() {
 
   // Allocate the frameBuffer that will hold the scene, and then be
   // re-rendered to the screen with distortion
-  glm::uvec2 frameBufferSize = glm::uvec2(glm::vec2(eyeSize) *
-      Rift::FRAMEBUFFER_OBJECT_SCALE);
+  glm::uvec2 frameBufferSize = glm::uvec2(
+    glm::vec2(eyeSize) *
+    distortionScale);
   frameBuffer.init(frameBufferSize);
   GL_CHECK_ERROR;
 
@@ -413,11 +433,10 @@ void RiftApp::initGl() {
   quadGeometry = GlUtils::getQuadGeometry();
 
   // Create the rendering displacement map
+  RiftDistortionHelper helper(ovrHmdInfo);
   FOR_EACH_EYE(eye) {
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    RiftDistortionHelper helper(hmdInfo);
-    eyes[eye].lookupTexture = helper.createLookupTexture(glm::uvec2(512, 512), eye);
+    eyes[eye].distortionTexture = 
+      helper.createLookupTexture(glm::uvec2(512, 512), eye);
   }
 
 #ifdef RIFT_MULTISAMPLE
@@ -439,21 +458,14 @@ void RiftApp::initGl() {
 }
 
 void RiftApp::onKey(int key, int scancode, int action, int mods) {
-  if (GLFW_PRESS != action) {
-    return;
-  }
-
-  switch (key) {
+  if (GLFW_PRESS == action) switch (key) {
   case GLFW_KEY_R:
     sensorFusion.Reset();
     return;
+  }
 
-  case GLFW_KEY_P:
-    if (renderMode == OVR::Util::Render::Stereo_None) {
-      renderMode = OVR::Util::Render::Stereo_LeftRight_Multipass;
-    } else {
-      renderMode = OVR::Util::Render::Stereo_None;
-    }
+  // Allow the camera controller to intercept the input
+  if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
     return;
   }
   RiftGlfwApp::onKey(key, scancode, action, mods);
@@ -461,66 +473,78 @@ void RiftApp::onKey(int key, int scancode, int action, int mods) {
 
 
 void RiftApp::draw() {
-  //if (renderMode == OVR::Util::Render::Stereo_None) {
-  //  gl::Stacks::projection().top() = glm::perspective(
-  //      60.0f, glm::aspect(windowSize),
-  //      Rift::ZNEAR, Rift::ZFAR);
-  //  // If we're not working stereo, we're just going to render the
-  //  // scene once, from a single position, directly to the back buffer
-  //  gl::viewport(windowSize);
-  //  renderScene();
-  //} else {
-    // If we get here, we're rendering in stereo, so we have to render our output twice
+  glClear(GL_COLOR_BUFFER_BIT);
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  gl::MatrixStack & pr = gl::Stacks::projection();
 
-    // We have to explicitly clear the screen here.  the Clear command doesn't object the viewport
-    // and the clear command inside renderScene will only target the active framebuffer object.
-    glClearColor(0.4f, 0.4f, 0.4f, 1.0f);
+  FOR_EACH_EYE(eye) {
+    const RiftPerEyeArg & eyeArgs = eyes[eye];
+    frameBuffer.activate();
+    glEnable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    for (int i = 0; i < 2; ++i) {
-      const PerEyeArg & eyeArgs = eyes[i];
-      currentProjectionOffset = eyeArgs.projectionOffset;
-      // Compute the modelview and projection offsets for the rendered scene based on the eye and
-      // whether or not we're doing side by side or rift rendering
-      frameBuffer.activate();
+
+    gl::Stacks::with_push(pr, mv, [&]{
+      mv.preMultiply(eyeArgs.modelviewOffset);
+      pr.preMultiply(eyeArgs.projectionOffset);
 #ifdef RIFT_MULTISAMPLE
       glEnable(GL_MULTISAMPLE);
 #endif
-      renderScene(eyeArgs);
+
+      renderScene();
+      GL_CHECK_ERROR;
+
 #ifdef RIFT_MULTISAMPLE
       glDisable(GL_MULTISAMPLE);
 #endif
-      frameBuffer.deactivate();
-      currentProjectionOffset = glm::mat4();
 
-      viewport(i);
-      static long accumulator = 0;
-      static long count = 0;
-      distortProgram->use();
-      glActiveTexture(GL_TEXTURE1);
-      eyeArgs.lookupTexture->bind();
-      glActiveTexture(GL_TEXTURE0);
-      frameBuffer.color->bind();
-//      frameBuffer.color->generateMipmap();
-      quadGeometry->bindVertexArray();
-      quadGeometry->draw();
-      gl::VertexArray::unbind();
-      gl::Program::clear();
-    } // for
-  // } // if
-  GL_CHECK_ERROR;
+    });
+
+    frameBuffer.deactivate();
+    glDisable(GL_DEPTH_TEST);
+
+    viewport(eye);
+    distortProgram->use();
+    glActiveTexture(GL_TEXTURE1);
+    eyeArgs.distortionTexture->bind();
+    glActiveTexture(GL_TEXTURE0);
+    frameBuffer.color->bind();
+    quadGeometry->bindVertexArray();
+    quadGeometry->draw();
+    gl::VertexArray::unbind();
+    gl::Program::clear();
+    GL_CHECK_ERROR;
+  }
+}
+
+void RiftApp::update() {
+  RiftGlfwApp::update();
+  CameraControl::instance().applyInteraction(player);
+
+  riftOrientation = glm::mat4_cast(Rift::fromOvr(sensorFusion.GetPredictedOrientation()));
+
+  static const glm::vec4 EYE_ROTATION_OFFSET(0, 0.15f, -0.09f, 1);
+  glm::vec3 riftImposedTranslation =
+    glm::vec3(glm::inverse(riftOrientation) * EYE_ROTATION_OFFSET);
+  riftImposedTranslation -= glm::vec3(EYE_ROTATION_OFFSET);
+  glm::mat4 playerRiftTranslation =
+    glm::translate(glm::mat4(), riftImposedTranslation);
+  gl::Stacks::modelview().top() = riftOrientation *
+    glm::inverse(playerRiftTranslation * player);
+
+  gl::Stacks::modelview().top() = 
+    riftOrientation * glm::inverse(player);
 }
 
 void RiftApp::renderStringAt(const std::string & str, float x, float y) {
-   gl::MatrixStack & mv = gl::Stacks::modelview();
+  gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pr = gl::Stacks::projection();
-  mv.push().identity();
-  pr.push().top() = currentProjectionOffset * glm::ortho(
-    -1.0f, 1.0f,
-    -windowAspectInverse * 2.0f, windowAspectInverse * 2.0f,
-    -100.0f, 100.0f);
-  glm::vec2 cursor(x, windowAspectInverse * y);
-  GlUtils::renderString(str, cursor, 18.0f);
-  pr.pop();
-  mv.pop();
-
+  gl::Stacks::with_push(mv, pr, [&]{
+    mv.identity();
+    pr.top() = 1.0f * glm::ortho(
+      -1.0f, 1.0f,
+      -windowAspectInverse * 2.0f, windowAspectInverse * 2.0f,
+      -100.0f, 100.0f);
+    glm::vec2 cursor(x, windowAspectInverse * y);
+    GlUtils::renderString(str, cursor, 18.0f);
+  });
 }

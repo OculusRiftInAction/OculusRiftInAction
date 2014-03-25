@@ -85,6 +85,7 @@ class Platform {
 public:
     static void sleepMillis(int millis);
     static long elapsedMillis();
+    static float elapsedSeconds();
     static void fail(const char * file, int line, const char * message, ...);
     static void say(std::ostream & out, const char * message, ...);
     static std::string format(const char * formatString, ...);
@@ -149,4 +150,5 @@ public:
 #include "Interaction.h"
 
 #include "Rift.h"
+#include "OpenCV.h"
 

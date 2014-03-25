@@ -2,82 +2,80 @@
 
 struct PerEyeArg {
   Eye eye;
+  glm::uvec2 viewportPosition;
   glm::mat4 projectionOffset;
   glm::mat4 modelviewOffset;
   RiftLookupTexturePtr distortionTexture;
 
-  PerEyeArg(Eye eye)
-    : eye(eye) { }
-
-  glm::mat4 getProjection() const {
-    return projectionOffset;
-  }
+  PerEyeArg(Eye eye) : eye(eye) { }
 };
 
 class SimpleScene: public RiftGlfwApp {
   glm::mat4 player;
-  glm::mat4 projection;
-  gl::TextureCubeMapPtr skyboxTexture;
-  gl::GeometryPtr treeGeometry;
-  float ipd;
-  float eyeHeight;
-  bool applyProjectionOffset;
-  bool applyModelviewOffset;
-  std::array<PerEyeArg, 2> eyes;
+  float ipd{ 0.06f };
+  float eyeHeight{ 1.5f };
+
+  std::array<PerEyeArg, 2> eyes{ { PerEyeArg(LEFT), PerEyeArg(RIGHT) } };
+
+  float distortionScale{ 1.0f };
 
   gl::FrameBufferWrapper frameBuffer;
   gl::ProgramPtr distortProgram;
   gl::GeometryPtr quadGeometry;
 
-  OVR::SensorFusion sensorFusion;
+  OVR::SensorFusion ovrSensorFusion;
   OVR::Ptr<OVR::SensorDevice> ovrSensor;
   glm::mat4 riftOrientation;
 
 public:
-  SimpleScene() : eyes({ { PerEyeArg(LEFT), PerEyeArg(RIGHT) } }) {
-    eyeHeight = 1.0f;
-    applyProjectionOffset = true;
-    applyModelviewOffset = true;
-    {
-      OVR::Ptr<OVR::ProfileManager> profileManager = *OVR::ProfileManager::Create();
-      OVR::Ptr<OVR::Profile> profile = *(profileManager->GetDeviceDefaultProfile(OVR::ProfileType::Profile_RiftDK1));
-      ipd = profile->GetIPD();
-      eyeHeight = profile->GetEyeHeight();
-      glm::mat4 modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(ipd / 2.0f, 0, 0));
-      eyes[LEFT].modelviewOffset = modelviewOffset;
-      eyes[RIGHT].modelviewOffset = glm::inverse(modelviewOffset);
+  SimpleScene() {
+    OVR::Ptr<OVR::ProfileManager> profileManager = 
+      *OVR::ProfileManager::Create();
+    OVR::Ptr<OVR::Profile> profile = 
+      *(profileManager->GetDeviceDefaultProfile(
+        OVR::ProfileType::Profile_RiftDK1));
+    ipd = profile->GetIPD();
+    eyeHeight = profile->GetEyeHeight();
+
+    // setup the initial player location
+    player = glm::inverse(glm::lookAt(
+      glm::vec3(0, eyeHeight, ipd * 4.0f),
+      glm::vec3(0, eyeHeight, 0),
+      GlUtils::Y_AXIS));
+
+    OVR::Util::Render::StereoConfig ovrStereoConfig;
+    ovrStereoConfig.SetHMDInfo(ovrHmdInfo);
+
+    gl::Stacks::projection().top() =
+      glm::perspective(ovrStereoConfig.GetYFOVRadians(),
+        glm::aspect(eyeSize), 0.01f, 1000.0f);
+
+    eyes[LEFT].viewportPosition =
+      glm::uvec2(0, 0);
+    eyes[LEFT].modelviewOffset = glm::translate(glm::mat4(),
+      glm::vec3(ipd / 2.0f, 0, 0));
+    eyes[LEFT].projectionOffset = glm::translate(glm::mat4(),
+      glm::vec3(ovrStereoConfig.GetProjectionCenterOffset(), 0, 0));
+
+    eyes[RIGHT].viewportPosition =
+      glm::uvec2(hmdNativeResolution.x / 2, 0);
+    eyes[RIGHT].modelviewOffset = glm::translate(glm::mat4(),
+      glm::vec3(-ipd / 2.0f, 0, 0));
+    eyes[RIGHT].projectionOffset = glm::translate(glm::mat4(),
+      glm::vec3(-ovrStereoConfig.GetProjectionCenterOffset(), 0, 0));
+
+    distortionScale = ovrStereoConfig.GetDistortionScale();
+
+    ovrSensor = 
+      *ovrManager->EnumerateDevices<OVR::SensorDevice>().
+        CreateDevice();
+    if (ovrSensor) {
+      ovrSensorFusion.AttachToSensor(ovrSensor);
     }
 
-    if (ovrManager) {
-      ovrSensor =
-        *ovrManager->EnumerateDevices<OVR::SensorDevice>().CreateDevice();
-      if (ovrSensor) {
-        sensorFusion.AttachToSensor(ovrSensor);
-      }
-    }
-    if (sensorFusion.IsAttachedToSensor()) {
-      SAY("Attached");
-    } else {
-      SAY("Attach failed");
-    }
-
-    {
-      OVR::HMDInfo hmdInfo;
-      Rift::getHmdInfo(ovrManager, hmdInfo);
-      OVR::Util::Render::StereoConfig config;
-      config.SetHMDInfo(hmdInfo);
-      gl::Stacks::projection().top() = 
-        glm::perspective(config.GetYFOVRadians(), eyeAspect, 0.01f, 1000.0f);
-      glm::mat4 projectionOffset = glm::translate(glm::mat4(),
-        glm::vec3(config.GetProjectionCenterOffset(), 0, 0));
-      eyes[LEFT].projectionOffset = projectionOffset;
-      eyes[RIGHT].projectionOffset = glm::inverse(projectionOffset);
-    }
-
-    glm::vec3 playerPosition(0, eyeHeight, ipd * 4.0f);
-    player = glm::inverse(glm::lookAt(playerPosition, glm::vec3(0, eyeHeight, 0), GlUtils::Y_AXIS));
-    CameraControl::instance().enableHydra(true);
+    if (!ovrSensorFusion.IsAttachedToSensor()) {
+      SAY_ERR("Could not attach to sensor device");
+    } 
   }
 
   virtual ~SimpleScene() {
@@ -90,7 +88,6 @@ public:
     glEnable(GL_LINE_SMOOTH);
     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
     gl::clearColor(Colors::darkGrey);
-    skyboxTexture = GlUtils::getCubemapTextures(Resource::IMAGES_SKY_CITY_XNEG_PNG);
 
     distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS, 
@@ -103,31 +100,25 @@ public:
     quadGeometry = GlUtils::getQuadGeometry();
     frameBuffer.init(glm::uvec2(glm::vec2(eyeSize) * 2.0f));
 
-    OVR::HMDInfo hmdInfo;
-    Rift::getHmdInfo(ovrManager, hmdInfo);
-    RiftDistortionHelper distortionHelper(hmdInfo);
+    RiftDistortionHelper distortionHelper(ovrHmdInfo);
     FOR_EACH_EYE(eye) {
       eyes[eye].distortionTexture = 
         distortionHelper.createLookupTexture(glm::uvec2(512, 512), eye);
     }
-
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (action == GLFW_PRESS) switch (key) {
-    case GLFW_KEY_P:
-      applyProjectionOffset = !applyProjectionOffset;
-      return;
-    case GLFW_KEY_M:
-      applyModelviewOffset = !applyModelviewOffset;
-      return;
-    case GLFW_KEY_R:
-      player = glm::inverse(glm::lookAt(glm::vec3(0, eyeHeight, ipd * 4.0f), glm::vec3(0, eyeHeight, 0), GlUtils::Y_AXIS));
-      sensorFusion.Reset();
+    if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
       return;
     }
 
-    if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+    if (action == GLFW_PRESS) switch (key) {
+    case GLFW_KEY_R:
+      ovrSensorFusion.Reset();
+      player = glm::inverse(glm::lookAt(
+        glm::vec3(0, eyeHeight, ipd * 4.0f),
+        glm::vec3(0, eyeHeight, 0),
+        GlUtils::Y_AXIS));
       return;
     }
 
@@ -136,18 +127,27 @@ public:
 
   virtual void update() {
     CameraControl::instance().applyInteraction(player);
-    riftOrientation = Rift::getMat4(sensorFusion);
+    riftOrientation = Rift::getMat4(ovrSensorFusion);
     gl::Stacks::modelview().top() = riftOrientation * glm::inverse(player);
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
+    gl::MatrixStack & mv = gl::Stacks::modelview();
+    gl::MatrixStack & pr = gl::Stacks::projection();
+
     FOR_EACH_EYE(eye) {
       const PerEyeArg & eyeArgs = eyes[eye];
       frameBuffer.activate();
       glEnable(GL_DEPTH_TEST);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      renderScene(eyeArgs);
+
+      gl::Stacks::with_push(pr, mv, [&]{
+        mv.preMultiply(eyeArgs.modelviewOffset);
+        pr.preMultiply(eyeArgs.projectionOffset);
+        renderScene();
+      });
+
       frameBuffer.deactivate();
       glDisable(GL_DEPTH_TEST);
 
@@ -164,26 +164,14 @@ public:
     }
   }
 
-  void renderScene(const PerEyeArg & eyeArg) {
-    gl::MatrixStack & pr = gl::Stacks::projection();
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    pr.push();
-    mv.push();
-    if (applyProjectionOffset) {
-      pr.preMultiply(eyeArg.projectionOffset);
-    }
-    if (applyModelviewOffset) {
-      mv.preMultiply(eyeArg.modelviewOffset);
-    }
-
+  void renderScene() {
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     GlUtils::renderFloorGrid(player);
-    mv.push().translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
-    GlUtils::drawColorCube();
-    mv.pop();
-
-    mv.pop();
-    pr.pop();
+    gl::MatrixStack & mv = gl::Stacks::modelview();
+    gl::Stacks::with_push(mv, [&]{
+      mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
+      GlUtils::drawColorCube(true);
+    });
   }
 };
 
