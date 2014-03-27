@@ -1,14 +1,14 @@
 #include "Common.h"
 
-const Resource SCENE_IMAGES[2] = {
-  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
+std::map<StereoEye, Resource> SCENE_IMAGES = {
+  { LEFT, Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG},
+  { RIGHT, Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG }
 };
 
 class UndistortedExample : public RiftGlfwApp {
 
 protected:
-  gl::Texture2dPtr textures[2];
+  std::map<StereoEye, gl::Texture2dPtr> textures;
   gl::GeometryPtr quadGeometry;
   gl::ProgramPtr program;
 
@@ -28,21 +28,22 @@ public:
     quadGeometry = GlUtils::getQuadGeometry();
     quadGeometry->bindVertexArray();
 
-    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      GlUtils::getImageAsTexture(textures[eyeIndex], SCENE_IMAGES[eyeIndex]);
-    }
+    for_each_eye([&](StereoEye eye){
+      Resource image = SCENE_IMAGES[eye];
+      GlUtils::getImageAsTexture(textures[eye], image);
+    });
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
-    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      renderEye(eyeIndex);
-    }
+    for_each_eye([&](StereoEye eye){
+      renderEye(eye);
+    });
   }
 
-  void renderEye(int eyeIndex) {
-    viewport(eyeIndex);
-    textures[eyeIndex]->bind();
+  void renderEye(StereoEye eye) {
+    viewport(eye);
+    textures[eye]->bind();
     quadGeometry->draw();
   }
 };

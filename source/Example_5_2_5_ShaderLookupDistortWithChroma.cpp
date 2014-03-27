@@ -1,8 +1,9 @@
 #include "Common.h"
 
-const Resource SCENE_IMAGES[2] = {
-  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
+
+std::map<StereoEye, Resource> SCENE_IMAGES = {
+  { LEFT, Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG},
+  { RIGHT, Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG }
 };
 
 #define DISTORTION_TIMING 1
@@ -12,8 +13,8 @@ protected:
   typedef LookupTexture::Ptr LookupTexturePtr;
 
   glm::uvec2 lookupTextureSize;
-  gl::Texture2dPtr sceneTextures[2];
-  LookupTexturePtr lookupTextures[2];
+  std::map<StereoEye, gl::Texture2dPtr> sceneTextures;
+  std::map<StereoEye, LookupTexturePtr> lookupTextures;
   gl::GeometryPtr quadGeometry;
   glm::vec4 K;
   glm::vec2 chromaK[2];
@@ -24,7 +25,7 @@ public:
   ShaderLookupDistort() : lookupTextureSize(512, 512), chroma(true) {
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(ovrHmdInfo);
-    const OVR::Util::Render::DistortionConfig & distortion = 
+    const OVR::Util::Render::DistortionConfig & distortion =
       stereoConfig.GetDistortionConfig();
 
     // The Rift examples use a post-distortion scale to resize the
@@ -59,8 +60,8 @@ public:
     }
   }
 
-  
-  glm::vec4 findSceneTextureCoords(int eyeIndex, glm::vec2 texCoord) {
+
+  glm::vec4 findSceneTextureCoords(StereoEye eye, glm::vec2 texCoord) {
     static bool init = false;
     if (!init) {
       init = true;
@@ -68,7 +69,7 @@ public:
     texCoord *= 2.0;
     texCoord -= 1.0;
     texCoord.y /= eyeAspect;
-    texCoord.x += (eyeIndex == 0) ? -lensOffset : lensOffset;
+    texCoord.x += (eye == LEFT) ? -lensOffset : lensOffset;
 
     float rSq = glm::length2(texCoord);
     float distortionScale = K[0] + rSq * (K[1] + rSq * (K[2] + rSq * K[3]));
@@ -76,7 +77,7 @@ public:
     glm::vec2 chromaTexCoords[2];
     for (int i = 0; i < 2; ++i) {
       chromaTexCoords[i] = texCoord * (chromaK[i][0] + chromaK[i][1] * rSq);
-      chromaTexCoords[i].x -= (eyeIndex == 0) ? -lensOffset : lensOffset;;
+      chromaTexCoords[i].x -= (eye == LEFT) ? -lensOffset : lensOffset;;
       chromaTexCoords[i].y *= eyeAspect;
       chromaTexCoords[i] += 1.0;
       chromaTexCoords[i] /= 2.0;
@@ -85,7 +86,7 @@ public:
     return glm::vec4(chromaTexCoords[0], chromaTexCoords[1]);
   }
 
-  void createLookupTexture(LookupTexturePtr & outTexture, int eyeIndex) {
+  void createLookupTexture(LookupTexturePtr & outTexture, StereoEye eye) {
     size_t lookupDataSize = lookupTextureSize.x * lookupTextureSize.y * 4;
     float * lookupData = new float[lookupDataSize];
     // The texture coordinates are actually from the center of the pixel, so thats what we need to use for the calculation.
@@ -95,7 +96,7 @@ public:
       for (size_t x = 0; x < lookupTextureSize.x; ++x) {
         size_t offset = (y * rowSize) + (x * 4);
         glm::vec2 texCoord = (glm::vec2(x, y) / glm::vec2(lookupTextureSize)) + texCenterOffset;
-        glm::vec4 sceneTexCoord = findSceneTextureCoords(eyeIndex, texCoord);
+        glm::vec4 sceneTexCoord = findSceneTextureCoords(eye, texCoord);
         memcpy(&lookupData[offset], &sceneTexCoord[0], sizeof(float)* 4);
       }
     }
@@ -119,35 +120,35 @@ public:
     quadGeometry = GlUtils::getQuadGeometry();
 
     // Generate the lookup textures and load the scene textures
-    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      GlUtils::getImageAsTexture(sceneTextures[eyeIndex], SCENE_IMAGES[eyeIndex]);
-      createLookupTexture(lookupTextures[eyeIndex], eyeIndex);
-    }
+    for_each_eye([&](StereoEye eye){
+      GlUtils::getImageAsTexture(sceneTextures[eye], SCENE_IMAGES[eye]);
+      createLookupTexture(lookupTextures[eye], eye);
+    });
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
-    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      renderEye(eyeIndex);
-    }
+    for_each_eye([&](StereoEye eye){
+      renderEye(eye);
+    });
     GL_CHECK_ERROR;
   }
 
-  void renderEye(int eyeIndex) {
-    viewport(eyeIndex);
+  void renderEye(StereoEye eye) {
+    viewport(eye);
     gl::ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
-      chroma ? 
-        Resource::SHADERS_RIFTCHROMAWARP_FS : 
+      chroma ?
+        Resource::SHADERS_RIFTCHROMAWARP_FS :
         Resource::SHADERS_RIFTWARP_FS);
     distortProgram->use();
     distortProgram->setUniform1i("Scene", 1);
     distortProgram->setUniform1i("OffsetMap", 0);
 
     glActiveTexture(GL_TEXTURE1);
-    sceneTextures[eyeIndex]->bind();
+    sceneTextures[eye]->bind();
     glActiveTexture(GL_TEXTURE0);
-    lookupTextures[eyeIndex]->bind();
+    lookupTextures[eye]->bind();
 
     quadGeometry->bindVertexArray();
 #ifdef DISTORTION_TIMING

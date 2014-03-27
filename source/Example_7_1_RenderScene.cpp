@@ -1,13 +1,10 @@
 #include "Common.h"
 
 struct PerEyeArg {
-  Eye eye;
   glm::uvec2 viewportPosition;
   glm::mat4 projectionOffset;
   glm::mat4 modelviewOffset;
   RiftLookupTexturePtr distortionTexture;
-
-  PerEyeArg(Eye eye) : eye(eye) { }
 };
 
 class SimpleScene: public RiftGlfwApp {
@@ -15,7 +12,7 @@ class SimpleScene: public RiftGlfwApp {
   float ipd{ 0.06f };
   float eyeHeight{ 1.5f };
 
-  std::array<PerEyeArg, 2> eyes{ { PerEyeArg(LEFT), PerEyeArg(RIGHT) } };
+  std::map<StereoEye, PerEyeArg> eyes;
 
   float distortionScale{ 1.0f };
 
@@ -29,9 +26,9 @@ class SimpleScene: public RiftGlfwApp {
 
 public:
   SimpleScene() {
-    OVR::Ptr<OVR::ProfileManager> profileManager = 
+    OVR::Ptr<OVR::ProfileManager> profileManager =
       *OVR::ProfileManager::Create();
-    OVR::Ptr<OVR::Profile> profile = 
+    OVR::Ptr<OVR::Profile> profile =
       *(profileManager->GetDeviceDefaultProfile(
         OVR::ProfileType::Profile_RiftDK1));
     ipd = profile->GetIPD();
@@ -66,7 +63,7 @@ public:
 
     distortionScale = ovrStereoConfig.GetDistortionScale();
 
-    ovrSensor = 
+    ovrSensor =
       *ovrManager->EnumerateDevices<OVR::SensorDevice>().
         CreateDevice();
     if (ovrSensor) {
@@ -75,7 +72,7 @@ public:
 
     if (!ovrSensorFusion.IsAttachedToSensor()) {
       SAY_ERR("Could not attach to sensor device");
-    } 
+    }
   }
 
   virtual ~SimpleScene() {
@@ -90,7 +87,7 @@ public:
     gl::clearColor(Colors::darkGrey);
 
     distortProgram = GlUtils::getProgram(
-      Resource::SHADERS_TEXTURED_VS, 
+      Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_RIFTWARP_FS);
     distortProgram->use();
     distortProgram->setUniform1i("OffsetMap", 1);
@@ -101,10 +98,10 @@ public:
     frameBuffer.init(glm::uvec2(glm::vec2(eyeSize) * 2.0f));
 
     RiftDistortionHelper distortionHelper(ovrHmdInfo);
-    FOR_EACH_EYE(eye) {
-      eyes[eye].distortionTexture = 
+    for_each_eye([&](StereoEye eye){
+      eyes[eye].distortionTexture =
         distortionHelper.createLookupTexture(glm::uvec2(512, 512), eye);
-    }
+    });
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
@@ -136,7 +133,7 @@ public:
     gl::MatrixStack & mv = gl::Stacks::modelview();
     gl::MatrixStack & pr = gl::Stacks::projection();
 
-    FOR_EACH_EYE(eye) {
+    for_each_eye([&](StereoEye eye){
       const PerEyeArg & eyeArgs = eyes[eye];
       frameBuffer.activate();
       glEnable(GL_DEPTH_TEST);
@@ -161,7 +158,7 @@ public:
       quadGeometry->draw();
       gl::VertexArray::unbind();
       gl::Program::clear();
-    }
+    });
   }
 
   void renderScene() {

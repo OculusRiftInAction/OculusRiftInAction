@@ -1,13 +1,10 @@
 #include "Common.h"
 
 struct PerEyeArg {
-  const Eye eye;
   glm::uvec2 viewportPosition;
   glm::mat4 modelviewOffset;
   glm::mat4 projectionOffset;
   RiftLookupTexturePtr distortionTexture;
-  
-  PerEyeArg(Eye eye) : eye(eye) { }
 };
 
 class SimpleScene: public RiftGlfwApp {
@@ -15,7 +12,7 @@ class SimpleScene: public RiftGlfwApp {
   float ipd{ 0.06f };
   float eyeHeight{ 1.5f };
 
-  std::array<PerEyeArg, 2> eyes{ { PerEyeArg(LEFT), PerEyeArg(RIGHT) } };
+  std::map<StereoEye, PerEyeArg> eyes;
 
   bool applyProjectionOffset{ true };
   bool applyModelviewOffset{ true };
@@ -29,9 +26,9 @@ class SimpleScene: public RiftGlfwApp {
 
 public:
   SimpleScene() {
-    OVR::Ptr<OVR::ProfileManager> profileManager = 
+    OVR::Ptr<OVR::ProfileManager> profileManager =
       *OVR::ProfileManager::Create();
-    OVR::Ptr<OVR::Profile> profile = 
+    OVR::Ptr<OVR::Profile> profile =
       *(profileManager->GetDeviceDefaultProfile(
         OVR::ProfileType::Profile_RiftDK1));
     ipd = profile->GetIPD();
@@ -39,27 +36,27 @@ public:
 
     // setup the initial player location
     player = glm::inverse(glm::lookAt(
-      glm::vec3(0, eyeHeight, ipd * 4.0f), 
-      glm::vec3(0, eyeHeight, 0), 
+      glm::vec3(0, eyeHeight, ipd * 4.0f),
+      glm::vec3(0, eyeHeight, 0),
       GlUtils::Y_AXIS));
 
     OVR::Util::Render::StereoConfig ovrStereoConfig;
     ovrStereoConfig.SetHMDInfo(ovrHmdInfo);
 
-    gl::Stacks::projection().top() = 
-      glm::perspective(ovrStereoConfig.GetYFOVRadians(), 
+    gl::Stacks::projection().top() =
+      glm::perspective(ovrStereoConfig.GetYFOVRadians(),
         glm::aspect(eyeSize), 0.01f, 1000.0f);
 
-    eyes[LEFT].viewportPosition = 
+    eyes[LEFT].viewportPosition =
       glm::uvec2(0, 0);
     eyes[LEFT].modelviewOffset = glm::translate(glm::mat4(),
       glm::vec3(ipd / 2.0f, 0, 0));
     eyes[LEFT].projectionOffset = glm::translate(glm::mat4(),
       glm::vec3(ovrStereoConfig.GetProjectionCenterOffset(), 0, 0));
 
-    eyes[RIGHT].viewportPosition = 
+    eyes[RIGHT].viewportPosition =
       glm::uvec2(hmdNativeResolution.x / 2, 0);
-    eyes[RIGHT].modelviewOffset = glm::translate(glm::mat4(), 
+    eyes[RIGHT].modelviewOffset = glm::translate(glm::mat4(),
       glm::vec3(-ipd / 2.0f, 0, 0));
     eyes[RIGHT].projectionOffset = glm::translate(glm::mat4(),
       glm::vec3(-ovrStereoConfig.GetProjectionCenterOffset(), 0, 0));
@@ -76,7 +73,7 @@ public:
     gl::clearColor(Colors::darkGrey);
 
     distortProgram = GlUtils::getProgram(
-      Resource::SHADERS_TEXTURED_VS, 
+      Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_RIFTWARP_FS);
     distortProgram->use();
     distortProgram->setUniform1i("OffsetMap", 1);
@@ -87,10 +84,10 @@ public:
     frameBuffer.init(glm::uvec2(glm::vec2(eyeSize) * distortionScale));
 
     RiftDistortionHelper distortionHelper(ovrHmdInfo);
-    FOR_EACH_EYE(eye) {
-      eyes[eye].distortionTexture = 
+    for_each_eye([&](StereoEye eye){
+      eyes[eye].distortionTexture =
         distortionHelper.createLookupTexture(glm::uvec2(512, 512), eye);
-    }
+    });
   }
 
   virtual void update() {
@@ -132,7 +129,7 @@ public:
     gl::MatrixStack & mv = gl::Stacks::modelview();
     gl::MatrixStack & pr = gl::Stacks::projection();
 
-    FOR_EACH_EYE(eye) {
+    for_each_eye([&](StereoEye eye){
       const PerEyeArg & eyeArgs = eyes[eye];
       if (applyBarrelDistortion) {
         frameBuffer.activate();
@@ -167,7 +164,7 @@ public:
         gl::VertexArray::unbind();
         gl::Program::clear();
       }
-    }
+    });
   }
 
   void renderScene() {

@@ -1,13 +1,10 @@
 #include "Common.h"
 
 struct PerEyeArg {
-  Eye eye;
   glm::uvec2 viewportPosition;
   glm::mat4 projectionOffset;
   glm::mat4 modelviewOffset;
   RiftLookupTexturePtr distortionTexture;
-
-  PerEyeArg(Eye eye) : eye(eye) { }
 };
 
 class SimpleScene : public RiftGlfwApp {
@@ -15,7 +12,7 @@ class SimpleScene : public RiftGlfwApp {
   float ipd{ 0.06 };
   float eyeHeight{ 1.5f };
 
-  std::array<PerEyeArg, 2> eyes{ { PerEyeArg(LEFT), PerEyeArg(RIGHT) } };
+  std::map<StereoEye, PerEyeArg> eyes;
 
   float distortionScale{ 1.0f };
 
@@ -101,10 +98,10 @@ public:
     frameBuffer.init(glm::uvec2(glm::vec2(eyeSize) * 2.0f));
 
     RiftDistortionHelper distortionHelper(ovrHmdInfo);
-    FOR_EACH_EYE(eye) {
+    for_each_eye([&](StereoEye eye){
       eyes[eye].distortionTexture =
         distortionHelper.createLookupTexture(glm::uvec2(512, 512), eye);
-    }
+    });
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
@@ -129,12 +126,12 @@ public:
     riftOrientation = Rift::getMat4(sensorFusion);
 
     static const glm::vec4 EYE_ROTATION_OFFSET(0, 0.15f, -0.09f, 1);
-    glm::vec3 riftImposedTranslation = 
+    glm::vec3 riftImposedTranslation =
       glm::vec3(glm::inverse(riftOrientation) * EYE_ROTATION_OFFSET);
     riftImposedTranslation -= glm::vec3(EYE_ROTATION_OFFSET);
-    glm::mat4 playerRiftTranslation = 
+    glm::mat4 playerRiftTranslation =
       glm::translate(glm::mat4(), riftImposedTranslation);
-    gl::Stacks::modelview().top() = riftOrientation * 
+    gl::Stacks::modelview().top() = riftOrientation *
       glm::inverse(playerRiftTranslation * player);
   }
 
@@ -143,7 +140,7 @@ public:
     gl::MatrixStack & mv = gl::Stacks::modelview();
     gl::MatrixStack & pr = gl::Stacks::projection();
 
-    FOR_EACH_EYE(eye) {
+    for_each_eye([&](StereoEye eye){
       const PerEyeArg & eyeArgs = eyes[eye];
       frameBuffer.activate();
       glEnable(GL_DEPTH_TEST);
@@ -168,7 +165,7 @@ public:
       quadGeometry->draw();
       gl::VertexArray::unbind();
       gl::Program::clear();
-    }
+    });
   }
 
   void renderScene() {

@@ -20,8 +20,8 @@ cv::Mat getImage(Resource resource, bool flip = false) {
 class ShaderLookupDistort : public RiftManagerApp {
 protected:
   cv::Mat sceneTextures[2];
-  cv::Mat lookupMapsX[2]{cv::Mat(), cv::Mat()};
-  cv::Mat lookupMapsY[2]{cv::Mat(), cv::Mat()};
+  std::map<StereoEye, cv::Mat> lookupMapsX;
+  std::map<StereoEye, cv::Mat> lookupMapsY;
   float K[4];
   float lensOffset;
 
@@ -46,14 +46,13 @@ public:
         - (2.0f * ovrHmdInfo.LensSeparationDistance
             / ovrHmdInfo.HScreenSize);
 
-    FOR_EACH_EYE(eye)
-    {
+    for_each_eye([&](StereoEye eye){
       sceneTextures[eye] = getImage(SCENE_IMAGES[eye]);
       createDistortionMap(eye);
-    }
+    });
   }
 
-  glm::vec2 findSceneTextureCoords(int eyeIndex, glm::vec2 texCoord) {
+  glm::vec2 findSceneTextureCoords(StereoEye eye, glm::vec2 texCoord) {
     static bool init = false;
     if (!init) {
       init = true;
@@ -79,7 +78,7 @@ public:
     // is at the intersection of the display pane with the
     // lens axis.  So we have to offset the X coordinate to
     // account for that.
-    texCoord.x += (eyeIndex == 0) ? -lensOffset : lensOffset;
+    texCoord.x += (eye == LEFT) ? -lensOffset : lensOffset;
 
     // Although I said we need the distance between the
     // origin and the texture, it turns out that getting
@@ -95,7 +94,7 @@ public:
     // need to reverse all the work we did to move from
     // texture space into Rift space.  So we apply the
     // inverse operations in reverse order.
-    texCoord.x -= (eyeIndex == 0) ? -lensOffset : lensOffset;;
+    texCoord.x -= (eye == LEFT) ? -lensOffset : lensOffset;;
     texCoord.y *= eyeAspect;
     texCoord += 1.0;
     texCoord /= 2.0;
@@ -107,22 +106,22 @@ public:
     return texCoord;
   }
 
-  void createDistortionMap(Eye eyeIndex) {
+  void createDistortionMap(StereoEye eye) {
     cv::Scalar defScalar((float) 1.0f, (float) 1.0f);
-    cv::Mat & map_x = lookupMapsX[eyeIndex];
-    map_x = cv::Mat(sceneTextures[eyeIndex].size(), CV_32FC1);
-    cv::Mat & map_y = lookupMapsY[eyeIndex];
-    map_y = cv::Mat(sceneTextures[eyeIndex].size(), CV_32FC1);
-    const glm::vec2 imageSize(sceneTextures[eyeIndex].cols, sceneTextures[eyeIndex].rows);
+    cv::Mat & map_x = lookupMapsX[eye];
+    map_x = cv::Mat(sceneTextures[eye].size(), CV_32FC1);
+    cv::Mat & map_y = lookupMapsY[eye];
+    map_y = cv::Mat(sceneTextures[eye].size(), CV_32FC1);
+    const glm::vec2 imageSize(sceneTextures[eye].cols, sceneTextures[eye].rows);
     glm::vec2 texCenterOffset = glm::vec2(0.5f)
         / glm::vec2(imageSize);
-    for (size_t row = 0; row < sceneTextures[eyeIndex].rows; ++row) {
-      for (size_t col = 0; col < sceneTextures[eyeIndex].cols; ++col) {
+    for (size_t row = 0; row < sceneTextures[eye].rows; ++row) {
+      for (size_t col = 0; col < sceneTextures[eye].cols; ++col) {
         glm::vec2 textureCoord(col, row);
         textureCoord /= imageSize;
         textureCoord += texCenterOffset;
         textureCoord.y = 1 - textureCoord.y;
-        glm::vec2 distortedCoord = findSceneTextureCoords(eyeIndex, textureCoord);
+        glm::vec2 distortedCoord = findSceneTextureCoords(eye, textureCoord);
         distortedCoord.y = 1 - distortedCoord.y;
         distortedCoord *= imageSize;
         map_x.at<float>(row, col) = distortedCoord.x;
@@ -131,25 +130,25 @@ public:
     }
   }
 
-  const char * WINDOWS[2] = {
-      "RiftLeft",
-      "RiftRight"
-  };
+  std::array<const char *, 2> WINDOWS{ {
+    "RiftLeft",
+    "RiftRight"
+  } };
 
   int run() {
-    cv::Mat distorted[2];
-    FOR_EACH_EYE(eye) {
+    std::map<StereoEye, cv::Mat> distorted;
+    for_each_eye([&](StereoEye eye){
       cv::namedWindow(WINDOWS[eye], CV_WINDOW_NORMAL | CV_WINDOW_KEEPRATIO);
       cvResizeWindow(WINDOWS[eye], 640, 800);
       cvMoveWindow(WINDOWS[eye], eye == LEFT ? 100 : 800, 100);
       distorted[eye] = cv::Mat(640, 800, sceneTextures[eye].type());
-    }
+    });
 
     do {
-      FOR_EACH_EYE(eye) {
+      for_each_eye([&](StereoEye eye){
         cv::remap(sceneTextures[eye], distorted[eye], lookupMapsX[eye], lookupMapsY[eye], CV_INTER_LINEAR);
         cv::imshow(WINDOWS[eye], distorted[eye]);     // Show our image inside it.
-      }
+      });
     } while (27 != (0xff & cv::waitKey(15)));
     return 0;
   }

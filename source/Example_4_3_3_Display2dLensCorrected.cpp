@@ -5,7 +5,7 @@ protected:
   gl::Texture2dPtr texture;
   gl::GeometryPtr quadGeometry;
   gl::ProgramPtr program;
-  glm::mat4 projections[2];
+  std::map<StereoEye, glm::mat4>  projections;
 
 public:
 
@@ -36,12 +36,12 @@ public:
 
     float lensOffset = 1.0f - (2.0f * ovrHmdInfo.LensSeparationDistance / ovrHmdInfo.HScreenSize);
 
-    for (int eye = 0; eye <= 1; eye++) {
+    for_each_eye([&](StereoEye eye){
       float eyeLensOffset = (eye == LEFT ? -lensOffset : lensOffset);
       projections[eye] = glm::ortho(
           -1.0f + eyeLensOffset, 1.0f + eyeLensOffset,
           -1.0f / eyeAspect, 1.0f / eyeAspect);
-    }
+    });
   }
 
   virtual void draw() {
@@ -50,11 +50,11 @@ public:
     texture->bind();
     quadGeometry->bindVertexArray();
 
-    for (int eye = 0; eye <= 1; eye++) {
+    for_each_eye([&](StereoEye eye){
       viewport(eye);
       program->setUniform("Projection", projections[eye]);
       quadGeometry->draw();
-    }
+    });
 
     gl::VertexArray::unbind();
     gl::Texture2d::unbind();

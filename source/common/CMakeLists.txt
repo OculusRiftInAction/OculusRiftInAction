@@ -7,6 +7,5 @@ list(APPEND HEADER_FILES ${CMAKE_CURRENT_BINARY_DIR}/Config.h )
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-ADD_MSVC_PRECOMPILED_HEADER("Common.h" "Common.cpp" SOURCE_FILES)
 add_library(ExampleCommon STATIC Common.cpp ${SOURCE_FILES} ${HEADER_FILES} ${SHADERS} )
 target_link_libraries(ExampleCommon ${EXAMPLE_LIBS})

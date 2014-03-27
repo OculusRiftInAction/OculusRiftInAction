@@ -1,11 +1,6 @@
 
 function(make_example FILE PROJECT_FOLDER)
     set(SOURCE_FILES ${FILE})
-    #set(PRECOMPILED_BINARY ${CMAKE_BINARY_DIR}/source/common/Common.pch)
-    #SET_SOURCE_FILES_PROPERTIES(${FILE}
-    #                            PROPERTIES COMPILE_FLAGS "/Yu\"Common.h\" /FI\"Common.h\" /Fp\"${PRECOMPILED_BINARY}\""
-    #                                       OBJECT_DEPENDS "${PRECOMPILED_BINARY}")
-
     file(RELATIVE_PATH FILE ${CMAKE_CURRENT_SOURCE_DIR} ${FILE})
     get_filename_component(NAME ${FILE} NAME_WE)
     string(REGEX REPLACE "^([^_]+(_[0-9]+)+).*\\.cpp$" "\\1" ROOT ${FILE} )
@@ -56,14 +51,6 @@ if (OpenCV_FOUND)
     make_examples(opencv/*.cpp "Examples/OpenCV")
 endif()
 
-
-find_package( OpenSceneGraph COMPONENTS OpenThreads osg osgDB osgUtil osgGA osgViewer osgText osgSim)
-if(OPENSCENEGRAPH_FOUND)
-    include_directories(${OPENSCENEGRAPH_INCLUDE_DIRS}) 
-    list(APPEND EXAMPLE_LIBS ${OPENSCENEGRAPH_LIBRARIES})
-    make_examples(OpenSceneGraph/*.cpp  "Examples/OpenSceneGraph")
-endif()
-
 find_package( Steamworks )
 if(STEAMWORKS_FOUND)
     include_directories(${STEAMWORKS_INCLUDE_DIR}) 
@@ -73,7 +60,6 @@ endif()
 
 find_package( Depthsense )
 if(DEPTHSENSE_FOUND)
-    include_directories(${PCL_INCLUDE_DIR})
     include_directories(${DEPTHSENSE_INCLUDE_DIR})
     list(APPEND EXAMPLE_LIBS ${DEPTHSENSE_LIBRARY})
     set(HAVE_DEPTHSENSE 1)
@@ -84,9 +70,6 @@ if (RIFT_BUILD_SCRATCH_EXAMPLES)
     message("Building scratch examples") 
     make_examples(scratch/*.cpp "Examples/Scratch")
 endif()
-
-
-
 
 if (0)
     find_package( LeapMotion )
@@ -102,8 +85,6 @@ if (0)
         list(APPEND EXAMPLE_LIBS ${PERC_LIBRARY})
         set(HAVE_PERC 1)
     endif()
-endif()
-
 
 #find_package( PCL 1.3 REQUIRED COMPONENTS io filters segmentation surface)
 #  include_directories(${PCL_INCLUDE_DIRS}) 
@@ -111,4 +92,7 @@ endif()
 #  link_directories(${PCL_LIBRARY_DIRS})
 #  list(APPEND EXAMPLE_LIBS ${PCL_LIBRARIES})
 #  add_definitions(${PCL_DEFINITIONS})
+endif()
+
+
 

@@ -1,8 +1,8 @@
 #include "Common.h"
 
-const Resource SCENE_IMAGES[2] = {
-  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
+std::map<StereoEye, Resource> SCENE_IMAGES = {
+  { LEFT, Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG},
+  { RIGHT, Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG }
 };
 
 class ShaderLookupDistortionExample : public RiftGlfwApp {
@@ -12,8 +12,8 @@ protected:
   typedef LookupTexture::Ptr LookupTexturePtr;
 
   glm::uvec2 lookupTextureSize;
-  gl::Texture2dPtr sceneTextures[2];
-  LookupTexturePtr lookupTextures[2];
+  std::map<StereoEye, gl::Texture2dPtr> sceneTextures;
+  std::map<StereoEye, LookupTexturePtr> lookupTextures;
   gl::GeometryPtr quadGeometry;
   gl::ProgramPtr program;
   float K[4];
@@ -23,7 +23,7 @@ public:
   ShaderLookupDistortionExample() : lookupTextureSize(512, 512) {
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(ovrHmdInfo);
-    const OVR::Util::Render::DistortionConfig & distortion = 
+    const OVR::Util::Render::DistortionConfig & distortion =
         stereoConfig.GetDistortionConfig();
 
     double postDistortionScale = 1.0 / stereoConfig.GetDistortionScale();
@@ -33,7 +33,7 @@ public:
     lensOffset = distortion.XCenterOffset;
   }
 
-  glm::vec2 findSceneTextureCoords(int eyeIndex, glm::vec2 texCoord) {
+  glm::vec2 findSceneTextureCoords(StereoEye eye, glm::vec2 texCoord) {
     static bool init = false;
     if (!init) {
       init = true;
@@ -59,7 +59,7 @@ public:
     // is at the intersection of the display pane with the
     // lens axis.  So we have to offset the X coordinate to
     // account for that.
-    texCoord.x += (eyeIndex == 0) ? -lensOffset : lensOffset;
+    texCoord.x += (eye == LEFT) ? -lensOffset : lensOffset;
 
     // Although I said we need the distance between the
     // origin and the texture, it turns out that getting
@@ -75,7 +75,7 @@ public:
     // need to reverse all the work we did to move from
     // texture space into Rift space.  So we apply the
     // inverse operations in reverse order.
-    texCoord.x -= (eyeIndex == 0) ? -lensOffset : lensOffset;
+    texCoord.x -= (eye == LEFT) ? -lensOffset : lensOffset;
     texCoord.y *= eyeAspect;
     texCoord += 1.0;
     texCoord /= 2.0;
@@ -87,7 +87,7 @@ public:
     return texCoord;
   }
 
-  void createLookupTexture(LookupTexturePtr & outTexture, int eyeIndex) {
+  void createLookupTexture(LookupTexturePtr & outTexture, StereoEye eye) {
     size_t lookupDataSize = lookupTextureSize.x * lookupTextureSize.y * 2;
     float * lookupData = new float[lookupDataSize];
     // The texture coordinates are actually from the center of the pixel, so thats what we need to use for the calculation.
@@ -97,7 +97,7 @@ public:
       for (size_t x = 0; x < lookupTextureSize.x; ++x) {
         size_t offset = (y * rowSize) + (x * 2);
         glm::vec2 texCoord = (glm::vec2(x, y) / glm::vec2(lookupTextureSize)) + texCenterOffset;
-        glm::vec2 sceneTexCoord = findSceneTextureCoords(eyeIndex, texCoord);
+        glm::vec2 sceneTexCoord = findSceneTextureCoords(eye, texCoord);
         lookupData[offset] = sceneTexCoord.x;
         lookupData[offset + 1] = sceneTexCoord.y;
       }
@@ -130,26 +130,26 @@ public:
     quadGeometry->bindVertexArray();
 
     // Load scene textures and generate lookup textures
-    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      GlUtils::getImageAsTexture(sceneTextures[eyeIndex], SCENE_IMAGES[eyeIndex]);
-      createLookupTexture(lookupTextures[eyeIndex], eyeIndex);
-    }
+    for_each_eye([&](StereoEye eye){
+      GlUtils::getImageAsTexture(sceneTextures[eye], SCENE_IMAGES[eye]);
+      createLookupTexture(lookupTextures[eye], eye);
+    });
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
-    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      renderEye(eyeIndex);
-    }
+    for_each_eye([&](StereoEye eye){
+      renderEye(eye);
+    });
   }
 
-  void renderEye(int eyeIndex) {
-    viewport(eyeIndex);
+  void renderEye(StereoEye eye) {
+    viewport(eye);
 
     glActiveTexture(GL_TEXTURE0);
-    lookupTextures[eyeIndex]->bind();
+    lookupTextures[eye]->bind();
     glActiveTexture(GL_TEXTURE1);
-    sceneTextures[eyeIndex]->bind();
+    sceneTextures[eye]->bind();
 
     quadGeometry->draw();
   }

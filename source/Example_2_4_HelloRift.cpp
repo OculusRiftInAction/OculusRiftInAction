@@ -20,7 +20,9 @@ protected:
     glm::uvec2                  viewportLocation;
     glm::mat4                   projectionOffset;
     glm::mat4                   modelviewOffset;
-  } eyeArgs[2];
+  };
+
+  std::map<StereoEye, EyeArg> eyeArgs;
 
 public:
   HelloRift() {
@@ -50,73 +52,74 @@ public:
     }
 
     windowPosition = glm::ivec2(ovrHmdInfo.DesktopX, ovrHmdInfo.DesktopY);
-    // The HMDInfo gives us the position of the Rift in desktop 
-    // coordinates as well as the native resolution of the Rift 
+    // The HMDInfo gives us the position of the Rift in desktop
+    // coordinates as well as the native resolution of the Rift
     // display panel, but NOT the current resolution of the signal
-    // being sent to the Rift.  
-    GLFWmonitor * hmdMonitor = 
+    // being sent to the Rift.
+    GLFWmonitor * hmdMonitor =
       GlfwApp::getMonitorAtPosition(windowPosition);
-    if (!hmdMonitor) {
-      FAIL("Unable to find Rift display");
+    if (hmdMonitor) {
+      // For the current resoltuion we must find the appropriate GLFW monitor
+      const GLFWvidmode * videoMode =
+        glfwGetVideoMode(hmdMonitor);
+      windowSize = glm::ivec2(videoMode->width, videoMode->height);
+    } else {
+      windowSize = glm::ivec2(1280, 800);
     }
 
-    // For the current resoltuion we must find the appropriate GLFW monitor
-    const GLFWvidmode * videoMode = 
-      glfwGetVideoMode(hmdMonitor);
-    windowSize = glm::ivec2(videoMode->width, videoMode->height);
 
-    // The eyeSize is used to help us set the viewport when rendering to 
-    // each eye.  This should be based off the video mode that is / will 
+    // The eyeSize is used to help us set the viewport when rendering to
+    // each eye.  This should be based off the video mode that is / will
     // be sent to the Rift
-    // We also use the eyeSize to set up the framebuffer which will be 
-    // used to render the scene to a texture for distortion and display 
-    // on the Rift.  The Framebuffer resolution does not have to match 
-    // the Physical display resolution in either aspect ratio or 
+    // We also use the eyeSize to set up the framebuffer which will be
+    // used to render the scene to a texture for distortion and display
+    // on the Rift.  The Framebuffer resolution does not have to match
+    // the Physical display resolution in either aspect ratio or
     // resolution, but using a resolution less than the native pixels can
     // negatively impact image quality.
     eyeSize = windowSize;
     eyeSize.x /= 2;
 
-    eyeArgs[1].viewportLocation = glm::ivec2(eyeSize.x, 0);
-    eyeArgs[0].viewportLocation = glm::ivec2(0, 0);
+    eyeArgs[RIGHT].viewportLocation = glm::ivec2(eyeSize.x, 0);
+    eyeArgs[LEFT].viewportLocation = glm::ivec2(0, 0);
 
-    // Notice that the eyeAspect we calculate is based on the physical 
-    // display resolution, regardless of the current resolution being 
+    // Notice that the eyeAspect we calculate is based on the physical
+    // display resolution, regardless of the current resolution being
     // sent to the Rift.  The Rift scales the image sent to it to fit
-    // the display panel, so a 1920x1080 image (with an aspect ratio of 
+    // the display panel, so a 1920x1080 image (with an aspect ratio of
     // 16:9 will be displayed with the aspect ratio of the Rift display
-    // (16:10 for the DK1).  This means that if you're cloning a 
-    // 1920x1080 output to the rift and an conventional monitor of those 
-    // dimensions the conventional monitor's image will appear a bit 
+    // (16:10 for the DK1).  This means that if you're cloning a
+    // 1920x1080 output to the rift and an conventional monitor of those
+    // dimensions the conventional monitor's image will appear a bit
     // squished.  This is expected and correct.
     eyeAspect = (float)(ovrHmdInfo.HResolution / 2) /
       (float)ovrHmdInfo.VResolution;
 
-    // Some of the values needed by the rendering or distortion need some 
+    // Some of the values needed by the rendering or distortion need some
     // calculation to find, but the OVR SDK includes a utility class to
-    // do them, so we use it here to get the ProjectionOffset and the 
+    // do them, so we use it here to get the ProjectionOffset and the
     // post distortion scale.
     OVR::Util::Render::StereoConfig ovrStereoConfig;
     ovrStereoConfig.SetHMDInfo(ovrHmdInfo);
 
-    // The projection offset and lens offset are both in normalized 
+    // The projection offset and lens offset are both in normalized
     // device coordinates, i.e. [-1, 1] on both the X and Y axis
     glm::vec3 projectionOffsetVector =
         glm::vec3(ovrStereoConfig.GetProjectionCenterOffset() / 2.0f, 0, 0);
-    eyeArgs[0].projectionOffset =
+    eyeArgs[LEFT].projectionOffset =
         glm::translate(glm::mat4(), projectionOffsetVector);
-    eyeArgs[1].projectionOffset =
+    eyeArgs[RIGHT].projectionOffset =
         glm::translate(glm::mat4(), -projectionOffsetVector);
 
     ipd = ovrStereoConfig.GetIPD();
-    // The IPD and the modelview offset are in meters.  If you wish to have a 
-    // different unit for  the scale of your world coordinates, you would need 
+    // The IPD and the modelview offset are in meters.  If you wish to have a
+    // different unit for  the scale of your world coordinates, you would need
     // to apply the conversion factor here.
     glm::vec3 modelviewOffsetVector =
         glm::vec3(ipd / 2.0f, 0, 0);
-    eyeArgs[0].modelviewOffset =
+    eyeArgs[LEFT].modelviewOffset =
         glm::translate(glm::mat4(), modelviewOffsetVector);
-    eyeArgs[1].modelviewOffset =
+    eyeArgs[RIGHT].modelviewOffset =
         glm::translate(glm::mat4(), -modelviewOffsetVector);
 
     gl::Stacks::projection().top() = glm::perspective(
@@ -139,6 +142,8 @@ public:
     }
   }
 
+
+
   void initGl() {
     GlfwApp::initGl();
     frameBuffer.init(eyeSize);
@@ -149,10 +154,13 @@ public:
     gl::Program::clear();
 
     RiftDistortionHelper helper(ovrHmdInfo);
-    FOR_EACH_EYE(eye) {
+
+
+    for_each_eye([&](StereoEye eye){
       eyeArgs[eye].lookupTexture =
           helper.createLookupTexture(glm::uvec2(512, 512), eye);
-    }
+    });
+
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -200,8 +208,8 @@ public:
     glClear(GL_COLOR_BUFFER_BIT);
     GL_CHECK_ERROR;
 
-    for (int i = 0; i < 2; ++i) {
-      const EyeArg & eyeArg = eyeArgs[i];
+    for_each_eye([&](StereoEye eye){
+      const EyeArg & eyeArg = eyeArgs[eye];
 
       frameBuffer.activate();
       renderScene(eyeArg);
@@ -227,7 +235,7 @@ public:
       gl::Texture2d::unbind();
       gl::Geometry::unbindVertexArray();
       gl::Program::clear();
-    }
+    });
   }
 
   virtual void renderScene(const EyeArg & eyeArg) {

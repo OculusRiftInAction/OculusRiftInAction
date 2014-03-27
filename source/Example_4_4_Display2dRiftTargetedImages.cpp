@@ -2,7 +2,8 @@
 
 class Display2dRiftTargeted : public RiftGlfwApp {
 protected:
-  gl::Texture2dPtr texture[2];
+
+  std::map<StereoEye, gl::Texture2dPtr> texture;
   gl::GeometryPtr quadGeometry;
   gl::ProgramPtr program;
 
@@ -18,11 +19,9 @@ public:
       Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_TEXTURED_FS);
 
-    GlUtils::getImageAsTexture(
-        texture[0],
+    GlUtils::getImageAsTexture( texture[LEFT],
         Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG);
-    GlUtils::getImageAsTexture(
-        texture[1],
+    GlUtils::getImageAsTexture( texture[RIGHT],
         Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG);
     quadGeometry = GlUtils::getQuadGeometry();
   }
@@ -33,11 +32,11 @@ public:
     program->use();
     quadGeometry->bindVertexArray();
 
-    FOR_EACH_EYE(eye) {
+    for_each_eye([&](OVR::Util::Render::StereoEye eye){
       viewport(eye);
       texture[eye]->bind();
       quadGeometry->draw();
-    }
+    });
 
     gl::VertexArray::unbind();
     gl::Texture2d::unbind();

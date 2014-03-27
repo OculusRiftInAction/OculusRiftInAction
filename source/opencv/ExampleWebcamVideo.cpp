@@ -259,10 +259,10 @@ public:
       return;
 #endif
     case GLFW_KEY_LEFT_BRACKET:
-      scale += (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
+      scale += (mods & GLFW_MOD_SHIFT) ? 0.1f : 0.01f;
       return;
     case GLFW_KEY_RIGHT_BRACKET:
-      scale -= (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
+      scale -= (mods & GLFW_MOD_SHIFT) ? 0.1f : 0.01f;
       return;
 
 #ifdef USE_RIFT

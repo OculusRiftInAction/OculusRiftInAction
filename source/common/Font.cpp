@@ -324,9 +324,12 @@ void Font::renderString(
       glm::vec2 offset(advance);
       offset.y -= m.size.y;
       // Bind the new position
-      mv.push().translate(offset).apply(program).pop();
-      // Render the item
-      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(m.indexOffset * sizeof(GLuint)));
+      mv.with_push([&]{
+          mv.translate(offset);
+          mv.apply(program);
+          // Render the item
+          glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(m.indexOffset * sizeof(GLuint)));
+      });
       advance.x += m.d;//+ m.offset.x;// font->getAdvance(m, mFontSize);
     });
     advance.x += getMetrics(' ').d;

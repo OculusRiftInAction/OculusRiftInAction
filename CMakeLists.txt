@@ -29,30 +29,9 @@ set(CMAKE_DEBUG_POSTFIX "d")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
 
-
-macro(ADD_MSVC_PRECOMPILED_HEADER PrecompiledHeader PrecompiledSource SourcesVar)
-  IF(MSVC)
-    GET_FILENAME_COMPONENT(PrecompiledBasename ${PrecompiledHeader} NAME_WE)
-    SET(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${PrecompiledBasename}.pch")
-    LIST(REMOVE_ITEM ${SourcesVar} "${CMAKE_CURRENT_SOURCE_DIR}/${PrecompiledSource}")
-    SET(Sources ${${SourcesVar}})
-
-    SET_SOURCE_FILES_PROPERTIES(${PrecompiledSource}
-                                PROPERTIES COMPILE_FLAGS "/Yc\"${PrecompiledHeader}\" /Fp\"${PrecompiledBinary}\""
-                                           OBJECT_OUTPUTS "${PrecompiledBinary}")
-    SET_SOURCE_FILES_PROPERTIES(${Sources}
-                                PROPERTIES COMPILE_FLAGS "/Yu\"${PrecompiledHeader}\" /FI\"${PrecompiledHeader}\" /Fp\"${PrecompiledBinary}\""
-                                           OBJECT_DEPENDS "${PrecompiledBinary}")  
-    # Add precompiled header to SourcesVar
-    LIST(APPEND ${SourcesVar} ${PrecompiledSource})
-  ENDIF(MSVC)
-ENDMACRO(ADD_MSVC_PRECOMPILED_HEADER)
-
-
 option(RIFT_BUILD_SCRATCH_EXAMPLES OFF)
 
 string( TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER )
-
 if(BUILD_TYPE_LOWER STREQUAL "debug")
    set(RIFT_DEBUG 1)
 endif()
@@ -84,7 +63,6 @@ if(APPLE)
     set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++0x")
     set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
     set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0")
-#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -stdlib=libc++ -g -Wall")
 endif()
 
 if(WIN32)
@@ -100,7 +78,7 @@ set(OVR_DIR ${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR)
 # Check for the existence of the LibOVR project.  If it's missing, the 
 # submodule probably hasn't been checked out.
 if (NOT(EXISTS ${OVR_DIR} AND IS_DIRECTORY ${OVR_DIR}))
-    message(FATAL_ERROR "Can't find the OVR library at ${OVR_DIR}.  Perhaps you forgot to check out the git submodules?") 
+    message(FATAL_ERROR "Submodules seem to be missing.  Please make sure you check out with 'git clone --recursive' OR run 'git submodule init' and 'git submodule update' after checkout") 
 endif()
 
 # Add debug output from the Oculus SDK
@@ -154,16 +132,11 @@ set_target_properties(jsoncpp PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
 list(APPEND EXAMPLE_LIBS jsoncpp)
 
-# OpenCV is a computer vision library with advanced
-# image loading and manipulation functionality
+# Computer vision library with advanced image loading and manipulation 
+# functionality.  
+# OpenCV is OPTIONAL.  
 find_package( OpenCV )
 if (OpenCV_FOUND) 
-    # Augmented reality tracking library
-    add_subdirectory(libraries/ARToolkit/lib)
-    set_target_properties(ARToolkit PROPERTIES FOLDER "3rdparty")
-    include_directories(${CMAKE_SOURCE_DIR}/libraries/ARToolkit/lib/include)
-    list(APPEND EXAMPLE_LIBS ARToolkit)
-
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)

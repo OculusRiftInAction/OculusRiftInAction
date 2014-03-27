@@ -7,11 +7,8 @@ static const glm::uvec2 EYE_SIZE(WINDOW_SIZE.x / 2, WINDOW_SIZE.y);
 static const float EYE_ASPECT = glm::aspect(EYE_SIZE);
 
 struct PerEyeArg {
-  const Eye eye;
   glm::uvec2 viewportPosition;
   glm::mat4 modelviewOffset;
-
-  PerEyeArg(Eye eye) : eye(eye) {};
 };
 
 
@@ -20,28 +17,28 @@ class SimpleScene : public GlfwApp {
   float ipd{ 0.06f };
   float eyeHeight{ 1.5f };
 
-  std::array<PerEyeArg, 2> eyes{ { PerEyeArg(LEFT), PerEyeArg(RIGHT) } };
+  std::map<StereoEye, PerEyeArg> eyes;
 
   bool applyModelviewOffset{ true };
 
 public:
   SimpleScene() {
-    OVR::Ptr<OVR::ProfileManager> profileManager = 
+    OVR::Ptr<OVR::ProfileManager> profileManager =
       *OVR::ProfileManager::Create();
-    OVR::Ptr<OVR::Profile> profile = 
+    OVR::Ptr<OVR::Profile> profile =
       *(profileManager->GetDeviceDefaultProfile(
         OVR::ProfileType::Profile_RiftDK1));
     ipd = profile->GetIPD();
     eyeHeight = profile->GetEyeHeight();
 
     player = glm::inverse(glm::lookAt(
-      glm::vec3(0, eyeHeight, ipd * 4.0f), 
-      glm::vec3(0, eyeHeight, 0), 
+      glm::vec3(0, eyeHeight, ipd * 4.0f),
+      glm::vec3(0, eyeHeight, 0),
       GlUtils::Y_AXIS));
-    
-    gl::Stacks::projection().top() = 
-      glm::perspective(PI / 2.0f, 
-      EYE_ASPECT, 
+
+    gl::Stacks::projection().top() =
+      glm::perspective(PI / 2.0f,
+      EYE_ASPECT,
       0.01f, 1000.0f);
 
     eyes[LEFT].viewportPosition =
@@ -101,7 +98,7 @@ public:
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gl::MatrixStack & mv = gl::Stacks::modelview();
 
-    FOR_EACH_EYE(eye) {
+    for_each_eye([&](StereoEye eye){
       const PerEyeArg & eyeArgs = eyes[eye];
       gl::viewport(eyeArgs.viewportPosition, EYE_SIZE);
 
@@ -112,7 +109,7 @@ public:
         }
         renderScene();
       });
-    }
+    });
   }
 
   void renderScene() {

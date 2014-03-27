@@ -14,7 +14,7 @@ struct Mesh {
   typedef std::vector<GLuint> VS;
 
   gl::MatrixStack model;
-  glm::vec3 color;
+  glm::vec3 color{1, 1, 1};
 
   VVec4 positions;
   VVec4 normals;
@@ -22,9 +22,7 @@ struct Mesh {
   VVec2 texCoords;
   VS indices;
   public:
-  Mesh()
-      : model(""), color(1) {
-    model.push();
+  Mesh() {
   }
 
   Mesh(const Mesh & other)
@@ -33,9 +31,7 @@ struct Mesh {
   {
   }
 
-  Mesh(const std::string & file)
-      : model(""), color(1) {
-    model.push();
+  Mesh(const std::string & file) {
     loadCtm(file);
   }
 

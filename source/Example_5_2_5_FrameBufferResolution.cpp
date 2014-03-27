@@ -1,34 +1,38 @@
 #include "Common.h"
 
-const Resource SCENE_IMAGES[4] = {
-  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_8___PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_8___PNG
+std::map<StereoEye, Resource> SCENE_IMAGES_HIGH = {
+  { LEFT, Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG},
+  { RIGHT, Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG }
 };
 
-#define DISTORTION_TIMING 1
+std::map<StereoEye, Resource> SCENE_IMAGES_LOW = {
+  { LEFT, Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_8___PNG},
+  { RIGHT, Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_8___PNG }
+};
+
+
 class ShaderLookupDistort : public RiftGlfwApp {
 protected:
   typedef gl::Texture<GL_TEXTURE_2D, GL_RGBA16F> LookupTexture;
   typedef LookupTexture::Ptr LookupTexturePtr;
 
   glm::uvec2 lookupTextureSize;
-  gl::Texture2dPtr sceneTextures[4];
-  LookupTexturePtr lookupTextures[2];
+  std::map<StereoEye, gl::Texture2dPtr> sceneTexturesHigh;
+  std::map<StereoEye, gl::Texture2dPtr> sceneTexturesLow;
+  std::map<StereoEye, LookupTexturePtr> lookupTextures;
   gl::GeometryPtr quadGeometry;
   glm::vec4 K;
-  size_t firstImageIndex{ 0 };
+  bool highRes{true};
   float lensOffset;
 
 public:
   ShaderLookupDistort() : lookupTextureSize(512, 512) {
     OVR::Util::Render::StereoConfig stereoConfig;
-    
+
     stereoConfig.SetHMDInfo(ovrHmdInfo);
-    const OVR::Util::Render::DistortionConfig & distortion = 
+    const OVR::Util::Render::DistortionConfig & distortion =
       stereoConfig.GetDistortionConfig();
-    stereoConfig.SetDistortionFitPointVP(0.6f, 0.0f);
+
     // The Rift examples use a post-distortion scale to resize the
     // image upward after distorting it because their K values have
     // been chosen such that they always result in a scale > 1.0, and
@@ -47,12 +51,14 @@ public:
   void onKey(int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) switch (key) {
     case GLFW_KEY_R:
-      firstImageIndex = (firstImageIndex + 2) % 4;
+      highRes = !highRes;
+      return;
     }
+    RiftGlfwApp::onKey(key, scancode, action, mods);
   }
 
 
-  glm::vec2 findSceneTextureCoords(int eyeIndex, glm::vec2 texCoord) {
+  glm::vec2 findSceneTextureCoords(StereoEye eye, glm::vec2 texCoord) {
     static bool init = false;
     if (!init) {
       init = true;
@@ -78,7 +84,7 @@ public:
     // is at the intersection of the display pane with the
     // lens axis.  So we have to offset the X coordinate to
     // account for that.
-    texCoord.x += (eyeIndex == 0) ? -lensOffset : lensOffset;
+    texCoord.x += (eye == LEFT) ? -lensOffset : lensOffset;
 
     // Although I said we need the distance between the
     // origin and the texture, it turns out that getting
@@ -94,7 +100,7 @@ public:
     // need to reverse all the work we did to move from
     // texture space into Rift space.  So we apply the
     // inverse operations in reverse order.
-    texCoord.x -= (eyeIndex == 0) ? -lensOffset : lensOffset;;
+    texCoord.x -= (eye == LEFT) ? -lensOffset : lensOffset;;
     texCoord.y *= eyeAspect;
     texCoord += 1.0;
     texCoord /= 2.0;
@@ -106,7 +112,7 @@ public:
     return texCoord;
   }
 
-  void createLookupTexture(LookupTexturePtr & outTexture, int eyeIndex) {
+  void createLookupTexture(LookupTexturePtr & outTexture, StereoEye eye) {
     size_t lookupDataSize = lookupTextureSize.x * lookupTextureSize.y * 2;
     float * lookupData = new float[lookupDataSize];
     // The texture coordinates are actually from the center of the pixel, so thats what we need to use for the calculation.
@@ -116,7 +122,7 @@ public:
       for (size_t x = 0; x < lookupTextureSize.x; ++x) {
         size_t offset = (y * rowSize) + (x * 2);
         glm::vec2 texCoord = (glm::vec2(x, y) / glm::vec2(lookupTextureSize)) + texCenterOffset;
-        glm::vec2 sceneTexCoord = findSceneTextureCoords(eyeIndex, texCoord);
+        glm::vec2 sceneTexCoord = findSceneTextureCoords(eye, texCoord);
         lookupData[offset] = sceneTexCoord.x;
         lookupData[offset + 1] = sceneTexCoord.y;
       }
@@ -141,24 +147,23 @@ public:
     quadGeometry = GlUtils::getQuadGeometry();
 
     // Generate the lookup textures and load the scene textures
-    for (int imageIndex = 0; imageIndex < 4; ++imageIndex) {
-      GlUtils::getImageAsTexture(sceneTextures[imageIndex], SCENE_IMAGES[imageIndex]);
-    }
-    FOR_EACH_EYE(eyeIndex) {
-      createLookupTexture(lookupTextures[eyeIndex], eyeIndex);
-    }
+    for_each_eye([&](StereoEye eye){
+      GlUtils::getImageAsTexture(sceneTexturesHigh[eye], SCENE_IMAGES_HIGH[eye]);
+      GlUtils::getImageAsTexture(sceneTexturesLow[eye], SCENE_IMAGES_LOW[eye]);
+      createLookupTexture(lookupTextures[eye], eye);
+    });
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
-    FOR_EACH_EYE(eyeIndex) {
-      renderEye(eyeIndex);
-    }
+    for_each_eye([&](StereoEye eye){
+      renderEye(eye);
+    });
     GL_CHECK_ERROR;
   }
 
-  void renderEye(int eyeIndex) {
-    viewport(eyeIndex);
+  void renderEye(StereoEye eye) {
+    viewport(eye);
     gl::ProgramPtr distortProgram = GlUtils::getProgram(
       Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_RIFTWARP_FS);
@@ -167,14 +172,15 @@ public:
     distortProgram->setUniform1i("OffsetMap", 0);
 
     glActiveTexture(GL_TEXTURE1);
-    sceneTextures[eyeIndex + firstImageIndex]->bind();
+    if (highRes) {
+      sceneTexturesHigh[eye]->bind();
+    } else {
+      sceneTexturesLow[eye]->bind();
+    }
     glActiveTexture(GL_TEXTURE0);
-    lookupTextures[eyeIndex]->bind();
+    lookupTextures[eye]->bind();
 
     quadGeometry->bindVertexArray();
-#ifdef DISTORTION_TIMING
-    query->begin();
-#endif
     quadGeometry->draw();
 
 

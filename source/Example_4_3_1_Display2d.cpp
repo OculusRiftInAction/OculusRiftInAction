@@ -32,10 +32,10 @@ public:
     texture->bind();
     quadGeometry->bindVertexArray();
 
-    for (int eye = 0; eye <= 1; eye++) {
+    for_each_eye([&](StereoEye eye){
       viewport(eye);
       quadGeometry->draw();
-    }
+    });
 
     gl::VertexArray::unbind();
     gl::Texture2d::unbind();

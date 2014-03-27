@@ -21,13 +21,12 @@
 
 //#define RIFT_MULTISAMPLE 1
 
-enum Eye {
-  LEFT, RIGHT
-};
+typedef OVR::Util::Render::StereoEye StereoEye;
+#define LEFT StereoEye::StereoEye_Left
+#define RIGHT StereoEye::StereoEye_Right
 
 class Rift {
 public:
-  static Eye EYES[];
   static void getDefaultDk1HmdValues(OVR::HMDInfo & hmdInfo);
   static void getRiftPositionAndSize(const OVR::HMDInfo & ovrHmdInfo,
       glm::ivec2 & windowPosition, glm::uvec2 & windowSize);
@@ -50,7 +49,7 @@ public:
   static glm::vec3 getEulerAngles(OVR::SensorFusion & sensorFusion);
   static glm::vec3 getEulerAngles(const OVR::Quatf & in);
 
-  static glm::vec4 Rift::fromOvr(const OVR::Color & in);
+  static glm::vec4 fromOvr(const OVR::Color & in);
   static glm::vec3 fromOvr(const OVR::Vector3f & in);
   static glm::quat fromOvr(const OVR::Quatf & in);
 
@@ -69,25 +68,25 @@ class RiftDistortionHelper {
   double lensOffset{ 0 };
   double eyeAspect{ 0.06 };
 
-  double getLensOffset(Eye eye) const;
+  double getLensOffset(StereoEye eye) const;
   static glm::dvec2 screenToTexture(const glm::dvec2 & v);
   static glm::dvec2 textureToScreen(const glm::dvec2 & v);
-  glm::dvec2 screenToRift(const glm::dvec2 & v, Eye eye) const;
-  glm::dvec2 riftToScreen(const glm::dvec2 & v, Eye eye) const;
-  glm::dvec2 textureToRift(const glm::dvec2 & v, Eye eye) const;
-  glm::dvec2 riftToTexture(const glm::dvec2 & v, Eye eye) const;
+  glm::dvec2 screenToRift(const glm::dvec2 & v, StereoEye eye) const;
+  glm::dvec2 riftToScreen(const glm::dvec2 & v, StereoEye eye) const;
+  glm::dvec2 textureToRift(const glm::dvec2 & v, StereoEye eye) const;
+  glm::dvec2 riftToTexture(const glm::dvec2 & v, StereoEye eye) const;
   double getUndistortionScaleForRadiusSquared(double rSq) const;
   double getUndistortionScale(const glm::dvec2 & v) const;
   double getUndistortionScaleForRadius(double r) const;
   glm::dvec2 getUndistortedPosition(const glm::dvec2 & v) const;
-  glm::dvec2 getTextureLookupValue(const glm::dvec2 & texCoord, Eye eye) const;
+  glm::dvec2 getTextureLookupValue(const glm::dvec2 & texCoord, StereoEye eye) const;
   double getDistortionScaleForRadius(double rTarget) const;
-  glm::dvec2 findDistortedVertexPosition(const glm::dvec2 & source, Eye eye) const;
+  glm::dvec2 findDistortedVertexPosition(const glm::dvec2 & source, StereoEye eye) const;
 
 public:
   RiftDistortionHelper(const OVR::HMDInfo & hmdInfo);
-  RiftLookupTexturePtr createLookupTexture(const glm::uvec2 & lookupTextureSize, Eye eye) const;
-  gl::GeometryPtr createDistortionMesh(const glm::uvec2 & distortionMeshResolution, Eye eye) const;
+  RiftLookupTexturePtr createLookupTexture(const glm::uvec2 & lookupTextureSize, StereoEye eye) const;
+  gl::GeometryPtr createDistortionMesh(const glm::uvec2 & distortionMeshResolution, StereoEye eye) const;
 };
 
 
@@ -123,16 +122,66 @@ class RiftGlfwApp : public GlfwApp, public RiftManagerApp {
 protected:
   GLFWmonitor * hmdMonitor;
   const bool fullscreen;
+  bool fakeRiftMonitor{ false };
 
 public:
   RiftGlfwApp(bool fullscreen = false) : fullscreen(fullscreen)
   {
+    // Attempt to find the Rift monitor.
     hmdMonitor = GlfwApp::getMonitorAtPosition(hmdDesktopPosition);
-    if (hmdMonitor && !fullscreen) {
-      const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
-      eyeSize = glm::uvec2(videoMode->width, videoMode->height);
-      eyeSize.x /= 2;
+    if (!hmdMonitor) {
+      SAY_ERR("No Rift display found.  Looking for alternate display");
+      fakeRiftMonitor = true;
+      // Try to find the best monitor that isn't the primary display.
+      GLFWmonitor * primaryMonitor = glfwGetPrimaryMonitor();
+      int monitorCount;
+      GLFWmonitor ** monitors = glfwGetMonitors(&monitorCount);
+      for (int i = 0; i < monitorCount; ++i) {
+        GLFWmonitor * monitor = monitors[i];
+        if (monitors[i] != primaryMonitor) {
+          hmdMonitor = monitors[i];
+          break;
+        }
+      }
+      // No joy, use the primary monitor
+      if (!hmdMonitor) {
+        hmdMonitor = primaryMonitor;
+      }
     }
+
+    if (!hmdMonitor) {
+      FAIL("Somehow failed to find any output display ");
+    }
+
+    const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
+    if (!fakeRiftMonitor || fullscreen) {
+      // if we've got a real rift monitor, OR we're doing fullscreen with 
+      // a fake Rift, use the resolution of the monitor
+      windowSize = glm::uvec2(videoMode->width, videoMode->height);
+    } else {
+      // If we've got a fake rift and we're NOT fullscreen, 
+      // use the DK1 resolution
+      windowSize = glm::uvec2(1280, 800);
+    }
+
+    // if we're using a fake rift 
+    if (fakeRiftMonitor) {
+      int fakex, fakey;
+      // Reset the desktop display's position to the target monitor
+      glfwGetMonitorPos(hmdMonitor, &fakex, &fakey);
+      hmdDesktopPosition = glm::ivec2(fakex, fakey);
+      // on a large display, try to center the fake Rift display.
+      if (videoMode->width > windowSize.x) {
+        hmdDesktopPosition.x += (videoMode->width - windowSize.x) / 2;
+      }
+      if (videoMode->height > windowSize.y) {
+        hmdDesktopPosition.y += (videoMode->height - windowSize.y) / 2;
+      }
+    }
+
+
+    eyeSize = windowSize;
+    eyeSize.x /= 2;
   }
 
   virtual void createRenderingTarget() {
@@ -144,23 +193,19 @@ public:
       // Fullscreen apps should use the native resolution of the Rift
       this->createFullscreenWindow(hmdNativeResolution, hmdMonitor);
     } else {
-      const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
       glfwWindowHint(GLFW_DECORATED, 0);
-      createWindow(glm::uvec2(videoMode->width, videoMode->height), hmdDesktopPosition);
+      createWindow(windowSize, hmdDesktopPosition);
       if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
         FAIL("Unable to create undecorated window");
       }
     }
   }
 
-  virtual void viewport(int eyeIndex) {
-    glm::uvec2 viewportPosition(eyeIndex == 0 ? 0 : eyeSize.x, 0);
+  virtual void viewport(StereoEye eye) {
+    glm::uvec2 viewportPosition(eye == LEFT ? 0 : eyeSize.x, 0);
     gl::viewport(viewportPosition, eyeSize);
   }
 
-  virtual void viewport(Eye eye) {
-    viewport((int)eye);
-  }
 
   void leftEyeViewport() {
     viewport(LEFT);
@@ -172,14 +217,14 @@ public:
 };
 
 struct RiftPerEyeArg {
-  Eye eye;
+  StereoEye eye;
   glm::mat4 strabsimusCorrection;
   glm::mat4 projectionOffset;
   glm::mat4 modelviewOffset;
   glm::uvec2 viewportPosition;
   RiftLookupTexturePtr distortionTexture;
 
-  RiftPerEyeArg(Eye eye)
+  RiftPerEyeArg(StereoEye eye)
     : eye(eye) { }
 };
 
@@ -220,9 +265,14 @@ public:
   virtual ~RiftApp();
 };
 
-#define FOR_EACH_EYE(eye) \
-for (Eye eye = LEFT; eye <= RIGHT; \
-  eye = static_cast<Eye>(eye + 1))
+template <typename Function>
+void for_each_eye(Function function) {
+  for (StereoEye eye = StereoEye::StereoEye_Left;
+      eye <= StereoEye::StereoEye_Right;
+      eye = static_cast<StereoEye>(eye + 1)) {
+    function(eye);
+  }
+}
 
 // Combine some macros together to create a single macro
 // to launch a class containing a run method

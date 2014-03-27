@@ -8,10 +8,6 @@ const float DISPLACEMENT_MAP_SCALE = 0.02f;
 const float Rift::ZFAR = 10000.0f;
 const float Rift::ZNEAR = 0.01f;
 
-Eye Rift::EYES[] = {
-  LEFT, RIGHT
-};
-
 glm::quat parseQuaternion(const Json::Value & node) {
   glm::quat out;
   out.x = node.get("x", 0).asFloat();
@@ -123,9 +119,9 @@ glm::vec3 Rift::getEulerAngles(OVR::SensorFusion & sensorFusion) {
 }
 
 glm::vec4 Rift::fromOvr(const OVR::Color & in) {
-  glm::vec4 result;
-  in.GetRGBA(&result.r, &result.g, &result.b, &result.a);
-  return result;
+  glm::vec4 c;
+  in.GetRGBA(&c.r, &c.g, &c.b, &c.a);
+  return c;
 }
 
 glm::vec3 Rift::fromOvr(const OVR::Vector3f & in) {
@@ -163,7 +159,7 @@ void Rift::getRiftPositionAndSize(
   windowSize = glm::ivec2(videoMode->width, videoMode->height);
 }
 
-double RiftDistortionHelper::getLensOffset(Eye eye) const{
+double RiftDistortionHelper::getLensOffset(StereoEye eye) const{
   return (eye == LEFT) ? -lensOffset : lensOffset;
 }
 
@@ -175,19 +171,19 @@ glm::dvec2 RiftDistortionHelper::textureToScreen(const glm::dvec2 & v) {
     return ((v * 2.0) - 1.0);
   }
 
-glm::dvec2 RiftDistortionHelper::screenToRift(const glm::dvec2 & v, Eye eye) const{
+glm::dvec2 RiftDistortionHelper::screenToRift(const glm::dvec2 & v, StereoEye eye) const{
   return glm::dvec2(v.x + getLensOffset(eye), v.y / eyeAspect);
 }
 
-glm::dvec2 RiftDistortionHelper::riftToScreen(const glm::dvec2 & v, Eye eye) const{
+glm::dvec2 RiftDistortionHelper::riftToScreen(const glm::dvec2 & v, StereoEye eye) const{
   return glm::dvec2(v.x - getLensOffset(eye), v.y * eyeAspect);
   }
 
-glm::dvec2 RiftDistortionHelper::textureToRift(const glm::dvec2 & v, Eye eye) const {
+glm::dvec2 RiftDistortionHelper::textureToRift(const glm::dvec2 & v, StereoEye eye) const {
   return screenToRift(textureToScreen(v), eye);
   }
 
-glm::dvec2 RiftDistortionHelper::riftToTexture(const glm::dvec2 & v, Eye eye) const{
+glm::dvec2 RiftDistortionHelper::riftToTexture(const glm::dvec2 & v, StereoEye eye) const{
   return screenToTexture(riftToScreen(v, eye));
   }
 
@@ -210,7 +206,7 @@ glm::dvec2 RiftDistortionHelper::getUndistortedPosition(const glm::dvec2 & v) co
     return v * getUndistortionScale(v);
   }
 
-glm::dvec2 RiftDistortionHelper::getTextureLookupValue(const glm::dvec2 & texCoord, Eye eye) const {
+glm::dvec2 RiftDistortionHelper::getTextureLookupValue(const glm::dvec2 & texCoord, StereoEye eye) const {
     glm::dvec2 riftPos = textureToRift(texCoord, eye);
     glm::dvec2 distorted = getUndistortedPosition(riftPos);
     glm::dvec2 result = riftToTexture(distorted, eye);
@@ -240,7 +236,7 @@ double RiftDistortionHelper::getDistortionScaleForRadius(double rTarget) const {
   }
 
 glm::dvec2 RiftDistortionHelper::findDistortedVertexPosition(const glm::dvec2 & source,
-    Eye eye) const {
+    StereoEye eye) const {
     const glm::dvec2 rift = screenToRift(source, eye);
     double rTarget = glm::length(rift);
     double distortionScale = getDistortionScaleForRadius(rTarget);
@@ -269,7 +265,7 @@ RiftDistortionHelper::RiftDistortionHelper(const OVR::HMDInfo & hmdInfo) {
     eyeAspect = hmdInfo.HScreenSize / 2.0f / hmdInfo.VScreenSize;
   }
 
-RiftLookupTexturePtr RiftDistortionHelper::createLookupTexture(const glm::uvec2 & lookupTextureSize, Eye eye) const {
+RiftLookupTexturePtr RiftDistortionHelper::createLookupTexture(const glm::uvec2 & lookupTextureSize, StereoEye eye) const {
     size_t lookupDataSize = lookupTextureSize.x * lookupTextureSize.y * 2;
     float * lookupData = new float[lookupDataSize];
     // The texture coordinates are actually from the center of the pixel, so thats what we need to use for the calculation.
@@ -299,7 +295,7 @@ RiftLookupTexturePtr RiftDistortionHelper::createLookupTexture(const glm::uvec2 
   }
 
 gl::GeometryPtr RiftDistortionHelper::createDistortionMesh(
-    const glm::uvec2 & distortionMeshResolution, Eye eye) const{
+    const glm::uvec2 & distortionMeshResolution, StereoEye eye) const{
     std::vector<glm::vec4> vertexData;
     vertexData.reserve(
       distortionMeshResolution.x * distortionMeshResolution.y * 2);
@@ -392,8 +388,8 @@ RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
 
   float eyeHeight = 1.5f;
   player = glm::inverse(glm::lookAt(
-    glm::vec3(0, eyeHeight, 4), 
-    glm::vec3(0, eyeHeight, 0), 
+    glm::vec3(0, eyeHeight, 4),
+    glm::vec3(0, eyeHeight, 0),
     glm::vec3(0, 1, 0)));
 }
 
@@ -434,10 +430,10 @@ void RiftApp::initGl() {
 
   // Create the rendering displacement map
   RiftDistortionHelper helper(ovrHmdInfo);
-  FOR_EACH_EYE(eye) {
-    eyes[eye].distortionTexture = 
+  for_each_eye([&](StereoEye eye){
+    eyes[eye].distortionTexture =
       helper.createLookupTexture(glm::uvec2(512, 512), eye);
-  }
+  });
 
 #ifdef RIFT_MULTISAMPLE
   distortProgram = GlUtils::getProgram(
@@ -477,7 +473,7 @@ void RiftApp::draw() {
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pr = gl::Stacks::projection();
 
-  FOR_EACH_EYE(eye) {
+  for_each_eye([&](StereoEye eye){
     const RiftPerEyeArg & eyeArgs = eyes[eye];
     frameBuffer.activate();
     glEnable(GL_DEPTH_TEST);
@@ -513,7 +509,7 @@ void RiftApp::draw() {
     gl::VertexArray::unbind();
     gl::Program::clear();
     GL_CHECK_ERROR;
-  }
+  });
 }
 
 void RiftApp::update() {
@@ -531,7 +527,7 @@ void RiftApp::update() {
   gl::Stacks::modelview().top() = riftOrientation *
     glm::inverse(playerRiftTranslation * player);
 
-  gl::Stacks::modelview().top() = 
+  gl::Stacks::modelview().top() =
     riftOrientation * glm::inverse(player);
 }
 

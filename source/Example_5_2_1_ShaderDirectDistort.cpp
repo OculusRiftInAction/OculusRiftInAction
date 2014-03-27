@@ -1,14 +1,14 @@
 #include "Common.h"
 
-const Resource SCENE_IMAGES[2] = {
-  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
+std::map<StereoEye, Resource> SCENE_IMAGES = {
+  { LEFT, Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG},
+  { RIGHT, Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG }
 };
 
 class ShaderDirectDistortionExample : public RiftGlfwApp {
 
 protected:
-  gl::Texture2dPtr textures[2];
+  std::map<StereoEye, gl::Texture2dPtr> textures;
   gl::GeometryPtr quadGeometry;
   glm::vec4 K;
   float lensOffset;
@@ -18,7 +18,7 @@ public:
   ShaderDirectDistortionExample() {
     OVR::Util::Render::StereoConfig stereoConfig;
     stereoConfig.SetHMDInfo(ovrHmdInfo);
-    const OVR::Util::Render::DistortionConfig & distortion = 
+    const OVR::Util::Render::DistortionConfig & distortion =
         stereoConfig.GetDistortionConfig();
 
     float postDistortionScale = 1.0f / stereoConfig.GetDistortionScale();
@@ -44,22 +44,22 @@ public:
     quadGeometry = GlUtils::getQuadGeometry();
     quadGeometry->bindVertexArray();
 
-    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
-      GlUtils::getImageAsTexture(textures[eyeIndex], SCENE_IMAGES[eyeIndex]);
-    }
+    for_each_eye([&](StereoEye eye){
+      GlUtils::getImageAsTexture(textures[eye], SCENE_IMAGES[eye]);
+    });
   }
 
   void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
-    FOR_EACH_EYE(eye) {
+    for_each_eye([&](StereoEye eye){
       renderEye(eye);
-    }
+    });
   }
 
-  void renderEye(int eyeIndex) {
-    viewport(eyeIndex);
-    program->setUniform("LensOffset", (eyeIndex == 0) ? -lensOffset : lensOffset);
-    textures[eyeIndex]->bind();
+  void renderEye(StereoEye eye) {
+    viewport(eye);
+    program->setUniform("LensOffset", (eye == LEFT) ? -lensOffset : lensOffset);
+    textures[eye]->bind();
     quadGeometry->draw();
   }
 };

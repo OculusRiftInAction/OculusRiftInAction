@@ -1096,8 +1096,8 @@ gl::GeometryPtr GlUtils::getCubeGeometry() {
   return cube;
 }
 
-static glm::vec3 AXES[] = { 
-  GlUtils::X_AXIS, 
+static glm::vec3 AXES[] = {
+  GlUtils::X_AXIS,
   GlUtils::Y_AXIS,
   GlUtils::Z_AXIS };
 
