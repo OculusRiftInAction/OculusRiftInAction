@@ -25,3 +25,18 @@
 [submodule "libraries/ARToolkit"]
 	path = libraries/ARToolkit
 	url = https://github.com/jherico/ARToolkit.git
+[submodule "java/examples"]
+
+	path = java/examples
+
+	url = https://github.com/jherico/jocular-examples
+
+[submodule "java/jocular"]
+	path = java/jocular
+	url = https://github.com/jherico/jocular
+
+[submodule "resources"]
+
+	path = resources
+
+	url = git@github.com:OculusRiftInAction/OculusRiftInActionResources.git
