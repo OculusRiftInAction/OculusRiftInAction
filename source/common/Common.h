@@ -49,8 +49,16 @@
 #include <glm/gtc/epsilon.hpp>
 #include <glm/gtx/norm.hpp>
 #include <GL/glew.h>
+
+#if 1
+#include <OVR_CAPI.h>
+//#include <OVR_CAPI_GL.h>
+#else
 #include <OVR.h>
 #undef new
+#endif
+
+
 
 #include <Resources.h>
 

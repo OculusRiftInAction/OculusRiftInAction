@@ -21,95 +21,59 @@
 
 //#define RIFT_MULTISAMPLE 1
 
-typedef OVR::Util::Render::StereoEye StereoEye;
-#define LEFT StereoEye::StereoEye_Left
-#define RIGHT StereoEye::StereoEye_Right
-
 class Rift {
 public:
-  static void getDefaultDk1HmdValues(OVR::HMDInfo & hmdInfo);
-  static void getRiftPositionAndSize(const OVR::HMDInfo & ovrHmdInfo,
+//  static void getDefaultDk1HmdValues(ovrHmd hmd, ovrHmdDesc & ovrHmdInfo);
+  static void getRiftPositionAndSize(ovrHmd hmd,
       glm::ivec2 & windowPosition, glm::uvec2 & windowSize);
-
   static glm::quat getStrabismusCorrection();
   static void setStrabismusCorrection(const glm::quat & q);
+  static void getHmdInfo(ovrHmd hmd, ovrHmdDesc & ovrHmdInfo);
+  static glm::mat4 getMat4(ovrHmd hmd);
 
-  static void getHmdInfo(
-    const OVR::Ptr<OVR::DeviceManager> & ovrManager,
-    OVR::HMDInfo & ovrHmdInfoOut);
+  static inline glm::mat4 fromOvr(const ovrFovPort & fovport, float nearPlane = 0.01f, float farPlane = 10000.0f) {
+    return fromOvr(ovrMatrix4f_Projection(fovport, nearPlane, farPlane, true));
+  }
 
-  // Fetch a glm style quaternion from an OVR sensor fusion object
-  static glm::quat getQuaternion(OVR::SensorFusion & sensorFusion);
+  static inline glm::mat4 fromOvr(const ovrMatrix4f & om) {
+    return glm::transpose(glm::make_mat4(&om.M[0][0]));
+  }
 
-  // Fetch a glm style quaternion from an OVR sensor fusion object
-  static glm::mat4 getMat4(OVR::SensorFusion & sensorFusion);
+  static inline glm::vec3 fromOvr(const ovrVector3f & ov) {
+    return glm::make_vec3(&ov.x);
+  }
 
+  static inline glm::uvec2 fromOvr(const ovrSizei & ov) {
+    return glm::uvec2(ov.h, ov.w);
+  }
 
-  // Fetch a glm vector containing Euler angles from an OVR sensor fusion object
-  static glm::vec3 getEulerAngles(OVR::SensorFusion & sensorFusion);
-  static glm::vec3 getEulerAngles(const OVR::Quatf & in);
+  static inline glm::quat fromOvr(const ovrQuatf & oq) {
+    return glm::make_quat(&oq.x);
+  }
 
-  static glm::vec4 fromOvr(const OVR::Color & in);
-  static glm::vec3 fromOvr(const OVR::Vector3f & in);
-  static glm::quat fromOvr(const OVR::Quatf & in);
+  static glm::mat4 Rift::fromOvr(const ovrPosef & op) {
+    return glm::mat4_cast(fromOvr(op.Orientation)) * glm::translate(glm::mat4(), Rift::fromOvr(op.Position));
+  }
 
-  static const float MONO_FOV;
-  static const float FRAMEBUFFER_OBJECT_SCALE;
-  static const float ZFAR;
-  static const float ZNEAR;
 };
 
 typedef gl::Texture<GL_TEXTURE_2D, GL_RG16F> RiftLookupTexture;
 typedef RiftLookupTexture::Ptr RiftLookupTexturePtr;
 
-class RiftDistortionHelper {
-  glm::dvec4 K{ 1, 0, 0, 0 };
-  glm::dvec4 chromaK{ 1, 0, 1, 0 };
-  double lensOffset{ 0 };
-  double eyeAspect{ 0.06 };
-
-  double getLensOffset(StereoEye eye) const;
-  static glm::dvec2 screenToTexture(const glm::dvec2 & v);
-  static glm::dvec2 textureToScreen(const glm::dvec2 & v);
-  glm::dvec2 screenToRift(const glm::dvec2 & v, StereoEye eye) const;
-  glm::dvec2 riftToScreen(const glm::dvec2 & v, StereoEye eye) const;
-  glm::dvec2 textureToRift(const glm::dvec2 & v, StereoEye eye) const;
-  glm::dvec2 riftToTexture(const glm::dvec2 & v, StereoEye eye) const;
-  double getUndistortionScaleForRadiusSquared(double rSq) const;
-  double getUndistortionScale(const glm::dvec2 & v) const;
-  double getUndistortionScaleForRadius(double r) const;
-  glm::dvec2 getUndistortedPosition(const glm::dvec2 & v) const;
-  glm::dvec2 getTextureLookupValue(const glm::dvec2 & texCoord, StereoEye eye) const;
-  double getDistortionScaleForRadius(double rTarget) const;
-  glm::dvec2 findDistortedVertexPosition(const glm::dvec2 & source, StereoEye eye) const;
-
-public:
-  RiftDistortionHelper(const OVR::HMDInfo & hmdInfo);
-  RiftLookupTexturePtr createLookupTexture(const glm::uvec2 & lookupTextureSize, StereoEye eye) const;
-  gl::GeometryPtr createDistortionMesh(const glm::uvec2 & distortionMeshResolution, StereoEye eye) const;
-};
-
-
 class RiftManagerApp {
 protected:
-  OVR::Ptr<OVR::DeviceManager> ovrManager;
-  OVR::HMDInfo ovrHmdInfo;
+  ovrHmd hmd;
+  ovrHmdDesc hmdDesc;
+
   glm::uvec2 hmdNativeResolution;
   glm::ivec2 hmdDesktopPosition;
-  glm::uvec2 eyeSize;
-  float eyeAspect{1};
-  float eyeAspectInverse{1};
 
 public:
   RiftManagerApp() {
-    ovrManager = *OVR::DeviceManager::Create();
-    Rift::getHmdInfo(ovrManager, ovrHmdInfo);
-    hmdNativeResolution = glm::ivec2(ovrHmdInfo.HResolution, ovrHmdInfo.VResolution);
-    eyeAspect = glm::aspect(hmdNativeResolution) / 2.0f;
-    eyeAspectInverse = 1.0f / eyeAspect;
-    hmdDesktopPosition = glm::ivec2(ovrHmdInfo.DesktopX, ovrHmdInfo.DesktopY);
-    eyeSize = hmdNativeResolution;
-    eyeSize.x /= 2;
+    hmd = ovrHmd_Create(0);
+    ovrHmd_GetDesc(hmd, &hmdDesc);
+    hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
+    hmdDesktopPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
   }
 };
 
@@ -171,17 +135,13 @@ public:
       glfwGetMonitorPos(hmdMonitor, &fakex, &fakey);
       hmdDesktopPosition = glm::ivec2(fakex, fakey);
       // on a large display, try to center the fake Rift display.
-      if (videoMode->width > windowSize.x) {
+      if (videoMode->width > (int)windowSize.x) {
         hmdDesktopPosition.x += (videoMode->width - windowSize.x) / 2;
       }
-      if (videoMode->height > windowSize.y) {
+      if (videoMode->height > (int)windowSize.y) {
         hmdDesktopPosition.y += (videoMode->height - windowSize.y) / 2;
       }
     }
-
-
-    eyeSize = windowSize;
-    eyeSize.x /= 2;
   }
 
   virtual void createRenderingTarget() {
@@ -201,60 +161,38 @@ public:
     }
   }
 
-  virtual void viewport(StereoEye eye) {
-    glm::uvec2 viewportPosition(eye == LEFT ? 0 : eyeSize.x, 0);
-    gl::viewport(viewportPosition, eyeSize);
+  virtual void viewport(ovrEyeType eye) {
+    glm::uvec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
+    gl::viewport(viewportPosition, glm::uvec2(windowSize.x / 2, windowSize.y));
   }
 
 
   void leftEyeViewport() {
-    viewport(LEFT);
+    viewport(ovrEye_Left);
   }
 
   void rightEyeViewport() {
-    viewport(RIGHT);
+    viewport(ovrEye_Right);
   }
-};
-
-struct RiftPerEyeArg {
-  StereoEye eye;
-  glm::mat4 strabsimusCorrection;
-  glm::mat4 projectionOffset;
-  glm::mat4 modelviewOffset;
-  glm::uvec2 viewportPosition;
-  RiftLookupTexturePtr distortionTexture;
-
-  RiftPerEyeArg(StereoEye eye)
-    : eye(eye) { }
 };
 
 class RiftApp : public RiftGlfwApp {
 public:
 
 protected:
-  OVR::SensorFusion sensorFusion;
   glm::mat4 player;
-  glm::mat4 riftOrientation;
+  ovrPosef  headPose;
 
 private:
-  float distortionScale;
-  OVR::Ptr<OVR::SensorDevice> ovrSensor;
-  gl::GeometryPtr quadGeometry;
-
-#ifdef RIFT_MULTISAMPLE
-  gl::MultisampleFrameBufferWrapper frameBuffer;
-#else
-  gl::FrameBufferWrapper frameBuffer;
-#endif
-
-  gl::ProgramPtr distortProgram;
-  std::array<RiftPerEyeArg, 2> eyes{ { RiftPerEyeArg(LEFT), RiftPerEyeArg(RIGHT) } };
+  ovrTexture eyeTextures[2];
+  ovrEyeRenderDesc eyeRenderDescs[2];
+  gl::FrameBufferWrapper frameBuffers[2];
 
 protected:
   void renderStringAt(const std::string & str, float x, float y);
-
   virtual void createRenderingTarget();
   virtual void initGl();
+  virtual void finishFrame();
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw() final;
   virtual void update();
@@ -267,9 +205,9 @@ public:
 
 template <typename Function>
 void for_each_eye(Function function) {
-  for (StereoEye eye = StereoEye::StereoEye_Left;
-      eye <= StereoEye::StereoEye_Right;
-      eye = static_cast<StereoEye>(eye + 1)) {
+  for (ovrEyeType eye = ovrEyeType::ovrEye_Left;
+      eye < ovrEyeType::ovrEye_Count;
+      eye = static_cast<ovrEyeType>(eye + 1)) {
     function(eye);
   }
 }
@@ -277,16 +215,20 @@ void for_each_eye(Function function) {
 // Combine some macros together to create a single macro
 // to launch a class containing a run method
 #define RUN_OVR_APP(AppClass) \
-    MAIN_DECL { \
-        OVR::System::Init(); \
-        try { \
-            return AppClass().run(); \
-        } catch (std::exception & error) { \
-            SAY_ERR(error.what()); \
-        } catch (std::string & error) { \
-            SAY_ERR(error.c_str()); \
-        } \
-        OVR::System::Destroy(); \
-        return -1; \
-    }
+MAIN_DECL { \
+  if (!ovr_Initialize()) { \
+      SAY_ERR("Failed to initialize the Oculus SDK"); \
+      return -1; \
+  } \
+  int result = -1; \
+  try { \
+    result = AppClass().run(); \
+  } catch (std::exception & error) { \
+    SAY_ERR(error.what()); \
+  } catch (std::string & error) { \
+    SAY_ERR(error.c_str()); \
+  } \
+  ovr_Shutdown(); \
+  return result; \
+}
 

@@ -729,7 +729,7 @@ gl::GeometryPtr GlUtils::getColorCubeGeometry() {
     mesh.addQuad(glm::vec2(1.0));
     m.pop();
 
-    m.push().rotate(glm::angleAxis(-PI / 2.0f, X_AXIS)).translate(move);
+    m.push().rotate(glm::angleAxis(-PI, X_AXIS)).translate(move);
     mesh.color = Colors::magenta;
     mesh.addQuad(glm::vec2(1.0));
     m.pop();

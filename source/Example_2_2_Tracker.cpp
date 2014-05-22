@@ -2,48 +2,31 @@
 
 class Tracker {
 protected:
-  OVR::Ptr<OVR::DeviceManager> ovrManager;
-
 public:
-    Tracker() {
-      ovrManager = *OVR::DeviceManager::Create();
-        if (!ovrManager) {
-            FAIL("Unable to create OVR device manager");
-        }
+
+  int run() {
+    ovrHmd hmd = ovrHmd_Create(0);
+    if (!hmd || !ovrHmd_StartSensor(hmd, 0, 0)) {
+      SAY_ERR("Unable to detect Rift head tracker");
+      return -1;
     }
+    for (int i = 0; i < 10; ++i) {
+      ovrSensorState state = ovrHmd_GetSensorState(hmd, 0);
+      
+      ovrQuatf orientation = state.Recorded.Pose.Orientation;
+      glm::quat q = glm::make_quat(&orientation.x);
+      glm::vec3 euler = glm::eulerAngles(q);
 
-    int run() {
-      OVR::Ptr<OVR::SensorDevice> ovrSensor = *ovrManager->
-        EnumerateDevices<OVR::SensorDevice>().CreateDevice();
-        if (!ovrSensor) {
-            SAY_ERR("Unable to detect Rift head tracker");
-            return -1;
-        }
-        OVR::SensorFusion ovrSensorFusion;
-        ovrSensorFusion.SetGravityEnabled(true);
-        ovrSensorFusion.SetPredictionEnabled(false);
-        ovrSensorFusion.SetYawCorrectionEnabled(false);
-        ovrSensorFusion.AttachToSensor(ovrSensor);
-
-        for (int i = 0; i < 10; ++i) {
-          OVR::Quatf orientation = ovrSensorFusion.GetOrientation();
-          float roll, pitch, yaw;
-
-          orientation.GetEulerAngles<
-            OVR::Axis::Axis_Z, OVR::Axis::Axis_X, OVR::Axis::Axis_Y,
-            OVR::RotateDirection::Rotate_CCW,
-            OVR::HandedSystem::Handed_R
-          >(&roll, &pitch, &yaw);
-
-          SAY("Current orientation - roll %0.2f, pitch %0.2f, yaw %0.2f",
-                  roll * RADIANS_TO_DEGREES,
-                  pitch  * RADIANS_TO_DEGREES,
-                  yaw * RADIANS_TO_DEGREES);
-          Platform::sleepMillis(1000);
-        }
-        ovrSensorFusion.AttachToSensor(nullptr);
-        return 0;
+      SAY("Current orientation - roll %0.2f, pitch %0.2f, yaw %0.2f",
+        euler.z * RADIANS_TO_DEGREES,
+        euler.x * RADIANS_TO_DEGREES,
+        euler.y * RADIANS_TO_DEGREES);
+      Platform::sleepMillis(1000);
     }
+    ovrHmd_StopSensor(hmd);
+    ovrHmd_Destroy(hmd);
+    return 0;
+  }
 };
 
 RUN_OVR_APP(Tracker);

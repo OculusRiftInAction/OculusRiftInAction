@@ -1,30 +1,25 @@
 #include "Common.h"
 
 class SensorFusionPredictionExample : public GlfwApp {
-  OVR::Ptr<OVR::DeviceManager> ovrManager;
-  OVR::Ptr<OVR::SensorDevice> ovrSensor;
-  OVR::SensorFusion ovrSensorFusion;
+  ovrHmd hmd;
+  ovrSensorState sensorState;
+  float predictionValue{ 0.030 };
+  bool renderSensors{ false };
 
-  OVR::Matrix4f actual;
-  OVR::Matrix4f predicted;
+  glm::mat4 actual;
+  glm::mat4 predicted;
 
 public:
 
   SensorFusionPredictionExample() {
-    ovrManager = *OVR::DeviceManager::Create();
-    if (!ovrManager) {
-      FAIL("Unable to create device manager");
+    hmd = ovrHmd_Create(0);
+    if (!hmd) {
+      FAIL("Unable to open HMD");
     }
 
-    ovrSensor = *ovrManager->EnumerateDevices<OVR::SensorDevice>().CreateDevice();
-    if (!ovrSensor) {
+    if (!ovrHmd_StartSensor(hmd, 0, 0)) {
       FAIL("Unable to locate Rift sensor device");
     }
-
-    ovrSensorFusion.SetGravityEnabled(true);
-    ovrSensorFusion.SetPredictionEnabled(true);
-    ovrSensorFusion.SetYawCorrectionEnabled(true);
-    ovrSensorFusion.AttachToSensor(ovrSensor);
   }
 
   void createRenderingTarget() {
@@ -33,16 +28,15 @@ public:
 
   void initGl() {
     GlfwApp::initGl();
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     gl::Stacks::projection().top() = glm::perspective(
-        PI / 3.0f, glm::aspect(windowSize),
-        Rift::ZNEAR, Rift::ZFAR);
+      PI / 3.0f, glm::aspect(windowSize),
+      0.01f, 10000.0f);
     gl::Stacks::modelview().top() = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 3.5f),
-        GlUtils::ORIGIN, GlUtils::UP);
+      glm::vec3(0.0f, 0.0f, 3.5f),
+      GlUtils::ORIGIN, GlUtils::UP);
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
@@ -52,21 +46,23 @@ public:
 
     switch (key) {
     case GLFW_KEY_R:
-      ovrSensorFusion.Reset();
+      ovrHmd_ResetSensor(hmd);
       return;
     case GLFW_KEY_UP:
-      ovrSensorFusion.SetPrediction(ovrSensorFusion.GetPredictionDelta() * 1.5f, true);
+      predictionValue *= 1.5f;
       return;
     case GLFW_KEY_DOWN:
-      ovrSensorFusion.SetPrediction(ovrSensorFusion.GetPredictionDelta() / 1.5f, true);
+      predictionValue /= 1.5f;
       return;
     }
     GlfwApp::onKey(key, scancode, action, mods);
   }
 
   void update() {
-    actual = ovrSensorFusion.GetOrientation();
-    predicted = ovrSensorFusion.GetPredictedOrientation();
+    sensorState = ovrHmd_GetSensorState(hmd, ovr_GetTimeInSeconds() + predictionValue);
+    // Update the modelview to reflect the orientation of the Rift
+    actual = glm::mat4_cast(Rift::fromOvr(sensorState.Recorded.Pose.Orientation));
+    predicted = glm::mat4_cast(Rift::fromOvr(sensorState.Predicted.Pose.Orientation)); 
   }
 
   void draw() {
@@ -74,22 +70,18 @@ public:
     
     std::string message = Platform::format(
         "Prediction Delta: %0.2f ms\n",
-        ovrSensorFusion.GetPredictionDelta() * 1000.0f);
+        predictionValue * 1000.0f);
     renderStringAt(message, -0.9f, 0.9f);
 
     gl::MatrixStack & mv = gl::Stacks::modelview();
-    glm::mat4 glm_mat;
-
-    glm_mat = glm::make_mat4((float*) predicted.M);
-    mv.push().transform(glm_mat);
-    GlUtils::renderArtificialHorizon();
-    mv.pop();
-
-    glm_mat = glm::make_mat4((float*) actual.M);
-    mv.push().transform(glm_mat);
-    mv.scale(1.25f);
-    GlUtils::renderArtificialHorizon(0.3f);
-    mv.pop();
+    mv.with_push([&]{
+      mv.transform(predicted);
+      GlUtils::renderArtificialHorizon();
+    });
+    mv.with_push([&]{
+      mv.transform(actual).scale(1.25f);
+      GlUtils::renderArtificialHorizon(0.3f);
+    });
   }
 
 };

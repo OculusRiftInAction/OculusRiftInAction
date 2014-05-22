@@ -28,6 +28,48 @@
 #include <CoreGraphics/CGDisplayConfiguration.h>
 #endif
 
+glm::uvec2 getSize(GLFWmonitor * monitor) {
+  const GLFWvidmode * mode = glfwGetVideoMode(monitor);
+  return glm::uvec2(mode->width, mode->height);
+}
+
+glm::ivec2 getPosition(GLFWmonitor * monitor) {
+  glm::ivec2 result;
+  glfwGetMonitorPos(monitor, &result.x, &result.y);
+  return result;
+}
+
+void GlfwApp::createSecondaryScreenWindow(const glm::uvec2 & size) {
+  GLFWmonitor * primary = glfwGetPrimaryMonitor();
+  int monitorCount;
+  GLFWmonitor ** monitors = glfwGetMonitors(&monitorCount);
+  GLFWmonitor * best = nullptr;
+  glm::uvec2 bestSize;
+  for (int i = 0; i < monitorCount; ++i) {
+    GLFWmonitor * cur = monitors[i];
+    if (cur == primary) {
+      continue;
+    }
+    glm::uvec2 curSize = getSize(cur);
+    if (best == nullptr || (bestSize.x < curSize.x && bestSize.y < curSize.y)) {
+      best = cur;
+      bestSize = curSize;
+    }
+  }
+  if (nullptr == best) {
+    best = primary;
+    bestSize = getSize(best);
+  }
+  glm::ivec2 pos = getPosition(best);
+  if (bestSize.x > size.x) {
+    pos.x += (bestSize.x - size.x) / 2;
+  }
+
+  if (bestSize.y > size.y) {
+    pos.y += (bestSize.y - size.y) / 2;
+  }
+  createWindow(size, pos);
+}
 
 void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action,
     int mods) {
@@ -169,6 +211,8 @@ void GlfwApp::preCreate() {
   glfwWindowHint(GLFW_DEPTH_BITS, 16);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
 #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -186,7 +230,7 @@ void GlfwApp::createWindow(const glm::uvec2 & size, const glm::ivec2 & position)
   if (!window) {
     FAIL("Unable to create rendering window");
   }
-  if (position.x > INT_MIN && position.y > INT_MIN) {
+  if ((position.x > INT_MIN) && (position.y > INT_MIN)) {
     glfwSetWindowPos(window, position.x, position.y);
   }
   onCreate();
@@ -208,6 +252,10 @@ void GlfwApp::initGl() {
   glEnable(GL_DEPTH_TEST);
   query = gl::TimeQueryPtr(new gl::TimeQuery());
   GL_CHECK_ERROR;
+}
+
+void GlfwApp::finishFrame() {
+  glfwSwapBuffers(window);
 }
 
 void GlfwApp::destroyWindow() {
@@ -269,7 +317,7 @@ int GlfwApp::run() {
     glfwPollEvents();
     update();
     draw();
-    glfwSwapBuffers(window);
+    finishFrame();
     long now = Platform::elapsedMillis();
     ++framecount;
     if ((now - start) >= 2000) {

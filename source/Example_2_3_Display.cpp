@@ -2,35 +2,26 @@
 
 class Display : public GlfwApp {
   glm::uvec2 eyeSize;
+  ovrHmd hmd;
 
 public:
   Display() {
-    OVR::Ptr<OVR::DeviceManager> ovrManager =
-      *OVR::DeviceManager::Create();
-
-    if (!ovrManager) {
-      FAIL("Unable to create Rift device manager");
-    }
-
-    OVR::Ptr<OVR::HMDDevice> ovrHmd = *ovrManager->
-      EnumerateDevices<OVR::HMDDevice>().CreateDevice();
-    if (!ovrHmd) {
+    hmd = ovrHmd_Create(0);
+    if (!hmd) {
       FAIL("Unable to detect Rift display");
     }
 
-    OVR::HMDInfo ovrHmdInfo;
-    ovrHmd->GetDeviceInfo(&ovrHmdInfo);
-    ovrHmd = nullptr;
+    ovrHmdDesc hmdDesc;
+    ovrHmd_GetDesc(hmd, &hmdDesc);
 
-    windowPosition = glm::ivec2(
-      ovrHmdInfo.DesktopX, ovrHmdInfo.DesktopY);
+    windowPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
 
     GLFWmonitor * hmdMonitor =
-      GlfwApp::getMonitorAtPosition(windowPosition);
+        GlfwApp::getMonitorAtPosition(windowPosition);
     const GLFWvidmode * videoMode =
-      glfwGetVideoMode(hmdMonitor);
+        glfwGetVideoMode(hmdMonitor);
     windowSize = glm::uvec2(
-      videoMode->width, videoMode->height);
+        videoMode->width, videoMode->height);
 
     eyeSize = windowSize;
     eyeSize.x /= 2;

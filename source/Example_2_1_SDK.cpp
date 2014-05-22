@@ -1,4 +1,3 @@
-#include <OVR.h>
 #include "Common.h"
 
 class Example_SdkInit {
@@ -6,17 +5,10 @@ public:
 
   virtual int run() {
     SAY("Initializing SDK");
-    OVR::System::Init();
-
-    SAY("Creating the device manager");
-    OVR::Ptr<OVR::DeviceManager> ovrManager =
-        *OVR::DeviceManager::Create();
-
-    SAY("Releasing the device manager");
-    ovrManager = nullptr;
+    ovr_Initialize();
 
     SAY("De-initializing the SDK");
-    OVR::System::Destroy();
+    ovr_Shutdown();
 
     SAY("Exiting");
     return 0;

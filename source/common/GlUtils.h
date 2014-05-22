@@ -80,6 +80,9 @@ public:
     getImageData(resource, outSize, imageData);
     texture = TexturePtr(new Texture());
     texture->bind();
+#ifdef HAVE_OPENCV
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 0);
+#endif
     texture->image2d(outSize, &imageData[0]);
     texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -87,12 +90,34 @@ public:
   }
 
   /**
+  * A convenience method for loading images into textures
+  * when you don't care about the dimensions of the image
+  */
+  template<
+    GLenum TextureType = GL_TEXTURE_2D, 
+    GLenum TextureFomat = GL_RGBA8
+  >
+  static typename gl::Texture<TextureType, TextureFomat>::Ptr  
+    getImageAsTexture(
+      Resource resource,
+      GLenum target = TextureType) {
+    glm::uvec2 imageSize;
+    std::shared_ptr<gl::Texture<TextureType, TextureFomat> > texture;
+    getImageAsTexture(texture, resource, target);
+    return texture;
+  }
+
+
+  /**
    * A convenience method for loading images into textures
    * when you don't care about the dimensions of the image
    */
-  template<GLenum TextureType>
+  template<
+    GLenum TextureType = GL_TEXTURE_2D,
+    GLenum TextureFomat = GL_RGBA8
+  >
   static void getImageAsTexture(
-    std::shared_ptr<gl::Texture<TextureType> > & texture,
+    std::shared_ptr<gl::Texture<TextureType, TextureFomat> > & texture,
     Resource resource,
     GLenum target = TextureType) {
     glm::uvec2 imageSize;

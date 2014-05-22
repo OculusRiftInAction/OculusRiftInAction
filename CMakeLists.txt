@@ -86,15 +86,18 @@ add_definitions(-DOVR_BUILD_DEBUG)
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(libraries/OculusSDK/LibOVR)
-set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
+set_target_properties(OVR PROPERTIES FOLDER "3rdparty")
 
-# Make sure to set up the OVR include paths
-include_directories(libraries/OculusSDK/LibOVR/Include)
-include_directories(libraries/OculusSDK/LibOVR/Src)
-include_directories(libraries/OculusSDK/LibOVR/Src/Kernel)
-include_directories(libraries/OculusSDK/LibOVR/Src/Util)
+add_definitions(-DGLEW_STATIC)
+add_subdirectory(libraries/glew)
+set_target_properties(glew PROPERTIES FOLDER "3rdparty")
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 
-set(EXAMPLE_LIBS OculusVR )
+add_subdirectory(libraries/OculusSDK/Bindings/C)
+set_target_properties(OVR_C PROPERTIES FOLDER "3rdparty")
+include_directories(libraries/OculusSDK/Bindings/C/Include)
+
+set(EXAMPLE_LIBS OVR_C )
 
 ###############################################################################
 #
@@ -102,10 +105,6 @@ set(EXAMPLE_LIBS OculusVR )
 #
 
 # Cross platform access to shader functionality
-add_definitions(-DGLEW_STATIC)
-add_subdirectory(libraries/glew)
-set_target_properties(glew PROPERTIES FOLDER "3rdparty")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND EXAMPLE_LIBS glew)
 
 # GLFW - Cross platform OpenGL window creation and input handling
@@ -124,27 +123,20 @@ set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
-# Json parsing library
-set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables")
-set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step")
-add_subdirectory(libraries/jsoncpp)
-set_target_properties(jsoncpp PROPERTIES FOLDER "3rdparty")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/jsoncpp)
-list(APPEND EXAMPLE_LIBS jsoncpp)
-
 # Computer vision library with advanced image loading and manipulation 
 # functionality.  
 # OpenCV is OPTIONAL.  
-find_package( OpenCV )
+find_package( OpenCV QUIET)
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
 else()
-    # Without OpenCV, we have to fall back on libpng
-    # which requires zlib.  For windows and apple we
-    # build the library.  For Unix systems we locate 
-    # the native package
+
+# Without OpenCV, we have to fall back on libpng
+# which requires zlib.  For windows and apple we
+# build the library.  For Unix systems we locate 
+# the native package
     if((WIN32 OR APPLE))
         # zlib
         add_subdirectory(libraries/zlib)
@@ -152,7 +144,7 @@ else()
         include_directories(${CMAKE_BINARY_DIR}/libraries/zlib)
         include_directories(${CMAKE_SOURCE_DIR}/libraries/zlib)
         list(APPEND EXAMPLE_LIBS zlib)
-
+    
         # png
         set(PNG_STATIC ON CACHE BOOL "Build PNG static library")
         set(PNG_TESTS OFF CACHE BOOL "Build PNG tests")
@@ -170,45 +162,6 @@ else()
     endif()
 endif()
 
-# Vector / matrix header only math library based on
-# the syntax of GLSL
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
-
-# Boost is a general purpose C++ library
-#set(Boost_DEBUG 1)
-if (NOT APPLE)
-    set(Boost_USE_STATIC_LIBS ON)
-    set(Boost_USE_MULTITHREADED ON)
-    set(Boost_USE_STATIC_RUNTIME ON)
-    find_package( Boost QUIET COMPONENTS filesystem system thread )
-    if(Boost_FOUND)
-        include_directories(${Boost_INCLUDE_DIRS})
-        link_directories(${Boost_LIBRARY_DIR}) 
-        list(APPEND EXAMPLE_LIBS ${Boost_LIBRARIES})
-        set(HAVE_BOOST 1)
-    endif()
-endif()
-
-find_package(Sixense)
-if(SIXENSE_FOUND)
-    if (WIN32)
-        file(COPY ${SIXENSE_BINARY}
-            DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-        file(COPY ${SIXENSE_UTIL_BINARY}
-            DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-    endif()
-    include_directories(${SIXENSE_INCLUDE_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${SIXENSE_LIBRARIES})
-    set(HAVE_SIXENSE 1)
-endif()
-
-find_package( SpaceNavigator QUIET)
-if(SPNAV_FOUND)
-    include_directories(${SPNAV_INCLUDE_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${SPNAV_LIBRARIES})
-    set(HAVE_SPNAV 1)
-endif()
-
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
@@ -219,6 +172,13 @@ list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 add_subdirectory(libraries/gl)
 set_target_properties(gl PROPERTIES FOLDER "Examples/Shared")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
+
+
+###############################################################################
+#
+# GLM - Vector / matrix header only math library based on the syntax of GLSL
+#
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
 ###############################################################################
 #
@@ -247,7 +207,6 @@ add_subdirectory(source/common)
 set_target_properties(ExampleCommon PROPERTIES FOLDER "Examples/Shared")
 include_directories(source/common)
 include_directories(${CMAKE_BINARY_DIR}/source/common)
-
 
 ###############################################################################
 #

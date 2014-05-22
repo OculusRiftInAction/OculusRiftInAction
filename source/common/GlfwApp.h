@@ -42,6 +42,7 @@ public:
   virtual int run();
 
   virtual void screenshot();
+  virtual void finishFrame();
   virtual void createWindow(const glm::uvec2 & size, const glm::ivec2 & position = glm::ivec2(INT_MIN));
   virtual void createWindow(int w, int h, int x = INT_MIN, int y = INT_MIN) {
     createWindow(glm::uvec2(w, h), glm::ivec2(x, y));
@@ -57,6 +58,7 @@ public:
   virtual void renderStringAt(const std::string & string, const glm::vec2 & position);
 
   static GLFWmonitor * getMonitorAtPosition(const glm::ivec2 & position);
+  void createSecondaryScreenWindow(const glm::uvec2 & size);
 
 private:
   void onCreate();
