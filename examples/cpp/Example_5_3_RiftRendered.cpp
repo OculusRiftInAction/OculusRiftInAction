@@ -1,11 +1,10 @@
 #include "Common.h"
-
 struct PerEyeArg {
   glm::mat4                     modelviewOffset;
   glm::mat4                     projection;
   gl::FrameBufferWrapper        frameBuffer;
   ovrFovPort                    fovPort;
-  ovrTexture                    texture;
+  ovrGLTexture                  texture;
   ovrEyeRenderDesc              renderDesc;
 };
 
@@ -34,6 +33,10 @@ public:
     windowSize = glm::uvec2(1280, 800);
   }
 
+  ~SimpleScene() {
+    ovrHmd_Destroy(hmd);
+  }
+
   void initGl() {
     RiftGlfwApp::initGl();
     glEnable(GL_BLEND);
@@ -45,26 +48,27 @@ public:
     for_each_eye([&](ovrEyeType eye){
       PerEyeArg & eyeArg = eyes[eye];
       eyeArg.fovPort = hmdDesc.DefaultEyeFov[eye];
-      eyeArg.texture.Header.API = ovrRenderAPI_OpenGL;
+      ovrTextureHeader & textureHeader = eyeArg.texture.Texture.Header;
+      textureHeader.API = ovrRenderAPI_OpenGL;
       ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, eyeArg.fovPort, 1.0f);
-      eyeArg.texture.Header.TextureSize = texSize;
-      eyeArg.texture.Header.RenderViewport.Size = texSize;
-      eyeArg.texture.Header.RenderViewport.Pos.x = 0;
-      eyeArg.texture.Header.RenderViewport.Pos.y = 0;
+      textureHeader.TextureSize = texSize;
+      textureHeader.RenderViewport.Size = texSize;
+      textureHeader.RenderViewport.Pos.x = 0;
+      textureHeader.RenderViewport.Pos.y = 0;
       eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
-      eyeArg.texture.PlatformData[0] = eyeArg.frameBuffer.color->texture;
+      eyeArg.texture.OGL.TexId = eyeArg.frameBuffer.color->texture;
 
       ovrMatrix4f projection = ovrMatrix4f_Projection(eyeArg.fovPort, 0.01, 100000, true);
       eyeArg.projection = Rift::fromOvr(projection);
     });
 
     ovrRenderAPIConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
     cfg.Header.API = ovrRenderAPI_OpenGL;
     cfg.Header.RTSize = hmdDesc.Resolution;
     cfg.Header.Multisample = 1;
 
-
-    int distortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp;
+    int distortionCaps = ovrDistortionCap_Chromatic;
     int renderCaps = 0;
     ovrFovPort eyePorts[] = { eyes[0].fovPort, eyes[1].fovPort };
     ovrEyeRenderDesc eyeRenderDescs[2];
@@ -75,6 +79,10 @@ public:
   virtual void update() {
     CameraControl::instance().applyInteraction(player);
     gl::Stacks::modelview().top() = glm::inverse(player);
+  }
+
+  virtual void finishFrame() {
+
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
@@ -103,24 +111,23 @@ public:
       gl::Stacks::projection().top() = eyeArgs.projection;
 
       ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
-      eyeArgs.frameBuffer.activate();
-      {
-        glEnable(GL_DEPTH_TEST);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      eyeArgs.frameBuffer.withFramebufferActive([&]{
         gl::Stacks::with_push(mv, [&]{
           mv.preMultiply(eyeArgs.modelviewOffset);
           renderScene();
         });
-      }
-      eyeArgs.frameBuffer.deactivate();
+      });
 
-      ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeArgs.texture);
+      ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeArgs.texture.Texture);
     }
 
     ovrHmd_EndFrame(hmd);
   }
 
   void renderScene() {
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     GlUtils::renderFloorGrid(player);
     gl::MatrixStack & mv = gl::Stacks::modelview();

@@ -50,17 +50,8 @@
 #include <glm/gtx/norm.hpp>
 #include <GL/glew.h>
 
-#if 1
 #include <OVR_CAPI.h>
-//#include <OVR_CAPI_GL.h>
-#else
-#include <OVR.h>
-#undef new
-#endif
-
-
-
-#include <Resources.h>
+#include <OVR_CAPI_GL.h>
 
 #include <GlDebug.h>
 #include <GlMethods.h>
@@ -72,6 +63,8 @@
 #include <GlShaders.h>
 #include <GlGeometry.h>
 #include <GlLighting.h>
+
+#include <Resources.h>
 
 
 template<class T>
