@@ -10,11 +10,14 @@ class SimpleScene: public RiftGlfwApp {
 
 public:
   SimpleScene() {
-    eyeHeight = ovrHmd_GetFloat(hmd, OVR_KEY_PLAYER_HEIGHT, OVR_DEFAULT_PLAYER_HEIGHT);
+    eyeHeight = ovrHmd_GetFloat(hmd, 
+        OVR_KEY_PLAYER_HEIGHT, 
+        OVR_DEFAULT_PLAYER_HEIGHT);
     ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
-    gl::Stacks::projection().top() = glm::perspective(
-      PI / 2.0f, glm::aspect(WINDOW_SIZE), 0.01f, 1000.0f);
     resetCamera();
+
+    gl::Stacks::projection().top() = glm::perspective(
+        PI / 2.0f, glm::aspect(WINDOW_SIZE), 0.01f, 1000.0f);
   }
 
   virtual ~SimpleScene() {
@@ -39,17 +42,17 @@ public:
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
-      return;
+    if (!CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+      if (action == GLFW_PRESS) {
+        switch (key) {
+        case GLFW_KEY_R:
+          resetCamera();
+          break;
+        }
+      } else {
+        GlfwApp::onKey(key, scancode, action, mods);
+      }
     }
-
-    if (action == GLFW_PRESS) switch (key) {
-    case GLFW_KEY_R:
-      resetCamera();
-      return;
-    }
-
-    GlfwApp::onKey(key, scancode, action, mods);
   }
 
   void resetCamera() {

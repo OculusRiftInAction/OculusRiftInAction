@@ -1,4 +1,5 @@
 #include "Common.h"
+
 struct PerEyeArg {
   glm::mat4                     modelviewOffset;
   glm::mat4                     projection;
@@ -13,19 +14,15 @@ class SimpleScene: public RiftGlfwApp {
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
 
-  PerEyeArg              eyes[2];
-  int                    frameIndex{ 0 };
+  PerEyeArg                     eyes[2];
+  int                           frameIndex{ 0 };
 
 public:
   SimpleScene() {
     ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
     eyeHeight = ovrHmd_GetFloat(hmd, OVR_KEY_PLAYER_HEIGHT, OVR_DEFAULT_PLAYER_HEIGHT);
+    resetCamera();
 
-    // setup the initial player location
-    player = glm::inverse(glm::lookAt(
-        glm::vec3(0, eyeHeight, ipd * 4.0f),
-        glm::vec3(0, eyeHeight, 0),
-        GlUtils::Y_AXIS));
     eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(),
         glm::vec3(ipd / 2.0f, 0, 0));
     eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
@@ -82,23 +79,27 @@ public:
   }
 
   virtual void finishFrame() {
-
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
-      return;
+    if (!CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+      if (action == GLFW_PRESS) {
+        switch (key) {
+        case GLFW_KEY_R:
+          resetCamera();
+          break;
+        }
+      } else {
+        RiftGlfwApp::onKey(key, scancode, action, mods);
+      }
     }
+  }
 
-    if (action == GLFW_PRESS) switch (key) {
-    case GLFW_KEY_R:
-      player = glm::inverse(glm::lookAt(
-        glm::vec3(0, eyeHeight, ipd * 4.0f),
-        glm::vec3(0, eyeHeight, 0),
-        GlUtils::Y_AXIS));
-      return;
-    }
-    RiftGlfwApp::onKey(key, scancode, action, mods);
+  void resetCamera() {
+    player = glm::inverse(glm::lookAt(
+      glm::vec3(0, eyeHeight, 1),  // Position of the camera
+      glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
+      GlUtils::Y_AXIS));           // Camera up axis
   }
 
   void draw() {
