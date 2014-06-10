@@ -16,15 +16,12 @@
 [submodule "libraries/gl"]
 	path = libraries/gl
 	url = https://github.com/jherico/gl.git
-[submodule "libraries/libusbx"]
-	path = libraries/libusbx
-	url = https://github.com/jherico/libusbx.git
-[submodule "libraries/java/math"]
-	path = libraries/java/math
-	url = https://github.com/jherico/java-math.git
-[submodule "libraries/ARToolkit"]
-	path = libraries/ARToolkit
-	url = https://github.com/jherico/ARToolkit.git
 [submodule "resources"]
 	path = resources
 	url = https://github.com/OculusRiftInAction/OculusRiftInActionResources.git
+[submodule "examples/java"]
+	path = examples/java
+	url = https://github.com/jherico/jocular-examples
+[submodule "examples/python"]
+	path = examples/python
+	url = https://github.com/jherico/pyovr-examples.git

@@ -28,20 +28,18 @@ void RiftApp::initGl() {
   query = gl::TimeQueryPtr(new gl::TimeQuery());
   GL_CHECK_ERROR;
 
-  ovrEyeDesc eyeDescs[2];
+  ovrFovPort eyeFovPorts[2];
   for_each_eye([&](ovrEyeType eye){
-    ovrEyeDesc & eyeDesc = eyeDescs[eye];
-    eyeDesc.Eye = eye;
-    eyeDesc.Fov = hmdDesc.DefaultEyeFov[eye];
-    eyeDesc.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
-    eyeDesc.RenderViewport.Size = eyeDesc.TextureSize;
-    eyeDesc.RenderViewport.Pos.x = 0;
-    eyeDesc.RenderViewport.Pos.y = 0;
-
     ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
-    eyeTextureHeader.TextureSize = eyeDesc.TextureSize;
-    eyeTextureHeader.RenderViewport = eyeDesc.RenderViewport;
+    eyeFovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
+    ovrSizei eyeTextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
+    frameBuffers[eye].init(Rift::fromOvr(eyeTextureSize));
+
+    eyeTextureHeader.RenderViewport.Size = eyeTextureSize;
+    eyeTextureHeader.RenderViewport.Pos.x = 0;
+    eyeTextureHeader.RenderViewport.Pos.y = 0;
     eyeTextureHeader.API = ovrRenderAPI_OpenGL;
+    eyeTextureHeader.TextureSize = eyeTextureSize;
   });
 
   ovrGLConfig cfg;
@@ -49,14 +47,22 @@ void RiftApp::initGl() {
   cfg.OGL.Header.RTSize = hmdDesc.Resolution;
   cfg.OGL.Header.Multisample = 1;
 
-  int distortionCaps = ovrDistortion_Chromatic | ovrDistortion_TimeWarp;
+  int distortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp;
   int renderCaps = 0;
 
-  void * foo = glDrawElements;
-  void * bar = glBindBuffer;
   int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
-      renderCaps, distortionCaps, eyeDescs, eyeRenderDescs);
+    renderCaps, eyeFovPorts, eyeRenderDescs);
 
+  float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
+  for_each_eye([&](ovrEyeType eye){
+    const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
+    ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
+    projections[eye] = Rift::fromOvr(ovrPerspectiveProjection);
+    glm::vec2 orthoScale = glm::vec2(1.0f) / Rift::fromOvr(erd.PixelsPerTanAngleAtCenter);
+    orthoProjections[eye] = Rift::fromOvr(
+        ovrMatrix4f_OrthoSubProjection(
+            ovrPerspectiveProjection, Rift::toOvr(orthoScale), orthoDistance, erd.ViewAdjust.x));
+  });
 
   ///////////////////////////////////////////////////////////////////////////
   // Initialize OpenGL settings and variables
@@ -65,16 +71,16 @@ void RiftApp::initGl() {
   glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
   glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
   GL_CHECK_ERROR;
-  
+
   // Allocate the frameBuffer that will hold the scene, and then be
   // re-rendered to the screen with distortion
   glm::uvec2 frameBufferSize = glm::uvec2(
-    glm::vec2(eyeDescs[0].TextureSize.w, eyeDescs[0].TextureSize.h));
+    glm::vec2(eyeTextures[0].Header.RenderViewport.Size.w, eyeTextures[0].Header.RenderViewport.Size.h));
   for_each_eye([&](ovrEyeType eye) {
     frameBuffers[eye].init(frameBufferSize);
     eyeTextures[eye].Header.API = ovrRenderAPI_OpenGL;
-    eyeTextures[eye].Header.TextureSize = eyeDescs[0].TextureSize;
-    eyeTextures[eye].Header.RenderViewport = eyeDescs[0].RenderViewport;
+    eyeTextures[eye].Header.TextureSize = eyeTextures[0].Header.RenderViewport.Size;
+    eyeTextures[eye].Header.RenderViewport = eyeTextures[0].Header.RenderViewport;
     ((ovrGLTexture&)eyeTextures[eye]).OGL.TexId = frameBuffers[eye].color->texture;
   });
   GL_CHECK_ERROR;
@@ -111,7 +117,7 @@ void RiftApp::draw() {
       const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
       // Set up the per-eye projection matrix
       {
-        ovrMatrix4f eyeProjection = ovrMatrix4f_Projection(erd.Desc.Fov, 0.01f, 100000.0f, true);
+        ovrMatrix4f eyeProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
         glm::mat4 ovrProj = Rift::fromOvr(eyeProjection);
         pr.top() = ovrProj;
       }

@@ -53,22 +53,24 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
     # Ensure we generate position independent code 
     if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC"  )
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC"  )    
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
     endif()
-endif()
-
-if(APPLE)
-    # Ensure we use C++ 11 
-    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++0x")
-    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
-    set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0")
 endif()
 
 if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
     set(TARGET_ARCHITECTURE "x86")
+elseif(APPLE)
+    # Ensure we use C++ 11 
+    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++0x")
+    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+    set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0")
+else()
+    add_subdirectory(libraries/OculusSDK/3rdParty/EDID)
+    set_target_properties(edid PROPERTIES FOLDER "3rdParty")
 endif()
+
 
 ###############################################################################
 #
@@ -86,7 +88,7 @@ add_definitions(-DOVR_BUILD_DEBUG)
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(libraries/OculusSDK/LibOVR)
-set_target_properties(OVR PROPERTIES FOLDER "3rdparty")
+set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
 
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
@@ -126,7 +128,7 @@ list(APPEND EXAMPLE_LIBS OpenCTM)
 # Computer vision library with advanced image loading and manipulation 
 # functionality.  
 # OpenCV is OPTIONAL.  
-find_package( OpenCV QUIET)
+#find_package( OpenCV QUIET)
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
@@ -195,22 +197,13 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 #
 add_subdirectory(resources)
 set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
-include_directories(resources)
+include_directories(resources/cpp)
 include_directories(${CMAKE_BINARY_DIR}/resources)
 list(APPEND EXAMPLE_LIBS ExampleResources)
 
 ###############################################################################
 #
-# Shared codebase for all the examples and demos
-#
-add_subdirectory(source/common)
-set_target_properties(ExampleCommon PROPERTIES FOLDER "Examples/Shared")
-include_directories(source/common)
-include_directories(${CMAKE_BINARY_DIR}/source/common)
-
-###############################################################################
-#
 # The examples themselves
 #
-add_subdirectory(source)
+add_subdirectory(examples/cpp)
 

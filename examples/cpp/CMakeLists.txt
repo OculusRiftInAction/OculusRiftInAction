@@ -1,3 +1,13 @@
+###############################################################################
+#
+# Shared codebase for all the examples and demos
+#
+add_subdirectory(common)
+set_target_properties(ExampleCommon PROPERTIES FOLDER "Examples/Shared")
+
+include_directories(common)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/common)
+
 
 function(make_example FILE PROJECT_FOLDER)
     set(SOURCE_FILES ${FILE})
@@ -46,53 +56,4 @@ function(make_examples GLOB PROJECT_FOLDER)
 endfunction() 
 
 make_examples(*.cpp "Examples")
-
-if (OpenCV_FOUND) 
-    make_examples(opencv/*.cpp "Examples/OpenCV")
-endif()
-
-find_package( Steamworks )
-if(STEAMWORKS_FOUND)
-    include_directories(${STEAMWORKS_INCLUDE_DIR}) 
-    list(APPEND EXAMPLE_LIBS ${STEAMWORKS_LIBRARY})
-    make_examples(steamworks/*.cpp  "Examples/Steamworks")
-endif()
-
-find_package( Depthsense )
-if(DEPTHSENSE_FOUND)
-    include_directories(${DEPTHSENSE_INCLUDE_DIR})
-    list(APPEND EXAMPLE_LIBS ${DEPTHSENSE_LIBRARY})
-    set(HAVE_DEPTHSENSE 1)
-    make_examples(opencv/depthsense/*.cpp "Examples/DepthSense")
-endif()
-
-if (RIFT_BUILD_SCRATCH_EXAMPLES)
-    message("Building scratch examples") 
-    make_examples(scratch/*.cpp "Examples/Scratch")
-endif()
-
-if (0)
-    find_package( LeapMotion )
-    if(LEAP_FOUND)
-        file(COPY ${LEAP_BINARY} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-        include_directories(${LEAP_INCLUDE_DIR}) 
-        list(APPEND EXAMPLE_LIBS ${LEAP_LIBRARY})
-    endif()
-
-    find_package( PerceptualComputing )
-    if (PERC_FOUND) 
-        include_directories(${PERC_INCLUDE_DIR})
-        list(APPEND EXAMPLE_LIBS ${PERC_LIBRARY})
-        set(HAVE_PERC 1)
-    endif()
-
-#find_package( PCL 1.3 REQUIRED COMPONENTS io filters segmentation surface)
-#  include_directories(${PCL_INCLUDE_DIRS}) 
-#  message(${PCL_INCLUDE_DIRS})
-#  link_directories(${PCL_LIBRARY_DIRS})
-#  list(APPEND EXAMPLE_LIBS ${PCL_LIBRARIES})
-#  add_definitions(${PCL_DEFINITIONS})
-endif()
-
-
 

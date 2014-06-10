@@ -43,6 +43,10 @@ public:
     return glm::make_vec3(&ov.x);
   }
 
+  static inline glm::vec2 fromOvr(const ovrVector2f & ov) {
+    return glm::make_vec2(&ov.x);
+  }
+
   static inline glm::uvec2 fromOvr(const ovrSizei & ov) {
     return glm::uvec2(ov.h, ov.w);
   }
@@ -51,8 +55,46 @@ public:
     return glm::make_quat(&oq.x);
   }
 
-  static glm::mat4 Rift::fromOvr(const ovrPosef & op) {
+  static inline glm::mat4 fromOvr(const ovrPosef & op) {
     return glm::mat4_cast(fromOvr(op.Orientation)) * glm::translate(glm::mat4(), Rift::fromOvr(op.Position));
+  }
+
+  static inline ovrMatrix4f toOvr(const glm::mat4 & m) {
+    ovrMatrix4f result;
+    glm::mat4 transposed(glm::transpose(m));
+    memcpy(result.M, &(transposed[0][0]), sizeof(float) * 16);
+    return result;
+  }
+
+  static inline ovrVector3f toOvr(const glm::vec3 & v) {
+    ovrVector3f result;
+    result.x = v.x;
+    result.y = v.y;
+    result.z = v.z;
+    return result;
+  }
+
+  static inline ovrVector2f toOvr(const glm::vec2 & v) {
+    ovrVector2f result;
+    result.x = v.x;
+    result.y = v.y;
+    return result;
+  }
+
+  static inline ovrSizei toOvr(const glm::uvec2 & v) {
+    ovrSizei result;
+    result.w = v.x;
+    result.h = v.y;
+    return result;
+  }
+
+  static inline ovrQuatf toOvr(const glm::quat & q) {
+    ovrQuatf result;
+    result.x = q.x;
+    result.y = q.y;
+    result.z = q.z;
+    result.w = q.w;
+    return result;
   }
 
 };
@@ -119,16 +161,16 @@ public:
 
     const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
     if (!fakeRiftMonitor || fullscreen) {
-      // if we've got a real rift monitor, OR we're doing fullscreen with 
+      // if we've got a real rift monitor, OR we're doing fullscreen with
       // a fake Rift, use the resolution of the monitor
       windowSize = glm::uvec2(videoMode->width, videoMode->height);
     } else {
-      // If we've got a fake rift and we're NOT fullscreen, 
+      // If we've got a fake rift and we're NOT fullscreen,
       // use the DK1 resolution
       windowSize = glm::uvec2(1280, 800);
     }
 
-    // if we're using a fake rift 
+    // if we're using a fake rift
     if (fakeRiftMonitor) {
       int fakex, fakey;
       // Reset the desktop display's position to the target monitor
@@ -187,6 +229,9 @@ private:
   ovrTexture eyeTextures[2];
   ovrEyeRenderDesc eyeRenderDescs[2];
   gl::FrameBufferWrapper frameBuffers[2];
+  glm::mat4 projections[2];
+  glm::mat4 orthoProjections[2];
+  ovrEyeType currentEye;
 
 protected:
   void renderStringAt(const std::string & str, float x, float y);
@@ -197,6 +242,25 @@ protected:
   virtual void draw() final;
   virtual void update();
   virtual void renderScene() = 0;
+  inline ovrEyeType getCurrentEye() const {
+    return currentEye;
+  }
+
+  const glm::mat4 & getPerspectiveProjection(ovrEyeType eye) const {
+    return projections[eye];
+  }
+
+  const glm::mat4 & getOrthographicProjection(ovrEyeType eye) const {
+    return orthoProjections[eye];
+  }
+
+  const glm::mat4 & getPerspectiveProjection() const {
+    return getPerspectiveProjection(getCurrentEye());
+  }
+
+  const glm::mat4 & getOrthographicProjection() const {
+    return getOrthographicProjection(getCurrentEye());
+  }
 
 public:
   RiftApp(bool fullscreen = false);

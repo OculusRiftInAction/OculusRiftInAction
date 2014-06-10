@@ -18,6 +18,9 @@ protected:
   gl::ProgramPtr program;
 
 public:
+  virtual ~UndistortedExample() {
+    ovrHmd_Destroy(hmd);
+  }
 
   void initGl() {
     RiftGlfwApp::initGl();

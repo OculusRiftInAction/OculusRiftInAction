@@ -22,6 +22,11 @@ public:
     }
   }
 
+  virtual ~SensorFusionPredictionExample() {
+    ovrHmd_Destroy(hmd);
+    hmd = nullptr;
+  }
+
   void createRenderingTarget() {
     createWindow(glm::uvec2(1280, 800), glm::ivec2(100, 100));
   }
