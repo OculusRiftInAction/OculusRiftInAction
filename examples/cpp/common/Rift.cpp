@@ -2,15 +2,26 @@
 #include <OVR_CAPI_GL.h>
 
 RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
+  Platform::sleepMillis(200);
   if (!ovrHmd_StartSensor(hmd, 0, 0)) {
     SAY_ERR("Could not attach to sensor device");
   }
 
+  memset(eyeTextures, 0, 2 * sizeof(ovrGLTexture));
   float eyeHeight = 1.5f;
   player = glm::inverse(glm::lookAt(
     glm::vec3(0, eyeHeight, 4),
     glm::vec3(0, eyeHeight, 0),
     glm::vec3(0, 1, 0)));
+
+  for_each_eye([&](ovrEyeType eye){
+    ovrSizei eyeTextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
+
+    ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].OGL.Header;
+    eyeTextureHeader.TextureSize = eyeTextureSize;
+    eyeTextureHeader.RenderViewport.Size = eyeTextureSize;
+    eyeTextureHeader.API = ovrRenderAPI_OpenGL;
+  });
 }
 
 RiftApp::~RiftApp() {
@@ -28,30 +39,17 @@ void RiftApp::initGl() {
   query = gl::TimeQueryPtr(new gl::TimeQuery());
   GL_CHECK_ERROR;
 
-  ovrFovPort eyeFovPorts[2];
-  for_each_eye([&](ovrEyeType eye){
-    ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
-    eyeFovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
-    ovrSizei eyeTextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
-    frameBuffers[eye].init(Rift::fromOvr(eyeTextureSize));
-
-    eyeTextureHeader.RenderViewport.Size = eyeTextureSize;
-    eyeTextureHeader.RenderViewport.Pos.x = 0;
-    eyeTextureHeader.RenderViewport.Pos.y = 0;
-    eyeTextureHeader.API = ovrRenderAPI_OpenGL;
-    eyeTextureHeader.TextureSize = eyeTextureSize;
-  });
 
   ovrGLConfig cfg;
+  memset(&cfg, 0, sizeof(cfg));
   cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
   cfg.OGL.Header.RTSize = hmdDesc.Resolution;
   cfg.OGL.Header.Multisample = 1;
 
   int distortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp;
-  int renderCaps = 0;
 
   int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
-    renderCaps, eyeFovPorts, eyeRenderDescs);
+    distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
 
   float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
   for_each_eye([&](ovrEyeType eye){
@@ -74,14 +72,10 @@ void RiftApp::initGl() {
 
   // Allocate the frameBuffer that will hold the scene, and then be
   // re-rendered to the screen with distortion
-  glm::uvec2 frameBufferSize = glm::uvec2(
-    glm::vec2(eyeTextures[0].Header.RenderViewport.Size.w, eyeTextures[0].Header.RenderViewport.Size.h));
+  glm::uvec2 frameBufferSize = Rift::fromOvr(eyeTextures[0].OGL.Header.TextureSize);
   for_each_eye([&](ovrEyeType eye) {
     frameBuffers[eye].init(frameBufferSize);
-    eyeTextures[eye].Header.API = ovrRenderAPI_OpenGL;
-    eyeTextures[eye].Header.TextureSize = eyeTextures[0].Header.RenderViewport.Size;
-    eyeTextures[eye].Header.RenderViewport = eyeTextures[0].Header.RenderViewport;
-    ((ovrGLTexture&)eyeTextures[eye]).OGL.TexId = frameBuffers[eye].color->texture;
+    eyeTextures[eye].OGL.TexId = frameBuffers[eye].color->texture;
   });
   GL_CHECK_ERROR;
 }
@@ -140,7 +134,7 @@ void RiftApp::draw() {
       renderScene();
       frameBuffers[eye].deactivate();
 
-      ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeTextures[eye]);
+      ovrHmd_EndEyeRender(hmd, eye, renderPose, &(eyeTextures[eye].Texture));
     });
     GL_CHECK_ERROR;
   });
