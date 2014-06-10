@@ -226,7 +226,7 @@ protected:
   ovrPosef  headPose;
 
 private:
-  ovrTexture eyeTextures[2];
+  ovrGLTexture eyeTextures[2];
   ovrEyeRenderDesc eyeRenderDescs[2];
   gl::FrameBufferWrapper frameBuffers[2];
   glm::mat4 projections[2];
@@ -235,7 +235,6 @@ private:
 
 protected:
   void renderStringAt(const std::string & str, float x, float y);
-  virtual void createRenderingTarget();
   virtual void initGl();
   virtual void finishFrame();
   virtual void onKey(int key, int scancode, int action, int mods);
