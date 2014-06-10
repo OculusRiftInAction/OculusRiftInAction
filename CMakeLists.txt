@@ -125,10 +125,16 @@ set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
+find_package( Boost QUIET)
+include_directories(${Boost_INCLUDE_DIRS})
+LINK_DIRECTORIES( C:\\dev\\boost_1_55_0_32\\lib32-msvc-12.0 )
+
 # Computer vision library with advanced image loading and manipulation 
 # functionality.  
 # OpenCV is OPTIONAL.  
-#find_package( OpenCV QUIET)
+
+
+find_package( OpenCV QUIET)
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})

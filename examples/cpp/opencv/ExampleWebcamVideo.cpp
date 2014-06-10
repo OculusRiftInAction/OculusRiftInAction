@@ -133,6 +133,8 @@ private:
   glm::uvec2 imageSize;
 
 protected:
+  double lastFrameTimes[2];
+
   WebcamHandler() {
     if (!videoCapture.grab()) {
       FAIL("Failed grab");
@@ -156,6 +158,8 @@ protected:
       if (!videoCapture.grab()) {
         FAIL("Failed grab");
       }
+      lastFrameTimes[0] = lastFrameTimes[1];
+      lastFrameTimes[1] = ovr_GetTimeInSeconds();
       // Wait for OpenGL to consume a frame before fetching a new one
       while (frameChanged) {
         Platform::sleepMillis(10);
@@ -193,11 +197,10 @@ protected:
 #endif
   gl::GeometryPtr videoGeometry;
   glm::quat predictionDelta;
-  glm::quat riftOrientation;
   float videoFps{ 0 };
   bool strabsimusCorrectionEnabled;
-  float webcamLatency{ 0.161f };
-  float riftLatency{ 0.028f };
+  float webcamLatency{ 0.361f };
+  glm::quat webcamOrientation;
   time_t lastWebcamImage;
   glm::vec4 k{ 5.37f, 3.83f, -4.2f, 25.0f};
   float scale{ 0.69f };
@@ -205,10 +208,6 @@ protected:
 public:
 
   WebcamApp() : currentTexture(0) {
-#ifdef USE_RIFT
-    sensorFusion.SetGravityEnabled(true);
-    sensorFusion.SetPredictionEnabled(true);
-#endif
     startCapture();
   }
 
@@ -224,40 +223,6 @@ public:
       return;
     }
     switch (key) {
-#if 0
-    case GLFW_KEY_Y:
-      k[0] += (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-    case GLFW_KEY_H:
-      k[0] -= (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-    case GLFW_KEY_U:
-      k[1] += (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-    case GLFW_KEY_J:
-      k[1] -= (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-    case GLFW_KEY_I:
-      k[2] += (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-    case GLFW_KEY_K:
-      k[2] -= (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-    case GLFW_KEY_O:
-      k[3] += (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-    case GLFW_KEY_L:
-      k[3] -= (mods & GLFW_MOD_SHIFT) ? 0.1 : 0.01;
-      videoGeometry = DistortionHelper(k).createDistortionMesh(glm::uvec2(64, 64), glm::aspect(getCaptureSize()));
-      return;
-#endif
     case GLFW_KEY_LEFT_BRACKET:
       scale += (mods & GLFW_MOD_SHIFT) ? 0.1f : 0.01f;
       return;
@@ -267,18 +232,11 @@ public:
 
 #ifdef USE_RIFT
     case GLFW_KEY_P:
-      sensorFusion.SetPredictionEnabled(!sensorFusion.IsPredictionEnabled());
       break;
     case GLFW_KEY_UP:
-      if (sensorFusion.IsPredictionEnabled()) {
-        sensorFusion.SetPrediction(sensorFusion.GetPredictionDelta() + 0.01f, true);
-      }
       // videoCapture.set(CV_CAP_PROP_FOCUS, videoCapture.get(CV_CAP_PROP_FOCUS) + 5);
       return;
     case GLFW_KEY_DOWN:
-      if (sensorFusion.IsPredictionEnabled()) {
-        sensorFusion.SetPrediction(sensorFusion.GetPredictionDelta() - 0.01f, true);
-      }
       // videoCapture.set(CV_CAP_PROP_FOCUS, videoCapture.get(CV_CAP_PROP_FOCUS) - 5);
       return;
 #endif
@@ -310,19 +268,17 @@ public:
       currentTexture = (currentTexture + 1) % TEXTURES;
       textures[currentTexture]->bind();
       textures[currentTexture]->image2d(getCaptureSize(), getCaptureResult().data, 0, GL_BGR);
+      webcamLatency = lastFrameTimes[1] - lastFrameTimes[0];
       frameChanged = false;
       lastWebcamImage = Platform::elapsedMillis();
     }
 
 #ifdef USE_RIFT
-    riftOrientation = Rift::fromOvr(sensorFusion.GetPredictedOrientation(riftLatency));
-
-#ifdef LATENCY_TEST
-    latencyTest.ProcessInputs();
-#endif
-    float currentWebcamLatency = (float)(Platform::elapsedMillis() - lastWebcamImage) / 1000.0f;
-    glm::quat webcamRiftOrientation = Rift::fromOvr(sensorFusion.GetPredictedOrientation(webcamLatency + riftLatency - currentWebcamLatency));
-    predictionDelta = webcamRiftOrientation * glm::inverse(Rift::fromOvr(sensorFusion.GetOrientation()));
+    double currentWebcamLatency = (float)(Platform::elapsedMillis() - lastWebcamImage) / 1000.0f;
+    double webcamPredictionTime = ovr_GetTimeInSeconds() - currentWebcamLatency;
+    ovrSensorState webcamState = ovrHmd_GetSensorState(hmd, webcamPredictionTime);
+    webcamOrientation = Rift::fromOvr(webcamState.Predicted.Pose.Orientation);
+    predictionDelta = webcamOrientation; //* glm::inverse(Rift::fromOvr(webcamState.Recorded.Pose.Orientation));
 
     gl::Stacks::modelview().top() = glm::lookAt(glm::vec3(0, 0, 2.0f), glm::vec3(), GlUtils::Y_AXIS);
 #endif
@@ -336,11 +292,13 @@ public:
     glEnable(GL_DEPTH_TEST);
     gl::clearColor(glm::vec3(0.05f, 0.05f, 0.05f));
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    glDisable(GL_DEPTH_TEST);
+    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     gl::MatrixStack & mv = gl::Stacks::modelview();
     mv.with_push([&]{
       mv.preMultiply(glm::mat4_cast(predictionDelta));
       mv.scale(scale);
+      mv.scale(0.8f);
 
       gl::ProgramPtr videoRenderProgram = GlUtils::getProgram(
         Resource::SHADERS_TEXTURED_VS,
@@ -354,12 +312,12 @@ public:
       gl::Program::clear();
     });
 
-    mv.with_push([&]{
-      mv.translate(glm::vec2(0.9, -0.6));
-      mv.rotate(riftOrientation);
-      mv.scale(0.4f);
-      GlUtils::renderArtificialHorizon(0.4f);
-    });
+    //mv.with_push([&]{
+    //  mv.translate(glm::vec2(0.9, -0.6));
+    //  mv.rotate(riftOrientation);
+    //  mv.scale(0.4f);
+    //  GlUtils::renderArtificialHorizon(0.4f);
+    //});
 
 
     //glDisable(GL_DEPTH_TEST);
