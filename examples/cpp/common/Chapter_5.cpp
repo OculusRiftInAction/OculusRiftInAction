@@ -15,7 +15,7 @@ void Chapter_5::initGl() {
 }
 
 void Chapter_5::onKey(int key, int scancode, int action, int mods) {
-  if (CameraControl::instance().onKey(camera, key, scancode, action, mods)) {
+  if (CameraControl::instance().onKey(key, scancode, action, mods)) {
     return;
   }
 
@@ -36,9 +36,10 @@ void Chapter_5::onKey(int key, int scancode, int action, int mods) {
 }
 
 void Chapter_5::update() {
-  // We invert the camera matrix to generate a player matrix,
+
+  // We invert the camera matrix to generate a "player" matrix,
   // because our interaction code works from the player's point
-  // of view instead of the world's point of view.
+  // of view instead of the world's view of the camera.
   glm::mat4 player = glm::inverse(camera);
   CameraControl::instance().applyInteraction(player);
   camera = glm::inverse(player);
