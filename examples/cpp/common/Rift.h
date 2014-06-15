@@ -113,11 +113,12 @@ protected:
 public:
   RiftManagerApp() {
     hmd = ovrHmd_Create(0);
-    if (NULL != hmd) {
-      ovrHmd_GetDesc(hmd, &hmdDesc);
-      hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
-      hmdDesktopPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
+    if (NULL == hmd) {
+      hmd = ovrHmd_CreateDebug(ovrHmd_None);
     }
+    ovrHmd_GetDesc(hmd, &hmdDesc);
+    hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
+    hmdDesktopPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
   }
 };
 
