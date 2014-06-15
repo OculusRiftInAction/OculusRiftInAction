@@ -24,6 +24,7 @@ class CameraControl {
   bool spacemouseEnabled;
   bool joystickEnabled;
   glm::ivec3 keyboardTranslate;
+  glm::ivec3 keyboardRotate;
 
   CameraControl();
   public:
