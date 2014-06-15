@@ -21,9 +21,14 @@ public:
     eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
         glm::vec3(-ipd / 2.0f, 0, 0));
     windowSize = glm::uvec2(1280, 800);
+
+    if (!ovrHmd_StartSensor(hmd, ovrSensorCap_Orientation, 0)) {
+      FAIL("Unable to locate Rift sensor device");
+    }
   }
 
   virtual ~SimpleScene() {
+    ovrHmd_StopSensor(hmd);
     ovrHmd_Destroy(hmd);
   }
 
@@ -67,18 +72,23 @@ public:
   virtual void draw() {
     ovrHmd_BeginFrame(hmd, frameIndex++);
 
+    ovrSensorState sensorState = ovrHmd_GetSensorState(hmd, 0);
+    ovrPoseStatef & poseState = sensorState.Recorded;
+    glm::mat4 orientation = glm::inverse(Rift::fromOvr(poseState.Pose));
+
     gl::MatrixStack & mv = gl::Stacks::modelview();
     for (int i = 0; i < ovrEye_Count; ++i) {
       ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
       PerEyeArg & eyeArgs = eyes[eye];
-      gl::Stacks::projection().top() = eyeArgs.projection;
-
       ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
+
+      gl::Stacks::projection().top() = eyeArgs.projection;
 
       eyeArgs.frameBuffer.withFramebufferActive([&]{
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         gl::Stacks::with_push(mv, [&]{
           mv.preMultiply(eyeArgs.modelviewOffset);
+          mv.preMultiply(orientation);
           drawChapter5Scene();
         });
       });
