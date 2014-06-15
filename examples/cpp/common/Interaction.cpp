@@ -77,33 +77,35 @@ bool CameraControl::onKey(glm::mat4 & camera, int key, int scancode, int action,
   if (GLFW_PRESS != action && GLFW_RELEASE != action) {
     return false;
   }
-
-
-  static int x = 0;
-  static int z = 0;
-  bool eatKey = false;
+  SAY("KEY %s: %c", (GLFW_PRESS == action) ? "pressed" : "released", key);
+  int update = (GLFW_PRESS == action) ? 1 : 0;
   switch (key) {
   case GLFW_KEY_A:
-    keyboardTranslate.x += (GLFW_PRESS == action) ? -1 : 1;
-    eatKey = true;
-    break;
-
+    keyboardTranslate.x = -update; return true;
   case GLFW_KEY_D:
-    keyboardTranslate.x += (GLFW_PRESS == action) ? 1 : -1;
-    eatKey = true;
-    break;
-
-  case GLFW_KEY_S:
-    keyboardTranslate.z += (GLFW_PRESS == action) ? 1 : -1;
-    eatKey = true;
-    break;
-
+    keyboardTranslate.x = update; return true;
   case GLFW_KEY_W:
-    keyboardTranslate.z += (GLFW_PRESS == action) ? -1 : 1;
-    eatKey = true;
-    break;
+    keyboardTranslate.z = -update; return true;
+  case GLFW_KEY_S:
+    keyboardTranslate.z = update; return true;
+  case GLFW_KEY_C:
+    keyboardTranslate.y = -update; return true;
+  case GLFW_KEY_F:
+    keyboardTranslate.y = update; return true;
+  case GLFW_KEY_UP:
+    keyboardRotate.x = -update; return true;
+  case GLFW_KEY_DOWN:
+    keyboardRotate.x = update; return true;
+  case GLFW_KEY_RIGHT:
+    keyboardRotate.y = -update; return true;
+  case GLFW_KEY_LEFT:
+    keyboardRotate.y = update; return true;
+  case GLFW_KEY_Q:
+    keyboardRotate.z = -update; return true;
+  case GLFW_KEY_E:
+    keyboardRotate.z = update; return true;
   }
-  return eatKey;
+  return false;
 }
 
 #ifdef HAVE_SIXENSE
@@ -218,7 +220,6 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
       scaleMod += 1.0f;
       scale /= scaleMod;
 
-
       translation = joystick->getCalibratedVector(
           STICK_POV_X,
           STICK_POV_Y,
@@ -245,9 +246,20 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
     recompose(camera);
   }
 
-  //SAY("%d %d", keyboardTranslate.x, keyboardTranslate.z);
-  translateCamera(camera, glm::vec3(keyboardTranslate) / 100.0f);
-
+  static DWORD lastKeyboardUpdateTick = 0;
+  DWORD now = GetTickCount();
+  if (0 != lastKeyboardUpdateTick) {
+    float dt = (now - lastKeyboardUpdateTick) / 1000.0f;
+    if (keyboardRotate.x || keyboardRotate.y || keyboardRotate.z) {
+      const glm::quat delta = glm::quat(glm::vec3(keyboardRotate) * dt);
+      rotateCamera(camera, delta);
+    }
+    if (keyboardTranslate.x || keyboardTranslate.y || keyboardTranslate.z) {
+      const glm::vec3 delta = glm::vec3(keyboardTranslate) * dt;
+      translateCamera(camera, delta);
+    }
+  }
+  lastKeyboardUpdateTick = now;
 }
 
 //
