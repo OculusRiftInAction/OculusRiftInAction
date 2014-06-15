@@ -15,7 +15,7 @@ void Chapter_5::initGl() {
 }
 
 void Chapter_5::onKey(int key, int scancode, int action, int mods) {
-  if (CameraControl::instance().onKey(key, scancode, action, mods)) {
+  if (CameraControl::instance().onKey(camera, key, scancode, action, mods)) {
     return;
   }
 
@@ -36,12 +36,18 @@ void Chapter_5::onKey(int key, int scancode, int action, int mods) {
 }
 
 void Chapter_5::update() {
+  // We invert the camera matrix to generate a player matrix,
+  // because our interaction code works from the player's point
+  // of view instead of the world's point of view.
+  glm::mat4 player = glm::inverse(camera);
   CameraControl::instance().applyInteraction(player);
-  gl::Stacks::modelview().top() = player;
+  camera = glm::inverse(player);
+
+  gl::Stacks::modelview().top() = camera;
 }
 
 void Chapter_5::resetCamera() {
-  player = glm::lookAt(
+  camera = glm::lookAt(
       glm::vec3(0, eyeHeight, 0.5f),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),     // Where the camera is looking
       GlUtils::Y_AXIS);               // Camera up axis
