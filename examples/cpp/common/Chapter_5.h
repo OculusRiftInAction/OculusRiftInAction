@@ -6,7 +6,7 @@ class Chapter_5: public RiftGlfwApp
 protected:
   float ipd;
   float eyeHeight;
-  glm::mat4 player;
+  glm::mat4 camera;
 
 public:
   Chapter_5();
