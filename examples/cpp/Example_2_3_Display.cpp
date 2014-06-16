@@ -1,11 +1,11 @@
 #include "Common.h"
 
-class Display : public GlfwApp {
+class RiftDisplay : public GlfwApp {
 glm::uvec2 eyeSize;
 ovrHmd hmd;
 
 public:
-Display() {
+RiftDisplay() {
   hmd = ovrHmd_Create(0);
   if (!hmd) {
     FAIL("Unable to detect Rift display");
@@ -55,4 +55,4 @@ void draw() {
 }
 };
 
-RUN_OVR_APP(Display);
+RUN_OVR_APP(RiftDisplay);
