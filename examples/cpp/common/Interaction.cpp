@@ -246,8 +246,8 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
     recompose(camera);
   }
 
-  static DWORD lastKeyboardUpdateTick = 0;
-  DWORD now = GetTickCount();
+  static uint32_t lastKeyboardUpdateTick = 0;
+  uint32_t now = Platform::elapsedMillis();
   if (0 != lastKeyboardUpdateTick) {
     float dt = (now - lastKeyboardUpdateTick) / 1000.0f;
     if (keyboardRotate.x || keyboardRotate.y || keyboardRotate.z) {
