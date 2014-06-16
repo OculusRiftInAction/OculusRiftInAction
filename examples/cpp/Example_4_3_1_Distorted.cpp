@@ -29,13 +29,13 @@ public:
       ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
       memset(eyeTextures + eye, 0, sizeof(eyeTextures[eye]));
         eyeFovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
-      eyeTextureHeader.TextureSize = 
+      eyeTextureHeader.TextureSize =
         ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
       eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.RenderViewport.Pos.x = 0;
       eyeTextureHeader.RenderViewport.Pos.y = 0;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
-      sceneTextures[eye] = 
+      sceneTextures[eye] =
         GlUtils::getImageAsTexture(SCENE_IMAGES[eye]);
       ((ovrGLTextureData&)eyeTextures[eye]).TexId =
         sceneTextures[eye]->texture;
@@ -46,10 +46,10 @@ public:
     cfg.Header.RTSize = hmdDesc.Resolution;
     cfg.Header.Multisample = 1;
 
-    int distortionCaps = ovrDistortionCap_Chromatic 
+    int distortionCaps = ovrDistortionCap_Chromatic
       | ovrDistortionCap_TimeWarp
       | ovrDistortionCap_NoSwapBuffers;
-    int configResult = ovrHmd_ConfigureRendering(hmd, &cfg, 
+    int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
       distortionCaps, eyeFovPorts, eyeRenderDescs);
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
@@ -62,7 +62,6 @@ public:
     glClear(GL_COLOR_BUFFER_BIT);
     for_each_eye([&](ovrEyeType eye) {
       ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
-      Sleep(9);
       ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeTextures[eye]);
     });
     glDisable(GL_CULL_FACE);
