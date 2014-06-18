@@ -4,9 +4,15 @@
 class Chapter_5: public RiftGlfwApp
 {
 protected:
+  gl::ProgramPtr program;
+  gl::GeometryPtr cube;
+  gl::GeometryPtr wireCube;
+
   float ipd;
   float eyeHeight;
   glm::mat4 camera;
+
+  void drawCube(const glm::vec3 & translate, const glm::vec3 & scale = GlUtils::ONE, bool wire = false);
 
 public:
   Chapter_5();

@@ -1,6 +1,8 @@
 #include "Common.h"
 #include "Chapter_5.h"
 
+const glm::vec3 FLOOR_CUBE = glm::vec3(0.975f, 0.975f, 0.975f);
+
 Chapter_5::Chapter_5() {
   ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
   eyeHeight = ovrHmd_GetFloat(hmd,
@@ -11,7 +13,16 @@ Chapter_5::Chapter_5() {
 
 void Chapter_5::initGl() {
   RiftGlfwApp::initGl();
-  gl::clearColor(Colors::darkGrey);
+
+  program = GlUtils::getProgram(
+      Resource::SHADERS_LITCOLORED_VS,
+      Resource::SHADERS_LITCOLORED_FS);
+  cube = GlUtils::getColorCubeGeometry();
+  wireCube = GlUtils::getWireCubeGeometry();
+
+  glLineWidth(4);  // TODO(alex) Why doesn't this have any effect?
+  glClearColor(0.65f, 0.65f, 0.65f, 1);
+  gl::Stacks::lights().addLight(glm::vec4(50, 50, 50, 1));
 }
 
 void Chapter_5::onKey(int key, int scancode, int action, int mods) {
@@ -23,9 +34,7 @@ void Chapter_5::onKey(int key, int scancode, int action, int mods) {
   case GLFW_KEY_R:
     if (GLFW_PRESS == action) {
       resetCamera();
-      if (NULL != hmd) {
-        ovrHmd_ResetSensor(hmd);
-      }
+      ovrHmd_ResetSensor(hmd);
     }
     return;
 
@@ -55,16 +64,12 @@ void Chapter_5::resetCamera() {
 }
 
 void Chapter_5::drawChapter5Scene() {
-  glm::vec3 scale = glm::vec3(0.975f, 0.975f, 0.975f);
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  const gl::ProgramPtr & program = GlUtils::getProgram(
-      Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
-  const gl::GeometryPtr & geometry = GlUtils::getColorCubeGeometry();
-
   program->use();
-  geometry->bindVertexArray();
   gl::Stacks::lights().apply(*program);
   gl::Stacks::projection().apply(*program);
+
+  // Bind solid cube geometry
+  cube->bindVertexArray();
 
   // Draw arches made of cubes.
   for (int x = -10; x <= 10; x++) {
@@ -73,11 +78,7 @@ void Chapter_5::drawChapter5Scene() {
         glm::vec3 pos(x, y, z);
         float len = glm::length(pos);
         if (len > 11 && len < 12) {
-          gl::Stacks::with_push(mv, [&]{
-            mv.translate(pos);
-            mv.apply(*program);
-            geometry->draw();
-          });
+          drawCube(pos);
         }
       }
     }
@@ -86,33 +87,36 @@ void Chapter_5::drawChapter5Scene() {
   // Draw a floor made of cubes.
   for (int x = -10; x <= 10; x++) {
     for (int z = -10; z <= 10; z++) {
-      glm::vec3 pos(x, -0.5f, z);
-      gl::Stacks::with_push(mv, [&]{
-        mv.translate(pos);
-        mv.scale(scale);
-        mv.apply(*program);
-        geometry->draw();
-      });
+      drawCube(glm::vec3(x, -0.5f, z), FLOOR_CUBE);
     }
   }
 
   // Draw a single cube at the center of the room,
   // at eye height.
-  gl::Stacks::with_push(mv, [&]{
-    mv.translate(glm::vec3(0, eyeHeight, 0));
-    mv.scale(ipd);
-    mv.apply(*program);
-    geometry->draw();
-  });
+  drawCube(glm::vec3(0, eyeHeight, 0), glm::vec3(ipd));
 
   // Put the cube on a pedestal.
-  gl::Stacks::with_push(mv, [&]{
-    mv.translate(glm::vec3(0, eyeHeight / 2, 0));
-    mv.scale(glm::vec3(ipd / 2, eyeHeight, ipd / 2));
-    mv.apply(*program);
-    geometry->draw();
-  });
+  drawCube(glm::vec3(0, eyeHeight / 2, 0), glm::vec3(ipd / 2, eyeHeight, ipd / 2));
+
+  // Done with the solid cube geometry
+  cube->unbindVertexArray();
+
+  // Wireframe the central cube and its pedestal.
+  wireCube->bindVertexArray();
+  drawCube(glm::vec3(0, eyeHeight, 0), glm::vec3(ipd + 0.0001), true);
+  drawCube(glm::vec3(0, eyeHeight / 2, 0), glm::vec3(ipd / 2 + 0.0001, eyeHeight, ipd / 2 + 0.0001), true);
+  wireCube->unbindVertexArray();
 
   gl::VertexArray::unbind();
   gl::Program::clear();
+}
+
+void Chapter_5::drawCube(const glm::vec3 & translate, const glm::vec3 & scale, bool wire) {
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  gl::Stacks::with_push(mv, [&]{
+    mv.translate(translate);
+    mv.scale(scale);
+    mv.apply(*program);
+    (wire ? wireCube : cube)->draw();
+  });
 }
