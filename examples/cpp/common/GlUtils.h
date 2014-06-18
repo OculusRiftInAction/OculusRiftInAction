@@ -36,6 +36,7 @@ public:
 
   static gl::GeometryPtr getColorCubeGeometry();
   static gl::GeometryPtr getCubeGeometry();
+  static gl::GeometryPtr getWireCubeGeometry();
 
   static gl::GeometryPtr getQuadGeometry(
     float aspect, float size = 2.0f
@@ -221,6 +222,7 @@ public:
   static const glm::vec3 Y_AXIS;
   static const glm::vec3 Z_AXIS;
   static const glm::vec3 ORIGIN;
+  static const glm::vec3 ONE;
   static const glm::vec3 UP;
 };
 
