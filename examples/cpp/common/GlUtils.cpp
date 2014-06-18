@@ -220,8 +220,7 @@ const glm::vec3 CUBE_FACE_COLORS[] = { //
         Colors::magenta, };
 
 // 6 sides * 2 triangles * 3 vertices
-const GLuint CUBE_INDICES[
-CUBE_FACE_COUNT * TRIANGLES_PER_FACE * VERTICES_PER_TRIANGLE] = { //
+const GLuint CUBE_INDICES[CUBE_FACE_COUNT * TRIANGLES_PER_FACE * VERTICES_PER_TRIANGLE] = { //
     0, 1, 2, 2, 1, 3, // X Positive
     2, 3, 6, 6, 3, 7, // X Negative
     6, 7, 4, 4, 7, 5, // Y Positive
@@ -230,52 +229,21 @@ CUBE_FACE_COUNT * TRIANGLES_PER_FACE * VERTICES_PER_TRIANGLE] = { //
     4, 0, 6, 6, 0, 2, // Z Negative
 };
 
-const unsigned int CUBE_WIRE_INDICES[CUBE_EDGE_COUNT * VERTICES_PER_EDGE] =
-    { //
-    0, 1, 1, 2, 2, 3, 3, 0, // square
-    4, 5, 5, 6, 6, 7, 7, 4, // facing square
+const unsigned int CUBE_WIRE_INDICES[CUBE_EDGE_COUNT * VERTICES_PER_EDGE] = { //
+    0, 1, 1, 3, 3, 2, 2, 0, // square
+    4, 5, 5, 7, 7, 6, 6, 4, // facing square
     0, 4, 1, 5, 2, 6, 3, 7, // transverse lines
-    };
+};
 
-//
-//// Mirror Z style
-//const glm::vec3 QUAD_VERTICES[4] = { //
-//  glm::vec3(-1, -1, 0),
-//  glm::vec3(+1, -1, 0),
-//  glm::vec3(-1, +1, 0),
-//  glm::vec3(+1, +1, 0),
-//};
-//
-//// Triangle strip
-//const GLuint QUAD_INDICES[4] = { //
-//    0, 1, 2, 3
-//};
 
 const glm::vec3 GlUtils::X_AXIS = glm::vec3(1.0f, 0.0f, 0.0f);
 const glm::vec3 GlUtils::Y_AXIS = glm::vec3(0.0f, 1.0f, 0.0f);
 const glm::vec3 GlUtils::Z_AXIS = glm::vec3(0.0f, 0.0f, 1.0f);
 const glm::vec3 GlUtils::ORIGIN = glm::vec3(0.0f, 0.0f, 0.0f);
+const glm::vec3 GlUtils::ONE = glm::vec3(1.0f, 1.0f, 1.0f);
 const glm::vec3 GlUtils::UP = glm::vec3(0.0f, 1.0f, 0.0f);
 
-//VertexBufferPtr GlUtils::getQuadVertices() {
-//  VertexBufferPtr result(new VertexBuffer());
-//  // Create the buffers for the texture quad we will draw
-//  result->bind();
-//  (*result) << gl::makeArrayLoader(QUAD_VERTICES);
-//  result->unbind();
-//  GL_CHECK_ERROR;
-//  return result;
-//}
-//
-//IndexBufferPtr GlUtils::getQuadIndices() {
-//  IndexBufferPtr result(new IndexBuffer());
-//  result->bind();
-//  (*result) << gl::makeArrayLoader(QUAD_INDICES);
-//  result->unbind();
-//  GL_CHECK_ERROR;
-//  return result;
-//}
-//
+
 gl::VertexBufferPtr getCubeVertices() {
   gl::VertexBufferPtr result(new gl::VertexBuffer());
   // Create the buffers for the texture quad we will draw
@@ -739,26 +707,10 @@ gl::GeometryPtr GlUtils::getColorCubeGeometry() {
   return geometry;
 }
 
-
 void GlUtils::drawColorCube(bool lit) {
-  // These hold the vertices, indices and the binding between the
-  // Shader variable names and the values loaded into video memory
-  /*
-  static GeometryPtr cubeGeometry(
-      new Geometry(getCubeVertices(), getCubeIndices(),
-      CUBE_FACE_COUNT * TRIANGLES_PER_FACE, 0));
-  static GeometryPtr cubeWireGeometry(
-      new Geometry(getCubeVertices(), getCubeWireIndices(),
-      CUBE_EDGE_COUNT * VERTICES_PER_EDGE, 0));
-      */
-  Resource vertexShader = lit ? Resource::SHADERS_LITCOLORED_VS :
-    Resource::SHADERS_COLORED_VS;
-  Resource fragmentShader = lit ? Resource::SHADERS_LITCOLORED_FS :
-    Resource::SHADERS_COLORED_FS;
-
-  const gl::ProgramPtr & renderProgram = GlUtils::getProgram(
-      Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
-  GlUtils::renderGeometry(getColorCubeGeometry(), renderProgram);
+  Resource fs = lit ? Resource::SHADERS_LITCOLORED_VS : Resource::SHADERS_COLORED_VS;
+  Resource vs = lit ? Resource::SHADERS_LITCOLORED_FS : Resource::SHADERS_COLORED_FS;
+  renderGeometry(getColorCubeGeometry(), getProgram(fs, vs));
 }
 
 void GlUtils::drawAngleTicks() {
@@ -835,24 +787,6 @@ void GlUtils::draw3dGrid() {
   renderGeometry(g, program);
   GL_CHECK_ERROR;
 }
-
-//void GlUtils::drawOrigin() {
-//  lineWidth(1.0);
-//  begin(LINES);
-//    color(vec3(0.25));
-//    color(X_AXIS / 1.5f);
-//    vertex(vec3(0));
-//    vertex(X_AXIS);
-//    color(Y_AXIS / 1.5f);
-//    vertex(vec3(0));
-//    vertex(Y_AXIS);
-//    color(Z_AXIS / 1.5f);
-//    vertex(vec3(0));
-//    vertex(Z_AXIS);
-//  end();
-//}
-//
-
 
 
 void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
@@ -1094,6 +1028,15 @@ gl::GeometryPtr GlUtils::getCubeGeometry() {
         12, 0, GL_TRIANGLES, 3));
   }
   return cube;
+}
+
+gl::GeometryPtr GlUtils::getWireCubeGeometry() {
+  static gl::GeometryPtr wireframe = 
+      gl::GeometryPtr(new gl::Geometry(
+          getCubeVertices(),
+          getCubeWireIndices(),
+          12, 0, GL_LINES, 3));
+  return wireframe;
 }
 
 static glm::vec3 AXES[] = {
