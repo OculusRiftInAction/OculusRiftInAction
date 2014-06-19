@@ -12,7 +12,7 @@ protected:
   float eyeHeight;
   glm::mat4 camera;
 
-  void drawCube(const glm::vec3 & translate, const glm::vec3 & scale = GlUtils::ONE, bool wire = false);
+  void drawCube(const glm::vec3 & translate, const glm::vec3 & scale = GlUtils::ONE);
 
 public:
   Chapter_5();
