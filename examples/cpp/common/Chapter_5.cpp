@@ -67,7 +67,6 @@ void Chapter_5::resetCamera() {
 }
 
 void Chapter_5::drawChapter5Scene() {
-
   program->use();
   gl::Stacks::lights().apply(*program);
   gl::Stacks::projection().apply(*program);
@@ -114,11 +113,15 @@ void Chapter_5::drawCube(const glm::vec3 & translate, const glm::vec3 & scale) {
     cube->unbindVertexArray();
 
     // Wire frame
-// gl::Stacks::projection().apply(*program);
-    mv.scale(1.001);
-    mv.apply(*program);
-    wireCube->bindVertexArray();
-    wireCube->draw();
-    wireCube->unbindVertexArray();
+    // Dolly the camera forward a smidge to offset the z-buffer
+    gl::MatrixStack & pv = gl::Stacks::projection();
+    gl::Stacks::with_push(pv, [&]{
+      pv.top() = glm::translate(glm::mat4(), glm::vec3(0, 0, -0.00001)) * pv.top();
+      pv.apply(*program);
+      wireCube->bindVertexArray();
+      wireCube->draw();
+      wireCube->unbindVertexArray();
+    });
+    pv.apply(*program);
   });
 }
