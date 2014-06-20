@@ -33,7 +33,7 @@ class CameraControl {
   void enableHydra(bool enable = true);
   void enableSpacemouse(bool enable = true);
   void enableJoystick(bool enable = true);
-  bool onKey(glm::mat4 & camera, int key, int scancode, int action, int mods);
+  bool onKey(int key, int scancode, int action, int mods);
 
 };
 

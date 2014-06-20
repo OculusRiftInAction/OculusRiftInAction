@@ -88,7 +88,7 @@ void RiftApp::onKey(int key, int scancode, int action, int mods) {
   }
 
   // Allow the camera controller to intercept the input
-  if (CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+  if (CameraControl::instance().onKey(key, scancode, action, mods)) {
     return;
   }
   RiftGlfwApp::onKey(key, scancode, action, mods);

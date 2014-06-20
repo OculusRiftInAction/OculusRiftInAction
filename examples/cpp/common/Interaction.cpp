@@ -73,7 +73,7 @@ static glm::quat getHydraOrientation(const sixenseControllerData & c) {
 }
 #endif
 
-bool CameraControl::onKey(glm::mat4 & camera, int key, int scancode, int action, int mods) {
+bool CameraControl::onKey(int key, int scancode, int action, int mods) {
   if (GLFW_PRESS != action && GLFW_RELEASE != action) {
     return false;
   }
