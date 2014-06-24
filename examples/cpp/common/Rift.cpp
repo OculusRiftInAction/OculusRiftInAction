@@ -26,8 +26,6 @@ RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
 
 RiftApp::~RiftApp() {
   ovrHmd_StopSensor(hmd);
-  ovrHmd_Destroy(hmd);
-  hmd = nullptr;
 }
 
 void RiftApp::finishFrame() {

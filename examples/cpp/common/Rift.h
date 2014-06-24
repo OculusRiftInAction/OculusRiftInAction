@@ -120,6 +120,11 @@ public:
     hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
     hmdDesktopPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
   }
+
+  virtual ~RiftManagerApp() {
+    ovrHmd_Destroy(hmd);
+    hmd = nullptr;
+  }
 };
 
 /**
@@ -204,6 +209,9 @@ public:
         FAIL("Unable to create undecorated window");
       }
     }
+  }
+
+  virtual ~RiftGlfwApp() {
   }
 
   virtual void viewport(ovrEyeType eye) {
