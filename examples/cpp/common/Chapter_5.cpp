@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "Chapter_5.h"
+#include <glm/gtx/string_cast.hpp>
 
 Chapter_5::Chapter_5() {
   ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
@@ -33,18 +34,19 @@ void Chapter_5::onKey(int key, int scancode, int action, int mods) {
     return;
   }
 
-  switch (key) {
-  case GLFW_KEY_R:
-    if (GLFW_PRESS == action) {
+  if (GLFW_PRESS == action) {
+    switch (key) {
+    case GLFW_KEY_R:
       resetCamera();
       ovrHmd_ResetSensor(hmd);
+      return;
+    case GLFW_KEY_LEFT_BRACKET:
+      SAY("%s", glm::to_string(camera));
+      return;
     }
-    return;
-
-  default:
-    RiftGlfwApp::onKey(key, scancode, action, mods);
-    return;
   }
+
+  RiftGlfwApp::onKey(key, scancode, action, mods);
 }
 
 void Chapter_5::update() {

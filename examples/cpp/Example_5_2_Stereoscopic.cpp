@@ -4,8 +4,10 @@
 static const glm::uvec2 WINDOW_SIZE(1280, 800);
 static const glm::ivec2 WINDOW_POS(100, 100);
 
-static const glm::uvec2 EYE_SIZE(WINDOW_SIZE.x / 2, WINDOW_SIZE.y);
-static const float EYE_ASPECT = glm::aspect(EYE_SIZE);
+static const glm::uvec2 EYE_SIZE(
+    WINDOW_SIZE.x / 2, WINDOW_SIZE.y);
+static const float EYE_ASPECT = 
+    glm::aspect(EYE_SIZE);
 
 struct PerEyeArg {
   glm::uvec2 viewportPosition;
@@ -20,13 +22,15 @@ public:
     gl::Stacks::projection().top() = glm::perspective(
         PI / 2.0f, EYE_ASPECT, 0.01f, 100.0f);
 
-    eyes[ovrEye_Left].viewportPosition = glm::uvec2(0, 0);
-    eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(ipd / 2.0f, 0, 0));
-
-    eyes[ovrEye_Right].viewportPosition = glm::uvec2(WINDOW_SIZE.x / 2, 0);
-    eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(-ipd / 2.0f, 0, 0));
+    glm::vec3 offset(ipd / 2.0f, 0, 0);
+    eyes[ovrEye_Left] = {
+      glm::uvec2(0, 0),
+      glm::translate(glm::mat4(), offset)
+    };
+    eyes[ovrEye_Right] = {
+      glm::uvec2(WINDOW_SIZE.x / 2, 0),
+      glm::translate(glm::mat4(), -offset)
+    };
   }
 
   virtual void createRenderingTarget() {
@@ -45,7 +49,7 @@ public:
         mv.preMultiply(eyeArgs.modelviewOffset);
         drawChapter5Scene();
       });
-    };
+    }
   }
 };
 
