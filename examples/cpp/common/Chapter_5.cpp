@@ -41,7 +41,14 @@ void Chapter_5::onKey(int key, int scancode, int action, int mods) {
       ovrHmd_ResetSensor(hmd);
       return;
     case GLFW_KEY_LEFT_BRACKET:
-      SAY("%s", glm::to_string(camera));
+      SAY("%s", glm::to_string(camera).c_str());
+      return;
+    case GLFW_KEY_RIGHT_BRACKET:
+      camera = glm::mat4x4(
+          1.000000, -0.000000, 0.000000, -0.000000,
+          -0.000000, 0.998896, -0.046983, 0.000000,
+          0.000000, 0.046983, 0.998896, -0.000000,
+          -0.000000, -2.200359, -15.852616, 1.000000);
       return;
     }
   }
