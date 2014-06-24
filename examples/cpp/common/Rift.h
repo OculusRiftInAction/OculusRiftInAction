@@ -48,7 +48,7 @@ public:
   }
 
   static inline glm::uvec2 fromOvr(const ovrSizei & ov) {
-    return glm::uvec2(ov.h, ov.w);
+    return glm::uvec2(ov.w, ov.h);
   }
 
   static inline glm::quat fromOvr(const ovrQuatf & oq) {
@@ -227,9 +227,9 @@ public:
 protected:
   glm::mat4 player;
   ovrPosef  headPose;
+  ovrGLTexture eyeTextures[2];
 
 private:
-  ovrGLTexture eyeTextures[2];
   ovrEyeRenderDesc eyeRenderDescs[2];
   gl::FrameBufferWrapper frameBuffers[2];
   glm::mat4 projections[2];

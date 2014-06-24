@@ -106,7 +106,8 @@ void RiftApp::draw() {
   ovrHmd_BeginFrame(hmd, frameIndex++);
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pr = gl::Stacks::projection();
-  for_each_eye([&](ovrEyeType eye) {
+  for (int i = 0; i < 2; ++i) {
+    ovrEyeType eye = currentEye = hmdDesc.EyeRenderOrder[i];
     gl::Stacks::with_push(pr, mv, [&]{
       const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
       // Set up the per-eye projection matrix
@@ -137,7 +138,7 @@ void RiftApp::draw() {
       ovrHmd_EndEyeRender(hmd, eye, renderPose, &(eyeTextures[eye].Texture));
     });
     GL_CHECK_ERROR;
-  });
+  }
   query->begin();
 #if 1
   glDisable(GL_CULL_FACE);
