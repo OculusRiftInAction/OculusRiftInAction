@@ -688,12 +688,18 @@ void GlUtils::renderRift() {
 
 
 void GlUtils::drawQuad(const glm::vec2 & min, const glm::vec2 & max) {
-  glBegin(GL_QUADS);
-  glVertex2f(min.x, min.y);
-  glVertex2f(max.x, min.y);
-  glVertex2f(max.x, max.y);
-  glVertex2f(min.x, max.y);
-  glEnd();
+  using namespace gl;
+  static GeometryPtr g;
+  if (!g) {
+    Mesh m;
+    m.addVertex(glm::vec3(min.x, max.y, 0));
+    m.addVertex(glm::vec3(min.x, min.y, 0));
+    m.addVertex(glm::vec3(max.x, max.y, 0));
+    m.addVertex(glm::vec3(max.x, min.y, 0));
+    g = m.getGeometry(GL_TRIANGLE_STRIP);
+  }
+  ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
+  renderGeometry(g, program);
 }
 
 gl::GeometryPtr GlUtils::getColorCubeGeometry() {

@@ -226,6 +226,10 @@ gl::GeometryPtr Mesh::getGeometry(GLenum elementType) const {
     elements = (unsigned int)indices.size() / 3;
 	  verticesPerElement = 3;
 	  break;
+  case GL_TRIANGLE_STRIP:
+    elements = (unsigned int)indices.size();
+    verticesPerElement = 1;
+    break;
   case GL_POINTS:
     elements = (unsigned int)indices.size();
     verticesPerElement = 1;

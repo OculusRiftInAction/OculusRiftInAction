@@ -114,7 +114,7 @@ public:
   RiftManagerApp() {
     hmd = ovrHmd_Create(0);
     if (NULL == hmd) {
-      hmd = ovrHmd_CreateDebug(ovrHmd_None);
+      hmd = ovrHmd_CreateDebug(ovrHmd_CrystalCoveProto);
     }
     ovrHmd_GetDesc(hmd, &hmdDesc);
     hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
@@ -252,8 +252,18 @@ protected:
   virtual void draw() final;
   virtual void update();
   virtual void renderScene() = 0;
+
+
   inline ovrEyeType getCurrentEye() const {
     return currentEye;
+  }
+
+  const ovrEyeRenderDesc & getEyeRenderDesc(ovrEyeType eye) const {
+    return eyeRenderDescs[eye];
+  }
+
+  const ovrFovPort & getFov(ovrEyeType eye) const {
+    return eyeRenderDescs[eye].Fov;
   }
 
   const glm::mat4 & getPerspectiveProjection(ovrEyeType eye) const {
@@ -262,6 +272,14 @@ protected:
 
   const glm::mat4 & getOrthographicProjection(ovrEyeType eye) const {
     return orthoProjections[eye];
+  }
+
+  const ovrFovPort & getFov() const {
+    return getFov(getCurrentEye());
+  }
+
+  const ovrEyeRenderDesc & getEyeRenderDesc() const {
+    return getEyeRenderDesc(getCurrentEye());
   }
 
   const glm::mat4 & getPerspectiveProjection() const {

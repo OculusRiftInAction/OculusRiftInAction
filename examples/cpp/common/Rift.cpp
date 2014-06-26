@@ -15,7 +15,7 @@ RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
     glm::vec3(0, 1, 0)));
 
   for_each_eye([&](ovrEyeType eye){
-    ovrSizei eyeTextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
+    ovrSizei eyeTextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.MaxEyeFov[eye], 1.0f);
 
     ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].OGL.Header;
     eyeTextureHeader.TextureSize = eyeTextureSize;
@@ -44,10 +44,12 @@ void RiftApp::initGl() {
   cfg.OGL.Header.RTSize = hmdDesc.Resolution;
   cfg.OGL.Header.Multisample = 1;
 
-  int distortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp;
+  int distortionCaps = 0 |
+    //ovrDistortionCap_Chromatic | 
+    ovrDistortionCap_TimeWarp;
 
   int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
-    distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
+    distortionCaps, hmdDesc.MaxEyeFov, eyeRenderDescs);
 
   float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
   for_each_eye([&](ovrEyeType eye){
