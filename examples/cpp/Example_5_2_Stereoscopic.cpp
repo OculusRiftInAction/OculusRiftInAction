@@ -15,7 +15,7 @@ struct PerEyeArg {
 };
 
 class SimpleScene : public Chapter_5 {
-  PerEyeArg eyes[2];
+  PerEyeArg       eyes[2];
 
 public:
   SimpleScene() {

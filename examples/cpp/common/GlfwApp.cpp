@@ -323,7 +323,7 @@ int GlfwApp::run() {
     if ((now - start) >= 2000) {
       float elapsed = (now - start) / 1000.f;
       fps = (float) framecount / elapsed;
-      SAY("FPS: %0.2f", fps);
+      SAY("FPS: %0.2f\n", fps);
       start = now;
       framecount = 0;
     }
