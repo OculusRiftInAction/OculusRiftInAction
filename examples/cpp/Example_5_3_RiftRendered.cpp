@@ -11,8 +11,8 @@ struct PerEyeArg {
 };
 
 class SimpleScene: public Chapter_5 {
-  PerEyeArg       eyes[2];
-  int             frameIndex{ 0 };
+  PerEyeArg eyes[2];
+  int frameIndex{ 0 };
 
 public:
   SimpleScene() {
@@ -20,11 +20,6 @@ public:
         glm::vec3(ipd / 2.0f, 0, 0));
     eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
         glm::vec3(-ipd / 2.0f, 0, 0));
-    windowSize = glm::uvec2(1280, 800);
-  }
-
-  virtual ~SimpleScene() {
-    ovrHmd_Destroy(hmd);
   }
 
   virtual void initGl() {

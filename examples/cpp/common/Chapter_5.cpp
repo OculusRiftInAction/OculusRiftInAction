@@ -41,9 +41,15 @@ void Chapter_5::onKey(int key, int scancode, int action, int mods) {
       ovrHmd_ResetSensor(hmd);
       return;
     case GLFW_KEY_LEFT_BRACKET:
-      SAY("%s", glm::to_string(camera).c_str());
+      camera = glm::translate(glm::mat4(), glm::quat(camera) * glm::vec3(ipd / 2, 0, 0)) * camera;
       return;
     case GLFW_KEY_RIGHT_BRACKET:
+      camera = glm::translate(glm::mat4(), glm::quat(camera) * glm::vec3(-ipd / 2, 0, 0)) * camera;
+      return;
+    case GLFW_KEY_0:
+      SAY("%s", glm::to_string(camera).c_str());
+      return;
+    case GLFW_KEY_1:
       camera = glm::mat4x4(
           1.000000, -0.000000, 0.000000, -0.000000,
           -0.000000, 0.998896, -0.046983, 0.000000,
@@ -76,9 +82,25 @@ void Chapter_5::resetCamera() {
 }
 
 void Chapter_5::drawChapter5Scene() {
+  gl::MatrixStack & pv = gl::Stacks::projection();
+
   program->use();
   gl::Stacks::lights().apply(*program);
-  gl::Stacks::projection().apply(*program);
+
+  pv.apply(*program);
+  drawLotsOfCubes(cube);
+
+  gl::Stacks::with_push(pv, [&]{
+    pv.preMultiply(glm::translate(glm::mat4(), glm::vec3(0, 0, -0.00001)));
+    pv.apply(*program);
+    drawLotsOfCubes(wireCube);
+  });
+
+  program->clear();
+}
+
+void Chapter_5::drawLotsOfCubes(gl::GeometryPtr & geometry) {
+  geometry->bindVertexArray();
 
   // Draw arches made of cubes.
   for (int x = -10; x <= 10; x++) {
@@ -87,7 +109,7 @@ void Chapter_5::drawChapter5Scene() {
         glm::vec3 pos(x, y, z);
         float len = glm::length(pos);
         if (len > 11 && len < 12) {
-          drawCube(pos);
+          drawGeometry(geometry, pos);
         }
       }
     }
@@ -96,41 +118,24 @@ void Chapter_5::drawChapter5Scene() {
   // Draw a floor made of cubes.
   for (int x = -12; x <= 12; x++) {
     for (int z = -12; z <= 12; z++) {
-      drawCube(glm::vec3(x, -0.5f, z));
+      drawGeometry(geometry, glm::vec3(x, -0.5f, z));
     }
   }
 
   // Draw a single cube at the center of the room, at eye height,
   // and put it on a pedestal.
-  drawCube(glm::vec3(0, eyeHeight, 0), glm::vec3(ipd));
-  drawCube(glm::vec3(0, eyeHeight / 2, 0), glm::vec3(ipd / 2, eyeHeight, ipd / 2));
+  drawGeometry(geometry, glm::vec3(0, eyeHeight, 0), glm::vec3(ipd));
+  drawGeometry(geometry, glm::vec3(0, eyeHeight / 2, 0), glm::vec3(ipd / 2, eyeHeight, ipd / 2));
 
-  gl::VertexArray::unbind();
-  gl::Program::clear();
+  geometry->unbindVertexArray();
 }
 
-void Chapter_5::drawCube(const glm::vec3 & translate, const glm::vec3 & scale) {
+void Chapter_5::drawGeometry(gl::GeometryPtr & geometry, const glm::vec3 & translate, const glm::vec3 & scale) {
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::Stacks::with_push(mv, [&]{
     mv.translate(translate);
     mv.scale(scale);
-
-    // Solid cube
-    mv.apply(*program);
-    cube->bindVertexArray();
-    cube->draw();
-    cube->unbindVertexArray();
-
-    // Wire frame
-    // Dolly the camera forward a smidge to offset the z-buffer
-    gl::MatrixStack & pv = gl::Stacks::projection();
-    gl::Stacks::with_push(pv, [&]{
-      pv.top() = glm::translate(glm::mat4(), glm::vec3(0, 0, -0.00001)) * pv.top();
-      pv.apply(*program);
-      wireCube->bindVertexArray();
-      wireCube->draw();
-      wireCube->unbindVertexArray();
-    });
-    pv.apply(*program);
+    mv.apply(program);
+    geometry->draw();
   });
 }

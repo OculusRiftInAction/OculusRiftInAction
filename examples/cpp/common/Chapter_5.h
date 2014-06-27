@@ -12,7 +12,8 @@ protected:
   float eyeHeight;
   glm::mat4 camera;
 
-  void drawCube(const glm::vec3 & translate, const glm::vec3 & scale = GlUtils::ONE);
+  void drawLotsOfCubes(gl::GeometryPtr & geometry);
+  void drawGeometry(gl::GeometryPtr & geometry, const glm::vec3 & translate, const glm::vec3 & scale = GlUtils::ONE);
 
 public:
   Chapter_5();

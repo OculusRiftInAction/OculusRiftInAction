@@ -20,16 +20,14 @@ public:
         glm::vec3(ipd / 2.0f, 0, 0));
     eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
         glm::vec3(-ipd / 2.0f, 0, 0));
-    windowSize = glm::uvec2(1280, 800);
 
     if (!ovrHmd_StartSensor(hmd, ovrSensorCap_Orientation, 0)) {
-      FAIL("Unable to locate Rift sensor device");
+      SAY("Warning: Unable to locate Rift sensor device.  Demo will be very boring.");
     }
   }
 
   virtual ~SimpleScene() {
     ovrHmd_StopSensor(hmd);
-    ovrHmd_Destroy(hmd);
   }
 
   virtual void initGl() {
