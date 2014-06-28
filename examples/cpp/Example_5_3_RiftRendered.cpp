@@ -1,6 +1,8 @@
 #include "Common.h"
 #include "Chapter_5.h"
 
+static const glm::uvec2 WINDOW_SIZE(1280, 800);
+
 struct PerEyeArg {
   glm::mat4                     modelviewOffset;
   glm::mat4                     projection;
@@ -20,11 +22,7 @@ public:
         glm::vec3(ipd / 2.0f, 0, 0));
     eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
         glm::vec3(-ipd / 2.0f, 0, 0));
-    windowSize = glm::uvec2(1280, 800);
-  }
-
-  virtual ~SimpleScene() {
-    ovrHmd_Destroy(hmd);
+    windowSize = WINDOW_SIZE;
   }
 
   virtual void initGl() {
@@ -34,8 +32,8 @@ public:
       PerEyeArg & eyeArg = eyes[eye];
       eyeArg.fovPort = hmdDesc.DefaultEyeFov[eye];
       ovrTextureHeader & textureHeader = eyeArg.texture.Texture.Header;
-      textureHeader.API = ovrRenderAPI_OpenGL;
       ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, eyeArg.fovPort, 1.0f);
+      textureHeader.API = ovrRenderAPI_OpenGL;
       textureHeader.TextureSize = texSize;
       textureHeader.RenderViewport.Size = texSize;
       textureHeader.RenderViewport.Pos.x = 0;
