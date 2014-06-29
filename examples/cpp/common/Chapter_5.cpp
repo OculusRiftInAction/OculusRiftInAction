@@ -14,7 +14,7 @@ void Chapter_5::initGl() {
   RiftGlfwApp::initGl();
 
   program = GlUtils::getProgram(
-      Resource::SHADERS_LITCOLORED_VS,
+      Resource::SHADERS_LITCOLOREDINSTANCED_VS,
       Resource::SHADERS_LITCOLORED_FS);
   cube = GlUtils::getColorCubeGeometry();
   wireCube = GlUtils::getWireCubeGeometry();
@@ -75,10 +75,12 @@ void Chapter_5::resetCamera() {
       GlUtils::Y_AXIS);               // Camera up axis
 }
 
-void Chapter_5::drawChapter5Scene() {
-  program->use();
-  gl::Stacks::lights().apply(*program);
-  gl::Stacks::projection().apply(*program);
+typedef std::vector<glm::mat4> VecXfm;
+
+VecXfm buildCubeScene(float eyeHeight, float ipd) {
+  VecXfm result;
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.push().identity();
 
   // Draw arches made of cubes.
   for (int x = -10; x <= 10; x++) {
@@ -87,7 +89,7 @@ void Chapter_5::drawChapter5Scene() {
         glm::vec3 pos(x, y, z);
         float len = glm::length(pos);
         if (len > 11 && len < 12) {
-          drawCube(pos);
+          result.push_back(glm::translate(glm::mat4(), pos));
         }
       }
     }
@@ -96,41 +98,53 @@ void Chapter_5::drawChapter5Scene() {
   // Draw a floor made of cubes.
   for (int x = -12; x <= 12; x++) {
     for (int z = -12; z <= 12; z++) {
-      drawCube(glm::vec3(x, -0.5f, z));
+      result.push_back(glm::translate(glm::mat4(), glm::vec3(x, -0.5f, z)));
     }
   }
 
   // Draw a single cube at the center of the room, at eye height,
   // and put it on a pedestal.
-  drawCube(glm::vec3(0, eyeHeight, 0), glm::vec3(ipd));
-  drawCube(glm::vec3(0, eyeHeight / 2, 0), glm::vec3(ipd / 2, eyeHeight, ipd / 2));
+  result.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd)));
+  result.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight / 2, 0)), glm::vec3(ipd / 2, eyeHeight, ipd / 2)));
+  return result;
+}
+
+void Chapter_5::drawChapter5Scene() {
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  gl::MatrixStack & pv = gl::Stacks::projection();
+
+  static int cubeCount;
+  static gl::VertexBufferPtr cubeTransforms;
+  if (!cubeTransforms) {
+    VecXfm foo = buildCubeScene(eyeHeight, ipd);
+    cubeTransforms = gl::VertexBufferPtr(new gl::VertexBuffer(foo));
+    cubeCount = foo.size();
+
+    cubeTransforms->bind();
+    cube->bindVertexArray();
+    cube->addInstanceVertexArray();
+
+    cubeTransforms->bind();
+    wireCube->bindVertexArray();
+    wireCube->addInstanceVertexArray();
+
+    gl::VertexArray::unbind();
+  }
+
+  program->use();
+  program->setUniform("InstanceTransformActive", 1);
+
+  gl::Stacks::lights().apply(*program);
+  gl::Stacks::projection().apply(*program);
+  gl::Stacks::modelview().apply(*program);
+
+  cube->bindVertexArray();
+  cube->drawInstanced(cubeCount);
+
+  wireCube->bindVertexArray();
+  gl::Stacks::projection().push().preTranslate(glm::vec3(0, 0, -0.00001)).apply(*program).pop();
+  wireCube->drawInstanced(cubeCount);
 
   gl::VertexArray::unbind();
   gl::Program::clear();
-}
-
-void Chapter_5::drawCube(const glm::vec3 & translate, const glm::vec3 & scale) {
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  gl::Stacks::with_push(mv, [&]{
-    mv.translate(translate);
-    mv.scale(scale);
-
-    // Solid cube
-    mv.apply(*program);
-    cube->bindVertexArray();
-    cube->draw();
-    cube->unbindVertexArray();
-
-    // Wire frame
-    // Dolly the camera forward a smidge to offset the z-buffer
-    gl::MatrixStack & pv = gl::Stacks::projection();
-    gl::Stacks::with_push(pv, [&]{
-      pv.top() = glm::translate(glm::mat4(), glm::vec3(0, 0, -0.00001)) * pv.top();
-      pv.apply(*program);
-      wireCube->bindVertexArray();
-      wireCube->draw();
-      wireCube->unbindVertexArray();
-    });
-    pv.apply(*program);
-  });
 }
