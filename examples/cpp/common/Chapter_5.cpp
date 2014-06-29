@@ -19,11 +19,7 @@ void Chapter_5::initGl() {
   cube = GlUtils::getColorCubeGeometry();
   wireCube = GlUtils::getWireCubeGeometry();
 
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glEnable(GL_LINE_SMOOTH);
-  glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-  glLineWidth(4);
+  glDisable(GL_LINE_SMOOTH);
   glClearColor(0.65f, 0.65f, 0.65f, 1);
 
   gl::Stacks::lights().addLight(glm::vec4(50, 50, 50, 1));
@@ -116,9 +112,9 @@ void Chapter_5::drawChapter5Scene() {
   static int cubeCount;
   static gl::VertexBufferPtr cubeTransforms;
   if (!cubeTransforms) {
-    VecXfm foo = buildCubeScene(eyeHeight, ipd);
-    cubeTransforms = gl::VertexBufferPtr(new gl::VertexBuffer(foo));
-    cubeCount = foo.size();
+    VecXfm scene = buildCubeScene(eyeHeight, ipd);
+    cubeTransforms = gl::VertexBufferPtr(new gl::VertexBuffer(scene));
+    cubeCount = scene.size();
 
     cubeTransforms->bind();
     cube->bindVertexArray();
