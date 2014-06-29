@@ -7,9 +7,7 @@ struct PerEyeArg {
   glm::mat4                     modelviewOffset;
   glm::mat4                     projection;
   gl::FrameBufferWrapper        frameBuffer;
-  ovrFovPort                    fovPort;
   ovrGLTexture                  texture;
-  ovrEyeRenderDesc              renderDesc;
 };
 
 class CubeScene_Rift: public CubeScene {
@@ -29,9 +27,8 @@ public:
 
     for_each_eye([&](ovrEyeType eye){
       PerEyeArg & eyeArg = eyes[eye];
-      eyeArg.fovPort = hmdDesc.DefaultEyeFov[eye];
       ovrTextureHeader & textureHeader = eyeArg.texture.Texture.Header;
-      ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, eyeArg.fovPort, 1.0f);
+      ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
       textureHeader.API = ovrRenderAPI_OpenGL;
       textureHeader.TextureSize = texSize;
       textureHeader.RenderViewport.Size = texSize;
@@ -40,7 +37,7 @@ public:
       eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
       eyeArg.texture.OGL.TexId = eyeArg.frameBuffer.color->texture;
 
-      ovrMatrix4f projection = ovrMatrix4f_Projection(eyeArg.fovPort, 0.01f, 100, true);
+      ovrMatrix4f projection = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.01f, 100, true);
       eyeArg.projection = Rift::fromOvr(projection);
     });
 
@@ -52,7 +49,7 @@ public:
 
     int distortionCaps = ovrDistortionCap_Chromatic;
     int renderCaps = 0;
-    ovrFovPort eyePorts[] = { eyes[0].fovPort, eyes[1].fovPort };
+    ovrFovPort eyePorts[] = { hmdDesc.DefaultEyeFov[0], hmdDesc.DefaultEyeFov[1] };
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
         distortionCaps, eyePorts, eyeRenderDescs);
