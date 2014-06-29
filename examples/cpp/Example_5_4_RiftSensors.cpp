@@ -18,10 +18,9 @@ class CubeScene_RiftSensors: public CubeScene {
 
 public:
   CubeScene_RiftSensors() {
-    eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(ipd / 2.0f, 0, 0));
-    eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(-ipd / 2.0f, 0, 0));
+    glm::vec3 offset(ipd / 2.0f, 0, 0);
+    eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(), offset);
+    eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(), -offset);
     windowSize = WINDOW_SIZE;
 
     if (!ovrHmd_StartSensor(hmd, ovrSensorCap_Orientation, 0)) {

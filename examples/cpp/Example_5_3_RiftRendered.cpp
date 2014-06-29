@@ -18,10 +18,9 @@ class CubeScene_Rift: public CubeScene {
 
 public:
   CubeScene_Rift() {
-    eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(ipd / 2.0f, 0, 0));
-    eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
-        glm::vec3(-ipd / 2.0f, 0, 0));
+    glm::vec3 offset(ipd / 2.0f, 0, 0);
+    eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(), offset);
+    eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(), -offset);
     windowSize = WINDOW_SIZE;
   }
 
