@@ -1,5 +1,5 @@
 #include "Common.h"
-#include "Chapter_5.h"
+#include "CubeScene.h"
 
 static const glm::uvec2 WINDOW_SIZE(1280, 800);
 
@@ -12,12 +12,12 @@ struct PerEyeArg {
   ovrEyeRenderDesc              renderDesc;
 };
 
-class SimpleScene: public Chapter_5 {
-  PerEyeArg       eyes[2];
-  int             frameIndex{ 0 };
+class CubeScene_Rift: public CubeScene {
+  PerEyeArg eyes[2];
+  int frameIndex{ 0 };
 
 public:
-  SimpleScene() {
+  CubeScene_Rift() {
     eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(),
         glm::vec3(ipd / 2.0f, 0, 0));
     eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(),
@@ -26,7 +26,7 @@ public:
   }
 
   virtual void initGl() {
-    Chapter_5::initGl();
+    CubeScene::initGl();
 
     for_each_eye([&](ovrEyeType eye){
       PerEyeArg & eyeArg = eyes[eye];
@@ -77,7 +77,7 @@ public:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         gl::Stacks::with_push(mv, [&]{
           mv.preMultiply(eyeArgs.modelviewOffset);
-          drawChapter5Scene();
+          drawCubeScene();
         });
       });
 
@@ -88,4 +88,4 @@ public:
   }
 };
 
-RUN_OVR_APP(SimpleScene);
+RUN_OVR_APP(CubeScene_Rift);

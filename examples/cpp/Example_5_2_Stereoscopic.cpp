@@ -1,5 +1,5 @@
 #include "Common.h"
-#include "Chapter_5.h"
+#include "CubeScene.h"
 
 static const glm::uvec2 WINDOW_SIZE(1280, 800);
 static const glm::ivec2 WINDOW_POS(100, 100);
@@ -14,11 +14,11 @@ struct PerEyeArg {
   glm::mat4 modelviewOffset;
 };
 
-class SimpleScene : public Chapter_5 {
-  PerEyeArg       eyes[2];
+class CubeScene_Stereo : public CubeScene {
+  PerEyeArg eyes[2];
 
 public:
-  SimpleScene() {
+  CubeScene_Stereo() {
     gl::Stacks::projection().top() = glm::perspective(
         PI / 2.0f, EYE_ASPECT, 0.01f, 100.0f);
 
@@ -47,10 +47,10 @@ public:
       gl::viewport(eyeArgs.viewportPosition, EYE_SIZE);
       gl::Stacks::with_push(mv, [&]{
         mv.preMultiply(eyeArgs.modelviewOffset);
-        drawChapter5Scene();
+        drawCubeScene();
       });
     }
   }
 };
 
-RUN_OVR_APP(SimpleScene);
+RUN_OVR_APP(CubeScene_Stereo);

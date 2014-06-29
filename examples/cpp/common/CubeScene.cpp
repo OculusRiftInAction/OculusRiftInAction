@@ -1,8 +1,8 @@
 #include "Common.h"
-#include "Chapter_5.h"
+#include "CubeScene.h"
 #include <glm/gtx/string_cast.hpp>
 
-Chapter_5::Chapter_5() {
+CubeScene::CubeScene() : cubeCount(0) {
   ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
   eyeHeight = ovrHmd_GetFloat(hmd,
       OVR_KEY_PLAYER_HEIGHT,
@@ -10,7 +10,7 @@ Chapter_5::Chapter_5() {
   resetCamera();
 }
 
-void Chapter_5::initGl() {
+void CubeScene::initGl() {
   RiftGlfwApp::initGl();
 
   program = GlUtils::getProgram(
@@ -19,13 +19,14 @@ void Chapter_5::initGl() {
   cube = GlUtils::getColorCubeGeometry();
   wireCube = GlUtils::getWireCubeGeometry();
 
+  glDisable(GL_BLEND);
   glDisable(GL_LINE_SMOOTH);
   glClearColor(0.65f, 0.65f, 0.65f, 1);
-
   gl::Stacks::lights().addLight(glm::vec4(50, 50, 50, 1));
+  gl::Stacks::modelview().push().identity();
 }
 
-void Chapter_5::onKey(int key, int scancode, int action, int mods) {
+void CubeScene::onKey(int key, int scancode, int action, int mods) {
   if (CameraControl::instance().onKey(key, scancode, action, mods)) {
     return;
   }
@@ -52,7 +53,7 @@ void Chapter_5::onKey(int key, int scancode, int action, int mods) {
   RiftGlfwApp::onKey(key, scancode, action, mods);
 }
 
-void Chapter_5::update() {
+void CubeScene::update() {
 
   // We invert the camera matrix to generate a "player" matrix,
   // because our interaction code works from the player's point
@@ -64,19 +65,16 @@ void Chapter_5::update() {
   gl::Stacks::modelview().top() = camera;
 }
 
-void Chapter_5::resetCamera() {
+void CubeScene::resetCamera() {
   camera = glm::lookAt(
       glm::vec3(0, eyeHeight, 0.5f),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),     // Where the camera is looking
       GlUtils::Y_AXIS);               // Camera up axis
 }
 
-typedef std::vector<glm::mat4> VecXfm;
-
-VecXfm buildCubeScene(float eyeHeight, float ipd) {
-  VecXfm result;
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  mv.push().identity();
+typedef std::vector<glm::mat4> VecXfm; 
+VecXfm buildCubeScene(float ipd, float eyeHeight) {
+  VecXfm transforms;
 
   // Draw arches made of cubes.
   for (int x = -10; x <= 10; x++) {
@@ -85,7 +83,7 @@ VecXfm buildCubeScene(float eyeHeight, float ipd) {
         glm::vec3 pos(x, y, z);
         float len = glm::length(pos);
         if (len > 11 && len < 12) {
-          result.push_back(glm::translate(glm::mat4(), pos));
+          transforms.push_back(glm::translate(glm::mat4(), pos));
         }
       }
     }
@@ -94,26 +92,24 @@ VecXfm buildCubeScene(float eyeHeight, float ipd) {
   // Draw a floor made of cubes.
   for (int x = -12; x <= 12; x++) {
     for (int z = -12; z <= 12; z++) {
-      result.push_back(glm::translate(glm::mat4(), glm::vec3(x, -0.5f, z)));
+      transforms.push_back(glm::translate(glm::mat4(), glm::vec3(x, -0.5f, z)));
     }
   }
 
   // Draw a single cube at the center of the room, at eye height,
   // and put it on a pedestal.
-  result.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd)));
-  result.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight / 2, 0)), glm::vec3(ipd / 2, eyeHeight, ipd / 2)));
-  return result;
+  transforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd)));
+  transforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight / 2, 0)), glm::vec3(ipd / 2, eyeHeight, ipd / 2)));
+  return transforms;
 }
 
-void Chapter_5::drawChapter5Scene() {
+void CubeScene::drawCubeScene() {
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pv = gl::Stacks::projection();
 
-  static int cubeCount;
-  static gl::VertexBufferPtr cubeTransforms;
-  if (!cubeTransforms) {
-    VecXfm scene = buildCubeScene(eyeHeight, ipd);
-    cubeTransforms = gl::VertexBufferPtr(new gl::VertexBuffer(scene));
+  if (!cubeCount) {
+    VecXfm scene = buildCubeScene(ipd, eyeHeight);
+    gl::VertexBufferPtr cubeTransforms = gl::VertexBufferPtr(new gl::VertexBuffer(scene));
     cubeCount = scene.size();
 
     cubeTransforms->bind();
