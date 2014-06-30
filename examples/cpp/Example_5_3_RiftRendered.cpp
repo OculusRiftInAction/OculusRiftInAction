@@ -48,11 +48,9 @@ public:
     cfg.Header.Multisample = 1;
 
     int distortionCaps = ovrDistortionCap_Chromatic;
-    int renderCaps = 0;
-    ovrFovPort eyePorts[] = { hmdDesc.DefaultEyeFov[0], hmdDesc.DefaultEyeFov[1] };
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
-        distortionCaps, eyePorts, eyeRenderDescs);
+        distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
   }
 
   virtual void finishFrame() {
