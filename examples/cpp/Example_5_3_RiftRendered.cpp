@@ -16,14 +16,22 @@ class CubeScene_Rift: public CubeScene {
 
 public:
   CubeScene_Rift() {
-    glm::vec3 offset(ipd / 2.0f, 0, 0);
-    eyes[ovrEye_Left].modelviewOffset = glm::translate(glm::mat4(), offset);
-    eyes[ovrEye_Right].modelviewOffset = glm::translate(glm::mat4(), -offset);
     windowSize = WINDOW_SIZE;
   }
 
   virtual void initGl() {
     CubeScene::initGl();
+
+    ovrRenderAPIConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.Header.API = ovrRenderAPI_OpenGL;
+    cfg.Header.RTSize = hmdDesc.Resolution;
+    cfg.Header.Multisample = 1;
+
+    int distortionCaps = ovrDistortionCap_Chromatic;
+    ovrEyeRenderDesc eyeRenderDescs[2];
+    int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
+        distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
 
     for_each_eye([&](ovrEyeType eye){
       PerEyeArg & eyeArg = eyes[eye];
@@ -38,19 +46,10 @@ public:
       eyeArg.texture.OGL.TexId = eyeArg.frameBuffer.color->texture;
 
       ovrMatrix4f projection = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.01f, 100, true);
+      ovrVector3f offset = eyeRenderDescs[eye].ViewAdjust;
       eyeArg.projection = Rift::fromOvr(projection);
+      eyeArg.modelviewOffset = glm::translate(glm::mat4(), Rift::fromOvr(offset));
     });
-
-    ovrRenderAPIConfig cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.Header.API = ovrRenderAPI_OpenGL;
-    cfg.Header.RTSize = hmdDesc.Resolution;
-    cfg.Header.Multisample = 1;
-
-    int distortionCaps = ovrDistortionCap_Chromatic;
-    ovrEyeRenderDesc eyeRenderDescs[2];
-    int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
-        distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
   }
 
   virtual void finishFrame() {
