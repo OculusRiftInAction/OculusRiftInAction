@@ -65,15 +65,12 @@ public:
   virtual void draw() {
     ovrHmd_BeginFrame(hmd, frameIndex++);
 
-    ovrSensorState sensorState = ovrHmd_GetSensorState(hmd, 0);
-    ovrPoseStatef & poseState = sensorState.Recorded;
-    glm::mat4 orientation = glm::inverse(Rift::fromOvr(poseState.Pose));
-
     gl::MatrixStack & mv = gl::Stacks::modelview();
     for (int i = 0; i < ovrEye_Count; ++i) {
       ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
       PerEyeArg & eyeArgs = eyes[eye];
       ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
+      glm::mat4 orientation = glm::inverse(Rift::fromOvr(renderPose));
 
       gl::Stacks::projection().top() = eyeArgs.projection;
 
