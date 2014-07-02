@@ -104,9 +104,6 @@ VecXfm buildCubeScene(float ipd, float eyeHeight) {
 }
 
 void CubeScene::drawCubeScene() {
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  gl::MatrixStack & pv = gl::Stacks::projection();
-
   if (!cubeCount) {
     VecXfm scene = buildCubeScene(ipd, eyeHeight);
     gl::VertexBufferPtr cubeTransforms = gl::VertexBufferPtr(new gl::VertexBuffer(scene));
