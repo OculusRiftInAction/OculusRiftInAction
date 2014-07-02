@@ -183,11 +183,10 @@ enum Enum {
   LEFT_X = 0,
   LEFT_Y = 1,
 
-  RIGHT_X = 3,
-  RIGHT_Y = 4,
+  TRIGGER = 2,
 
-  LEFT_TRIGGER = 2,
-  RIGHT_TRIGGER = 5,
+  RIGHT_Y = 3,
+  RIGHT_X = 4,
 };
 } // namespace Axis
 
@@ -213,8 +212,10 @@ enum Enum {
 class Controller : public GlfwJoystick {
 public:
   Controller(unsigned int glfwIndex) : GlfwJoystick(glfwIndex) {
-//    calibration[Axis::RIGHT_X] = Ptr(new AxisCalibration(true));
-//    calibration[Axis::RIGHT_Y] = Ptr(new AxisCalibration(true));
+    calibration[Axis::RIGHT_X] = Ptr(new AxisCalibration(true));
+    calibration[Axis::RIGHT_Y] = Ptr(new AxisCalibration(true));
+    calibration[Axis::LEFT_X] = Ptr(new AxisCalibration(false, 0, 0.05f));
+    calibration[Axis::LEFT_Y] = Ptr(new AxisCalibration(false, 0, 0.05f));
   }
 };
 
