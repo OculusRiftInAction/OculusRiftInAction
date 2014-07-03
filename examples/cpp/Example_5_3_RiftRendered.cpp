@@ -35,8 +35,9 @@ public:
 
     for_each_eye([&](ovrEyeType eye){
       PerEyeArg & eyeArg = eyes[eye];
+      ovrFovPort fov = hmdDesc.DefaultEyeFov[eye];
       ovrTextureHeader & textureHeader = eyeArg.texture.Texture.Header;
-      ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
+      ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
       textureHeader.API = ovrRenderAPI_OpenGL;
       textureHeader.TextureSize = texSize;
       textureHeader.RenderViewport.Size = texSize;
@@ -45,8 +46,9 @@ public:
       eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
       eyeArg.texture.OGL.TexId = eyeArg.frameBuffer.color->texture;
 
-      ovrMatrix4f projection = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.01f, 100, true);
       ovrVector3f offset = eyeRenderDescs[eye].ViewAdjust;
+      ovrMatrix4f projection = ovrMatrix4f_Projection(fov, 0.01f, 100, true);
+
       eyeArg.projection = Rift::fromOvr(projection);
       eyeArg.modelviewOffset = glm::translate(glm::mat4(), Rift::fromOvr(offset));
     });

@@ -38,12 +38,13 @@ public:
     int distortionCaps = ovrDistortionCap_Chromatic;
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
-      distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
+        distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
 
     for_each_eye([&](ovrEyeType eye){
       PerEyeArg & eyeArg = eyes[eye];
+      ovrFovPort fov = hmdDesc.DefaultEyeFov[eye];
       ovrTextureHeader & textureHeader = eyeArg.texture.Texture.Header;
-      ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
+      ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
       textureHeader.API = ovrRenderAPI_OpenGL;
       textureHeader.TextureSize = texSize;
       textureHeader.RenderViewport.Size = texSize;
@@ -52,8 +53,9 @@ public:
       eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
       eyeArg.texture.OGL.TexId = eyeArg.frameBuffer.color->texture;
 
-      ovrMatrix4f projection = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.01f, 100, true);
       ovrVector3f offset = eyeRenderDescs[eye].ViewAdjust;
+      ovrMatrix4f projection = ovrMatrix4f_Projection(fov, 0.01f, 100, true);
+
       eyeArg.projection = Rift::fromOvr(projection);
       eyeArg.modelviewOffset = glm::translate(glm::mat4(), Rift::fromOvr(offset));
     });
@@ -69,16 +71,15 @@ public:
     for (int i = 0; i < ovrEye_Count; ++i) {
       ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
       PerEyeArg & eyeArgs = eyes[eye];
-      ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
-      glm::mat4 orientation = glm::inverse(Rift::fromOvr(renderPose));
-
       gl::Stacks::projection().top() = eyeArgs.projection;
+
+      ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
 
       eyeArgs.frameBuffer.withFramebufferActive([&]{
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         gl::Stacks::with_push(mv, [&]{
           mv.preMultiply(eyeArgs.modelviewOffset);
-          mv.preMultiply(orientation);
+          mv.preMultiply(glm::inverse(Rift::fromOvr(renderPose)));
           drawCubeScene();
         });
       });
