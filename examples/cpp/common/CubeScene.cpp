@@ -14,15 +14,16 @@ void CubeScene::initGl() {
   RiftGlfwApp::initGl();
 
   program = GlUtils::getProgram(
-      Resource::SHADERS_LITCOLOREDINSTANCED_VS,
-      Resource::SHADERS_LITCOLORED_FS);
+      Resource::SHADERS_CHAPTER5_VS,
+      Resource::SHADERS_CHAPTER5_FS);
   cube = GlUtils::getColorCubeGeometry();
-  wireCube = GlUtils::getWireCubeGeometry();
+  pedestal = GlUtils::getColorCubeGeometry();
 
   glDisable(GL_BLEND);
   glDisable(GL_LINE_SMOOTH);
   glClearColor(0.65f, 0.65f, 0.65f, 1);
   gl::Stacks::lights().addLight(glm::vec4(50, 50, 50, 1));
+  gl::Stacks::lights().addLight(glm::vec4(50, 50, -50, 1));
   gl::Stacks::modelview().push().identity();
 }
 
@@ -73,7 +74,7 @@ void CubeScene::resetCamera() {
 }
 
 typedef std::vector<glm::mat4> VecXfm; 
-VecXfm buildCubeScene(float ipd, float eyeHeight) {
+VecXfm buildRoom() {
   VecXfm transforms;
 
   // Draw arches made of cubes.
@@ -96,6 +97,12 @@ VecXfm buildCubeScene(float ipd, float eyeHeight) {
     }
   }
 
+  return transforms;
+}
+
+VecXfm buildPedestal(float ipd, float eyeHeight) {
+  VecXfm transforms;
+
   // Draw a single cube at the center of the room, at eye height,
   // and put it on a pedestal.
   transforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd)));
@@ -105,23 +112,22 @@ VecXfm buildCubeScene(float ipd, float eyeHeight) {
 
 void CubeScene::drawCubeScene() {
   if (!cubeCount) {
-    VecXfm scene = buildCubeScene(ipd, eyeHeight);
-    gl::VertexBufferPtr cubeTransforms = gl::VertexBufferPtr(new gl::VertexBuffer(scene));
+    VecXfm scene = buildRoom();
     cubeCount = scene.size();
 
-    cubeTransforms->bind();
+    (new gl::VertexBuffer(scene))->bind();
     cube->bindVertexArray();
     cube->addInstanceVertexArray();
 
-    cubeTransforms->bind();
-    wireCube->bindVertexArray();
-    wireCube->addInstanceVertexArray();
+    (new gl::VertexBuffer(buildPedestal(ipd, eyeHeight)))->bind();
+    pedestal->bindVertexArray();
+    pedestal->addInstanceVertexArray();
 
     gl::VertexArray::unbind();
   }
 
   program->use();
-  program->setUniform("InstanceTransformActive", 1);
+  program->setUniform("FadeToWhite", 1);
 
   gl::Stacks::lights().apply(*program);
   gl::Stacks::projection().apply(*program);
@@ -130,9 +136,10 @@ void CubeScene::drawCubeScene() {
   cube->bindVertexArray();
   cube->drawInstanced(cubeCount);
 
-  wireCube->bindVertexArray();
-  gl::Stacks::projection().push().preTranslate(glm::vec3(0, 0, -0.00001)).apply(*program).pop();
-  wireCube->drawInstanced(cubeCount);
+  program->setUniform("FadeToWhite", 0);
+
+  pedestal->bindVertexArray();
+  pedestal->drawInstanced(2);
 
   gl::VertexArray::unbind();
   gl::Program::clear();

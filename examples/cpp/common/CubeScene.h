@@ -6,7 +6,7 @@ class CubeScene: public RiftGlfwApp
 protected:
   gl::ProgramPtr program;
   gl::GeometryPtr cube;
-  gl::GeometryPtr wireCube;
+  gl::GeometryPtr pedestal;
   glm::mat4 camera;
   float ipd, eyeHeight;
   int cubeCount;
