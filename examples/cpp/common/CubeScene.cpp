@@ -38,6 +38,8 @@ void CubeScene::onKey(int key, int scancode, int action, int mods) {
       resetCamera();
       ovrHmd_ResetSensor(hmd);
       return;
+
+    // TODO(alex) Remove this before release, it's for development only.
     case GLFW_KEY_LEFT_BRACKET:
       SAY("%s", glm::to_string(camera).c_str());
       return;
