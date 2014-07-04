@@ -10,13 +10,20 @@ struct PerEyeArg {
   ovrGLTexture                  texture;
 };
 
-class CubeScene_Rift: public CubeScene {
+class CubeScene_RiftSensors: public CubeScene {
   PerEyeArg eyes[2];
   int frameIndex{ 0 };
 
 public:
-  CubeScene_Rift() {
+  CubeScene_RiftSensors() {
     windowSize = WINDOW_SIZE;
+    if (!ovrHmd_StartSensor(hmd, ovrSensorCap_Orientation, 0)) {
+      SAY("Warning: Unable to locate Rift sensor device.  This demo is boring now.");
+    }
+  }
+
+  virtual ~CubeScene_RiftSensors() {
+    ovrHmd_StopSensor(hmd);
   }
 
   virtual void initGl() {
@@ -72,6 +79,7 @@ public:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         gl::Stacks::with_push(mv, [&]{
           mv.preMultiply(eyeArgs.modelviewOffset);
+          mv.preMultiply(glm::inverse(Rift::fromOvr(renderPose)));
           drawCubeScene();
         });
       });
@@ -83,4 +91,4 @@ public:
   }
 };
 
-RUN_OVR_APP(CubeScene_Rift);
+RUN_OVR_APP(CubeScene_RiftSensors);

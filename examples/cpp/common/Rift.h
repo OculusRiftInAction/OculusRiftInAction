@@ -48,7 +48,7 @@ public:
   }
 
   static inline glm::uvec2 fromOvr(const ovrSizei & ov) {
-    return glm::uvec2(ov.h, ov.w);
+    return glm::uvec2(ov.w, ov.h);
   }
 
   static inline glm::quat fromOvr(const ovrQuatf & oq) {
@@ -119,6 +119,11 @@ public:
     ovrHmd_GetDesc(hmd, &hmdDesc);
     hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
     hmdDesktopPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
+  }
+
+  virtual ~RiftManagerApp() {
+    ovrHmd_Destroy(hmd);
+    hmd = nullptr;
   }
 };
 
@@ -206,6 +211,9 @@ public:
     }
   }
 
+  virtual ~RiftGlfwApp() {
+  }
+
   virtual void viewport(ovrEyeType eye) {
     glm::uvec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
     gl::viewport(viewportPosition, glm::uvec2(windowSize.x / 2, windowSize.y));
@@ -227,9 +235,9 @@ public:
 protected:
   glm::mat4 player;
   ovrPosef  headPose;
+  ovrGLTexture eyeTextures[2];
 
 private:
-  ovrGLTexture eyeTextures[2];
   ovrEyeRenderDesc eyeRenderDescs[2];
   gl::FrameBufferWrapper frameBuffers[2];
   glm::mat4 projections[2];
