@@ -37,16 +37,20 @@ void RiftApp::initGl() {
   query = gl::TimeQueryPtr(new gl::TimeQuery());
   GL_CHECK_ERROR;
 
+  int samples;
+  glGetIntegerv(GL_SAMPLES, &samples);
 
   ovrGLConfig cfg;
   memset(&cfg, 0, sizeof(cfg));
   cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-  cfg.OGL.Header.RTSize = hmdDesc.Resolution;
+  cfg.OGL.Header.RTSize = Rift::toOvr(windowSize);
   cfg.OGL.Header.Multisample = 1;
 
-  int distortionCaps = 0 |
-    //ovrDistortionCap_Chromatic | 
-    ovrDistortionCap_TimeWarp;
+  int distortionCaps = 0 
+    | ovrDistortionCap_Vignette
+    | ovrDistortionCap_Chromatic
+    | ovrDistortionCap_TimeWarp
+    ;
 
   int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
     distortionCaps, hmdDesc.MaxEyeFov, eyeRenderDescs);
@@ -140,12 +144,9 @@ void RiftApp::draw() {
     GL_CHECK_ERROR;
   }
   query->begin();
+  postDraw();
 #if 1
-  glDisable(GL_CULL_FACE);
-  glDisable(GL_DEPTH_TEST);
   ovrHmd_EndFrame(hmd);
-  glEnable(GL_CULL_FACE);
-  glEnable(GL_DEPTH_TEST);
 #else
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   static gl::GeometryPtr geometry = GlUtils::getQuadGeometry(1.0, 1.5f);

@@ -19,8 +19,6 @@
 
 #pragma once
 
-//#define RIFT_MULTISAMPLE 1
-
 class Rift {
 public:
 //  static void getDefaultDk1HmdValues(ovrHmd hmd, ovrHmdDesc & ovrHmdInfo);
@@ -56,7 +54,10 @@ public:
   }
 
   static inline glm::mat4 fromOvr(const ovrPosef & op) {
-    return glm::mat4_cast(fromOvr(op.Orientation)) * glm::translate(glm::mat4(), Rift::fromOvr(op.Position));
+    glm::mat4 orientation = glm::mat4_cast(fromOvr(op.Orientation));
+    glm::mat4 translation = glm::translate(glm::mat4(), Rift::fromOvr(op.Position));
+    return translation * orientation;
+    //  return glm::mat4_cast(fromOvr(op.Orientation)) * glm::translate(glm::mat4(), Rift::fromOvr(op.Position));
   }
 
   static inline ovrMatrix4f toOvr(const glm::mat4 & m) {
@@ -195,9 +196,6 @@ public:
   }
 
   virtual void createRenderingTarget() {
-#ifdef RIFT_MULTISAMPLE
-    glfwWindowHint(GLFW_SAMPLES, 4);
-#endif
 
     if (fullscreen) {
       // Fullscreen apps should use the native resolution of the Rift
@@ -250,8 +248,10 @@ protected:
   virtual void finishFrame();
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw() final;
+  virtual void postDraw() {};
   virtual void update();
   virtual void renderScene() = 0;
+
 
 
   inline ovrEyeType getCurrentEye() const {
