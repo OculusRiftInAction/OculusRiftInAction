@@ -4,12 +4,10 @@
 class CubeScene: public RiftGlfwApp
 {
 protected:
-  gl::ProgramPtr program;
-  gl::GeometryPtr cube;
-  gl::GeometryPtr pedestal;
   glm::mat4 camera;
   float ipd, eyeHeight;
-  int cubeCount;
+  gl::GeometryPtr cube;
+  gl::ProgramPtr program;
 
 public:
   CubeScene();
