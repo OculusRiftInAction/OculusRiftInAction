@@ -63,11 +63,7 @@ public:
       ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
       ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeTextures[eye]);
     });
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
     ovrHmd_EndFrame(hmd);
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
   }
 };
 
