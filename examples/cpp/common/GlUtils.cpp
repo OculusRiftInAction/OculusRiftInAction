@@ -665,52 +665,50 @@ void GlUtils::drawQuad(const glm::vec2 & min, const glm::vec2 & max) {
 }
 
 gl::GeometryPtr GlUtils::getColorCubeGeometry() {
-  static gl::GeometryPtr  geometry;
-  if (!geometry) {
-    Mesh mesh;
-    glm::vec3 move(0, 0, 0.5f);
-    gl::MatrixStack & m = mesh.model;
+  Mesh mesh;
+  glm::vec3 move(0, 0, 0.5f);
+  gl::MatrixStack & m = mesh.model;
 
-    m.push().rotate(glm::angleAxis(PI / 2.0f, Y_AXIS)).translate(move);
-    mesh.color = Colors::red;
-    mesh.addQuad(glm::vec2(1.0));
-    mesh.fillColors(true);
-    m.pop();
+  m.push().rotate(glm::angleAxis(PI / 2.0f, Y_AXIS)).translate(move);
+  mesh.color = Colors::red;
+  mesh.addQuad(glm::vec2(1.0));
+  mesh.fillColors(true);
+  m.pop();
 
-    m.push().rotate(glm::angleAxis(-PI / 2.0f, X_AXIS)).translate(move);
-    mesh.color = Colors::green;
-    mesh.addQuad(glm::vec2(1.0));
-    m.pop();
+  m.push().rotate(glm::angleAxis(-PI / 2.0f, X_AXIS)).translate(move);
+  mesh.color = Colors::green;
+  mesh.addQuad(glm::vec2(1.0));
+  m.pop();
 
-    m.push().translate(move);
-    mesh.color = Colors::blue;
-    mesh.addQuad(glm::vec2(1.0));
-    m.pop();
+  m.push().translate(move);
+  mesh.color = Colors::blue;
+  mesh.addQuad(glm::vec2(1.0));
+  m.pop();
 
-    m.push().rotate(glm::angleAxis(-PI / 2.0f, Y_AXIS)).translate(move);
-    mesh.color = Colors::cyan;
-    mesh.addQuad(glm::vec2(1.0));
-    m.pop();
+  m.push().rotate(glm::angleAxis(-PI / 2.0f, Y_AXIS)).translate(move);
+  mesh.color = Colors::cyan;
+  mesh.addQuad(glm::vec2(1.0));
+  m.pop();
 
-    m.push().rotate(glm::angleAxis(PI / 2.0f, X_AXIS)).translate(move);
-    mesh.color = Colors::yellow;
-    mesh.addQuad(glm::vec2(1.0));
-    m.pop();
+  m.push().rotate(glm::angleAxis(PI / 2.0f, X_AXIS)).translate(move);
+  mesh.color = Colors::yellow;
+  mesh.addQuad(glm::vec2(1.0));
+  m.pop();
 
-    m.push().rotate(glm::angleAxis(-PI, X_AXIS)).translate(move);
-    mesh.color = Colors::magenta;
-    mesh.addQuad(glm::vec2(1.0));
-    m.pop();
+  m.push().rotate(glm::angleAxis(-PI, X_AXIS)).translate(move);
+  mesh.color = Colors::magenta;
+  mesh.addQuad(glm::vec2(1.0));
+  m.pop();
 
-    geometry = mesh.getGeometry();
-  }
+  gl::GeometryPtr  geometry = mesh.getGeometry();
   return geometry;
 }
 
 void GlUtils::drawColorCube(bool lit) {
+  static gl::GeometryPtr cube = getColorCubeGeometry();
   Resource fs = lit ? Resource::SHADERS_LITCOLORED_VS : Resource::SHADERS_COLORED_VS;
   Resource vs = lit ? Resource::SHADERS_LITCOLORED_FS : Resource::SHADERS_COLORED_FS;
-  renderGeometry(getColorCubeGeometry(), getProgram(fs, vs));
+  renderGeometry(cube, getProgram(fs, vs));
 }
 
 void GlUtils::drawAngleTicks() {
@@ -1076,7 +1074,7 @@ void GlUtils::cubeRecurse(int depth, float elapsed) {
   renderProgram->use();
   gl::Stacks::projection().apply(renderProgram);
 
-  gl::GeometryPtr cubeGeometry = GlUtils::getColorCubeGeometry();
+  static gl::GeometryPtr cubeGeometry = GlUtils::getColorCubeGeometry();
   cubeGeometry->bindVertexArray();
   gl::MatrixStack & mv = gl::Stacks::modelview();
   mv.with_push([&]{
@@ -1095,7 +1093,7 @@ void GlUtils::dancingCubes(int elements, float elapsed) {
   renderProgram->use();
   gl::Stacks::projection().apply(renderProgram);
 
-  gl::GeometryPtr cubeGeometry = getColorCubeGeometry();
+  static gl::GeometryPtr cubeGeometry = getColorCubeGeometry();
   cubeGeometry->bindVertexArray();
 
   static glm::vec3 AXES[] = { GlUtils::X_AXIS, GlUtils::Y_AXIS,
