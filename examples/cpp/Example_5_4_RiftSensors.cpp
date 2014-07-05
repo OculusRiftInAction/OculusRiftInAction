@@ -78,8 +78,8 @@ public:
       eyeArgs.frameBuffer.withFramebufferActive([&]{
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         gl::Stacks::with_push(mv, [&]{
-          mv.preMultiply(eyeArgs.modelviewOffset);
           mv.preMultiply(glm::inverse(Rift::fromOvr(renderPose)));
+          mv.preMultiply(eyeArgs.modelviewOffset);
           drawCubeScene();
         });
       });
