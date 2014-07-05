@@ -6,7 +6,6 @@ Resource SCENE_IMAGES[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
 };
 
-
 class DistortedExample : public RiftGlfwApp {
 protected:
   gl::Texture2dPtr sceneTextures[2];
@@ -28,17 +27,17 @@ public:
     for_each_eye([&](ovrEyeType eye){
       ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
       memset(eyeTextures + eye, 0, sizeof(eyeTextures[eye]));
-        eyeFovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
+          eyeFovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
       eyeTextureHeader.TextureSize =
-        ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
+          ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
       eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.RenderViewport.Pos.x = 0;
       eyeTextureHeader.RenderViewport.Pos.y = 0;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
       sceneTextures[eye] =
-        GlUtils::getImageAsTexture(SCENE_IMAGES[eye]);
+          GlUtils::getImageAsTexture(SCENE_IMAGES[eye]);
       ((ovrGLTextureData&)eyeTextures[eye]).TexId =
-        sceneTextures[eye]->texture;
+          sceneTextures[eye]->texture;
     });
 
     ovrRenderAPIConfig cfg; memset(&cfg, 0, sizeof(cfg));
@@ -47,8 +46,8 @@ public:
     cfg.Header.Multisample = 1;
 
     int distortionCaps = ovrDistortionCap_Chromatic
-      | ovrDistortionCap_TimeWarp
-      | ovrDistortionCap_NoSwapBuffers;
+        | ovrDistortionCap_TimeWarp
+        | ovrDistortionCap_NoSwapBuffers;
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
       distortionCaps, eyeFovPorts, eyeRenderDescs);
     if (0 == configResult) {
