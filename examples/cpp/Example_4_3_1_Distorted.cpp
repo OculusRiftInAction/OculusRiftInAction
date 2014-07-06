@@ -5,7 +5,6 @@ Resource SCENE_IMAGES[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
 };
 
-
 class DistortedExample : public RiftGlfwApp {
 protected:
   gl::Texture2dPtr sceneTextures[2];
@@ -20,6 +19,7 @@ public:
     RiftGlfwApp::initGl();
 
     for_each_eye([&](ovrEyeType eye){
+<<<<<<< HEAD
       glm::uvec2 textureSize;
       GlUtils::getImageAsTexture(sceneTextures[eye], 
         SCENE_IMAGES[eye], textureSize);
@@ -48,12 +48,9 @@ public:
     glConfig.OGL.Header.Multisample = 1;
     glConfig.OGL.Window = 0;
 
-    int distortionCaps = 
-      0 
-      | ovrDistortionCap_Vignette 
+    int distortionCaps = ovrDistortionCap_Vignette
       | ovrDistortionCap_Chromatic
       | ovrDistortionCap_TimeWarp
-      //| ovrDistortionCap_NoSwapBuffers
       ;
     int configResult = ovrHmd_ConfigureRendering(hmd, &glConfig.Config,
       distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);

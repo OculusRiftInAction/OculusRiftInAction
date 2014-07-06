@@ -131,38 +131,30 @@ void Mesh::addMesh(const Mesh & mesh, bool forceColor) {
   add_all_incremented(indexOffset, indices, mesh.indices);
 }
 
-//void Mesh::addMesh(const Mesh & mesh, const glm::vec3 & color) {
-//  if (colors.empty()) {
-//    colors.resize(positions.size());
-//    colors = VVec3(positions.size(), getColor());
-//  }
-//  addMesh(mesh);
-//}
-
 void Mesh::addQuad(float width, float height) {
   int indexOffset = positions.size();
   float x = width / 2.0f;
   float y = height / 2.0f;
 
+  // Positions are transformed
   VVec4 quad;
-  // C++11      { glm::vec3(-x, -y, 0), glm::vec3(x, -y, 0), glm::vec3(x, y, 0), glm::vec3(-x, y, 0),  });
   quad.push_back(glm::vec4(-x, -y, 0, 1));
   quad.push_back(glm::vec4(x, -y, 0, 1));
   quad.push_back(glm::vec4(x, y, 0, 1));
   quad.push_back(glm::vec4(-x, y, 0, 1));
-
-  // Positions are transformed
   add_all_transformed(model.top(), positions, quad);
-  if (normals.size()) {
-    // normals are transformed with only the rotation, not the translation
-    model.push().untranslate();
-    add_all_transformed(model.top(), normals, quad);
-    model.pop();
+
+  // normals are transformed only by rotation, not translation
+  VVec4 norm;
+  for (int i = 0; i < 4; i++) {
+    norm.push_back(glm::vec4(0, 0, 1, 1));
   }
+  model.push().untranslate();
+  add_all_transformed(model.top(), normals, norm);
+  model.pop();
 
   // indices are copied and incremented
   VS quadIndices;
-  // C++11 VS( { 0, 1, 2, 0, 2, 3 } );
   quadIndices.push_back(0);
   quadIndices.push_back(1);
   quadIndices.push_back(2);
@@ -172,7 +164,6 @@ void Mesh::addQuad(float width, float height) {
   add_all_incremented(indexOffset, indices, quadIndices);
 
   fillColors();
-  fillNormals();
 }
 
 void Mesh::validate() const {
