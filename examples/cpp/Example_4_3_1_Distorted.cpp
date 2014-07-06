@@ -19,7 +19,6 @@ public:
     RiftGlfwApp::initGl();
 
     for_each_eye([&](ovrEyeType eye){
-<<<<<<< HEAD
       glm::uvec2 textureSize;
       GlUtils::getImageAsTexture(sceneTextures[eye], 
         SCENE_IMAGES[eye], textureSize);

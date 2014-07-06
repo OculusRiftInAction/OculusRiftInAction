@@ -21,6 +21,7 @@ class ClientSideDistortionExample : public RiftGlfwApp {
   glm::mat4   player;
   float       ipd = OVR_DEFAULT_IPD;
   float       eyeHeight = OVR_DEFAULT_EYE_HEIGHT;
+  bool        enableSamples = false;
 
 public:
   ClientSideDistortionExample() {
@@ -35,7 +36,7 @@ public:
     RiftGlfwApp::initGl();
     for_each_eye([&](ovrEyeType eye){
       EyeArg & eyeArg = eyeArgs[eye];
-      eyeArg.fov = hmdDesc.DefaultEyeFov[eye];
+      eyeArg.fov = hmdDesc.MaxEyeFov[eye];
       // Set up the per-eye projection matrix
       eyeArg.projection = Rift::fromOvr(
         ovrMatrix4f_Projection(eyeArg.fov, 0.01, 100000, true));
@@ -45,8 +46,7 @@ public:
       }
       eyeArg.viewOffset = glm::translate(glm::mat4(), viewOffset);
       ovrRecti texRect;
-      texRect.Size = ovrHmd_GetFovTextureSize(hmd, eye,
-        hmdDesc.DefaultEyeFov[eye], 1.0f);
+      texRect.Size = ovrHmd_GetFovTextureSize(hmd, eye, eyeArg.fov, 1.0f);
       texRect.Pos.x = texRect.Pos.y = 0;
 
       eyeArg.frameBuffer.init(Rift::fromOvr(texRect.Size));
@@ -88,6 +88,23 @@ public:
     });
   }
 
+
+  void onKey(int key, int scancode, int action, int mods) {
+    if (GLFW_PRESS != action) {
+      return;
+    }
+
+    switch (key) {
+    case GLFW_KEY_S:
+      enableSamples = !enableSamples;
+      break;
+
+    default:
+      GlfwApp::onKey(key, scancode, action, mods);
+      break;
+    }
+  }
+
   void update() {
     gl::Stacks::modelview().top() = glm::inverse(player);
   }
@@ -115,7 +132,7 @@ public:
       eyeArg.frameBuffer.deactivate();
     }
 
-    glClearColor(0, 0, 1, 1);
+    glClearColor(0.1f, 0.1f, 0.1f, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
@@ -126,6 +143,7 @@ public:
       Resource::SHADERS_DISTORTION_FS
     );
     distortionProgram->use();
+    distortionProgram->setUniform("samples", enableSamples);
 
     glViewport(0, 0, windowSize.x, windowSize.y);
     for_each_eye([&](ovrEyeType eye) {
@@ -148,13 +166,16 @@ public:
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_LINE_SMOOTH);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     GlUtils::renderFloorGrid(player);
     gl::MatrixStack & mv = gl::Stacks::modelview();
     gl::Stacks::with_push(mv, [&]{
       mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
-      GlUtils::drawColorCube(true);
+      GlUtils::drawColorCube(false);
     });
   }
 };

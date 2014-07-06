@@ -17,7 +17,7 @@ public:
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (!CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+    if (!CameraControl::instance().onKey(key, scancode, action, mods)) {
       static const float GROW = 10;
       static const float SHRINK = 1.0f / GROW;
       if (action == GLFW_PRESS) {

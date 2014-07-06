@@ -16,7 +16,7 @@ public:
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (!CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+    if (!CameraControl::instance().onKey(key, scancode, action, mods)) {
       static const float ROOT_2 = sqrt(2.0f);
       static const float INV_ROOT_2 = 1.0f / ROOT_2;
       if (action == GLFW_PRESS) {

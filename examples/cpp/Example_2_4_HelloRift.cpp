@@ -2,19 +2,21 @@
 #include <OVR_CAPI_GL.h>
 
 #define DISTORT
+
+struct EyeArgs {
+  glm::mat4               projection;
+  glm::mat4               viewOffset;
+  gl::FrameBufferWrapper  framebuffer;
+  ovrGLTexture            textures;
+};
+
 class HelloRift : public GlfwApp {
 protected:
-  ovrHmd                        hmd;
-  ovrHmdDesc                    hmdDesc;
-
-  ovrEyeRenderDesc              eyes[2];
-  gl::FrameBufferWrapper        frameBuffers[2];
-
-  bool                          useTracker{false};
-
-  float                         ipd{ OVR_DEFAULT_IPD };
-  ovrEyeRenderDesc              eyeRenderDescs[2];
-  ovrGLTexture                  eyeTextures[2];
+  ovrHmd                  hmd;
+  ovrHmdDesc              hmdDesc;
+  EyeArgs                 perEyeArgs[2];
+  float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
+  float                   ipd{ OVR_DEFAULT_IPD };
 
 public:
   HelloRift() {
@@ -41,16 +43,11 @@ public:
     ovrHmd_Destroy(hmd);
     hmd = 0;
   }
-#define SAMPLE_COUNT 4
-#define TEXTURE_MULTIPLIER 1.4f
-
 
   virtual void createRenderingTarget() {
-    glfwWindowHint(GLFW_SAMPLES, SAMPLE_COUNT);
     glfwWindowHint(GLFW_DECORATED, 0);
+
     createWindow(windowSize, windowPosition);
-    GLint sampleCount;
-    glGetIntegerv(GL_SAMPLES, &sampleCount);
 
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
@@ -61,24 +58,24 @@ public:
     GlfwApp::initGl();
     ovrFovPort eyeFovPorts[2];
     for_each_eye([&](ovrEyeType eye){
-      ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].OGL.Header;
+      EyeArgs & eyeArgs = perEyeArgs[eye];
+      ovrTextureHeader & eyeTextureHeader = eyeArgs.textures.OGL.Header;
       eyeFovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
       eyeTextureHeader.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
-      eyeTextureHeader.TextureSize.w *= TEXTURE_MULTIPLIER;
-      eyeTextureHeader.TextureSize.h *= TEXTURE_MULTIPLIER;
       eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.RenderViewport.Pos.x = 0;
       eyeTextureHeader.RenderViewport.Pos.y = 0;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
-      frameBuffers[eye].init(Rift::fromOvr(eyeTextureHeader.TextureSize));
-      eyeTextures[eye].OGL.TexId = frameBuffers[eye].color->texture;
+      eyeArgs.framebuffer.init(Rift::fromOvr(eyeTextureHeader.TextureSize));
+      eyeArgs.textures.OGL.TexId = eyeArgs.framebuffer.color->texture;
     });
 
     ovrGLConfig cfg;
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.RTSize = hmdDesc.Resolution;
     cfg.OGL.Header.Multisample = 1;
+
 #ifdef OVR_OS_WINDOWS
     cfg.OGL.Window = 0;
 #elif defined(OVR_OS_LINUX)
@@ -88,8 +85,17 @@ public:
 
     int distortionCaps = ovrDistortionCap_TimeWarp | ovrDistortionCap_Chromatic | ovrDistortionCap_Vignette | ovrDistortionCap_NoSwapBuffers;
 
+    ovrEyeRenderDesc              eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, eyeFovPorts, eyeRenderDescs);
+
+    for_each_eye([&](ovrEyeType eye){
+      EyeArgs & eyeArgs = perEyeArgs[eye];
+      eyeArgs.projection = Rift::fromOvr(
+        ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01, 100, true));
+      eyeArgs.viewOffset = glm::translate(glm::mat4(), 
+        Rift::fromOvr(eyeRenderDescs[eye].ViewAdjust));
+    });
   }
 
   void onKey(int key, int scancode, int action, int mods) {
@@ -102,10 +108,6 @@ public:
       ovrHmd_ResetSensor(hmd);
       break;
 
-    case GLFW_KEY_T:
-      useTracker = !useTracker;
-      break;
-
     default:
       GlfwApp::onKey(key, scancode, action, mods);
       break;
@@ -113,64 +115,44 @@ public:
   }
 
   virtual void update() {
-    static const glm::vec3 CAMERA = glm::vec3(0.0f, 0.0f, ipd * 5);
-    gl::Stacks::modelview().top() = glm::lookAt(CAMERA, GlUtils::ORIGIN, GlUtils::Y_AXIS);
+    static const glm::vec3 EYE = glm::vec3(0, eyeHeight, ipd * 5);
+    static const glm::vec3 LOOKAT = glm::vec3(0, eyeHeight, 0);
+    gl::Stacks::modelview().top() = glm::lookAt(EYE, LOOKAT, GlUtils::UP);
   }
 
   void draw() {
     static int frameIndex = 0;
     ovrHmd_BeginFrame(hmd, frameIndex++);
-    glClearColor(0, 1, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
-    GL_CHECK_ERROR;
-
-    for_each_eye([&](ovrEyeType eye) {
-      frameBuffers[eye].activate();
-      renderScene(eye);
-      frameBuffers[eye].deactivate();
-
-      glDisable(GL_DEPTH_TEST);
-      glDisable(GL_BLEND);
-    });
-
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    ovrHmd_EndFrame(hmd);
-    glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
+    for( int i = 0; i < 2; ++i) {
+      ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
+      EyeArgs & eyeArgs = perEyeArgs[eye];
+      gl::Stacks::projection().top() = eyeArgs.projection;
+      gl::MatrixStack & mv = gl::Stacks::modelview();
+
+      eyeArgs.framebuffer.activate();
+      ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
+      mv.withPush([&]{
+        // Apply the per-eye offset & the head pose
+        mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(renderPose)) * mv.top();
+        renderScene();
+      });
+      ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeArgs.textures.Texture);
+      eyeArgs.framebuffer.deactivate();
+    };
+    ovrHmd_EndFrame(hmd);
   }
 
+  virtual void renderScene() {
+    glClear(GL_DEPTH_BUFFER_BIT);
+    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    GlUtils::renderFloorGrid(glm::mat4());
 
-  virtual void renderScene(ovrEyeType eye) {
     gl::MatrixStack & mv = gl::Stacks::modelview();
-    gl::MatrixStack & pr = gl::Stacks::projection();
-    ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
-    const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
-    gl::Stacks::with_push([&]{
-      // Set up the per-eye projection matrix
-      pr.top() = Rift::fromOvr(ovrMatrix4f_Projection(erd.Fov, 0.01, 100000, true));
-      // Set up the per-eye modelview matrix
-      mv.preMultiply(glm::translate(glm::mat4(), Rift::fromOvr(renderPose.Position) * -1.0f));
-      // Apply the head pose
-      mv.postMultiply(glm::mat4_cast(glm::inverse(Rift::fromOvr(renderPose.Orientation))));
-      // Apply the per-eye offset
-      mv.preMultiply(glm::translate(glm::mat4(), Rift::fromOvr(erd.ViewAdjust)));
-
-      glEnable(GL_DEPTH_TEST);
-      glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      mv.with_push([&]{
-        mv.translate(glm::vec3(0, 0, -1.5f))
-          .rotate(glm::angleAxis(PI / 2.0f, GlUtils::X_AXIS));
-        GlUtils::draw3dGrid();
-      });
-      mv.with_push([&]{
-        mv.scale(ipd);
-        GlUtils::drawColorCube();
-      });
-
-      ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeTextures[eye].Texture);
+    mv.with_push([&]{
+      mv.translate(glm::vec3(0, eyeHeight, 0));
+      mv.scale(ipd);
+      GlUtils::drawColorCube();
     });
   }
 };
