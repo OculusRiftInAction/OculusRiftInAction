@@ -2,8 +2,6 @@
 
 struct EyeArg {
   gl::FrameBufferWrapper        frameBuffer;
-//  ovrGLTexture                  texture;
-  ovrFovPort                    fov;
   glm::vec2                     scale;
   glm::vec2                     offset;
 
@@ -36,28 +34,27 @@ public:
     RiftGlfwApp::initGl();
     for_each_eye([&](ovrEyeType eye){
       EyeArg & eyeArg = eyeArgs[eye];
-      eyeArg.fov = hmdDesc.MaxEyeFov[eye];
+      ovrFovPort fov = hmdDesc.DefaultEyeFov[eye];
+      ovrEyeRenderDesc renderDesc = ovrHmd_GetRenderDesc(hmd, eye, fov);
+
       // Set up the per-eye projection matrix
       eyeArg.projection = Rift::fromOvr(
-        ovrMatrix4f_Projection(eyeArg.fov, 0.01, 100000, true));
-      glm::vec3 viewOffset = glm::vec3(ipd / 2.0f, 0, 0);
-      if (eye == ovrEye_Right) {
-        viewOffset *= -1.0f;
-      }
-      eyeArg.viewOffset = glm::translate(glm::mat4(), viewOffset);
+        ovrMatrix4f_Projection(fov, 0.01, 100000, true));
+      eyeArg.viewOffset = glm::translate(glm::mat4(), Rift::fromOvr(renderDesc.ViewAdjust));
       ovrRecti texRect;
-      texRect.Size = ovrHmd_GetFovTextureSize(hmd, eye, eyeArg.fov, 1.0f);
+      texRect.Size = ovrHmd_GetFovTextureSize(hmd, eye,
+        hmdDesc.DefaultEyeFov[eye], 1.0f);
       texRect.Pos.x = texRect.Pos.y = 0;
 
       eyeArg.frameBuffer.init(Rift::fromOvr(texRect.Size));
 
       ovrVector2f scaleAndOffset[2];
-      ovrHmd_GetRenderScaleAndOffset(eyeArg.fov, texRect.Size,
+      ovrHmd_GetRenderScaleAndOffset(fov, texRect.Size,
         texRect, scaleAndOffset);
       eyeArg.scale = Rift::fromOvr(scaleAndOffset[0]);
       eyeArg.offset = Rift::fromOvr(scaleAndOffset[1]);
 
-      ovrHmd_CreateDistortionMesh(hmd, eye, eyeArg.fov, 0, &eyeArg.mesh);
+      ovrHmd_CreateDistortionMesh(hmd, eye, fov, 0, &eyeArg.mesh);
 
       eyeArg.meshVao = gl::VertexArrayPtr(new gl::VertexArray());
       eyeArg.meshVao->bind();
@@ -100,7 +97,7 @@ public:
       break;
 
     default:
-      GlfwApp::onKey(key, scancode, action, mods);
+      RiftGlfwApp::onKey(key, scancode, action, mods);
       break;
     }
   }
