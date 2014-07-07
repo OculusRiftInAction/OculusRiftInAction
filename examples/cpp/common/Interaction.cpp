@@ -230,13 +230,11 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
       rotation = glm::quat(euler / 20.0f);
     } else {
       using namespace Xbox::Axis;
-      // We invert the Z axis because of the handedness of the
-      // coordinate system
-      translation.z = -joystick->getCalibratedAxisValue(LEFT_Y) * 100.0f;
-      rotation.y = (joystick->getCalibratedAxisValue(LEFT_TRIGGER) +
-          joystick->getCalibratedAxisValue(RIGHT_TRIGGER)) / 100.0f;
+      translation.z = joystick->getCalibratedAxisValue(LEFT_Y) * 20.0f;
+      translation.x = joystick->getCalibratedAxisValue(LEFT_X) * 20.0f;
+      rotation.y = joystick->getCalibratedAxisValue(RIGHT_X) / 100.0f;
       rotation.x = joystick->getCalibratedAxisValue(RIGHT_Y) / 200.0f;
-      rotation.z = joystick->getCalibratedAxisValue(RIGHT_X) / 400.0f;
+      rotation.z = joystick->getCalibratedAxisValue(TRIGGER) / 400.0f;
     }
 
     if (glm::length(translation) > 0.01f) {

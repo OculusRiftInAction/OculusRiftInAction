@@ -16,17 +16,19 @@ public:
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (!CameraControl::instance().onKey(player, key, scancode, action, mods)) {
+    if (!CameraControl::instance().onKey(key, scancode, action, mods)) {
+      static const float ROOT_2 = sqrt(2.0f);
+      static const float INV_ROOT_2 = 1.0f / ROOT_2;
       if (action == GLFW_PRESS) {
         switch (key) {
         case GLFW_KEY_HOME:
           if (texRes < 0.95f) {
-            texRes *= 1.1f;
+            texRes *= ROOT_2;
           }
           break;
         case GLFW_KEY_END:
           if (texRes > 0.05f) {
-            texRes *= (1.0f / 1.1f);
+            texRes *= INV_ROOT_2;
           }
           break;
         case GLFW_KEY_R:
@@ -51,13 +53,12 @@ public:
     int currentEye = getCurrentEye();
     ovrGLTexture & eyeTex = eyeTextures[currentEye];
     const ovrSizei & texSize = eyeTex.Texture.Header.TextureSize;
-    ovrSizei & renderSize = eyeTex.Texture.Header.RenderViewport.Size;
-    renderSize.w = texSize.w * texRes;
-    renderSize.h = texSize.h * texRes;
+    ovrRecti & rvp = eyeTex.Texture.Header.RenderViewport;
+    rvp.Size.w = texSize.w * texRes;
+    rvp.Size.h = texSize.h * texRes;
     glViewport(
-      0, 
-      texSize.h - renderSize.h,
-      renderSize.w, renderSize.h);
+      rvp.Pos.x, rvp.Pos.y,
+      rvp.Size.w, rvp.Size.h);
 
     glEnable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
