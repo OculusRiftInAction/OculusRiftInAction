@@ -59,7 +59,6 @@ public:
   }
 
   virtual void finishFrame() {
-//    glfwSwapBuffers(window);
   }
 
   void draw() {
