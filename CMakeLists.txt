@@ -94,12 +94,18 @@ add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
 set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
+list(APPEND EXAMPLE_LIBS glew)
+
+add_subdirectory(libraries/jansson)
+set_target_properties(jansson PROPERTIES FOLDER "3rdparty")
+include_directories(${CMAKE_SOURCE_DIR}/libraries/jansson/src)
+list(APPEND EXAMPLE_LIBS jansson)
 
 add_subdirectory(libraries/OculusSDK/Bindings/C)
 set_target_properties(OVR_C PROPERTIES FOLDER "3rdparty")
 include_directories(libraries/OculusSDK/Bindings/C/Include)
+list(APPEND EXAMPLE_LIBS OVR_C)
 
-set(EXAMPLE_LIBS OVR_C )
 
 ###############################################################################
 #
@@ -107,7 +113,6 @@ set(EXAMPLE_LIBS OVR_C )
 #
 
 # Cross platform access to shader functionality
-list(APPEND EXAMPLE_LIBS glew)
 
 # GLFW - Cross platform OpenGL window creation and input handling
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")

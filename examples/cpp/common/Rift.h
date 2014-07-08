@@ -112,10 +112,10 @@ protected:
   glm::ivec2 hmdDesktopPosition;
 
 public:
-  RiftManagerApp() {
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK1) {
     hmd = ovrHmd_Create(0);
     if (NULL == hmd) {
-      hmd = ovrHmd_CreateDebug(ovrHmd_CrystalCoveProto);
+      hmd = ovrHmd_CreateDebug(defaultHmdType);
     }
     ovrHmd_GetDesc(hmd, &hmdDesc);
     hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);

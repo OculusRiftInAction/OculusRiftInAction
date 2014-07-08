@@ -20,7 +20,7 @@ public:
 
     for_each_eye([&](ovrEyeType eye){
       glm::uvec2 textureSize;
-      GlUtils::getImageAsTexture(sceneTextures[eye], 
+      GlUtils::getImageAsTexture(sceneTextures[eye],
         SCENE_IMAGES[eye], textureSize);
 
       memset(eyeTextures + eye, 0,
@@ -30,7 +30,7 @@ public:
         eyeTextures[eye].OGL.Header;
 
       eyeTextureHeader.TextureSize = Rift::toOvr(textureSize);
-      eyeTextureHeader.RenderViewport.Size = 
+      eyeTextureHeader.RenderViewport.Size =
         eyeTextureHeader.TextureSize;
 
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
@@ -40,12 +40,17 @@ public:
     });
 
     ovrGLConfig glConfig;
-    //ovrRenderAPIConfig cfg; 
+    //ovrRenderAPIConfig cfg;
     memset(&glConfig, 0, sizeof(glConfig));
     glConfig.OGL.Header.API = ovrRenderAPI_OpenGL;
     glConfig.OGL.Header.RTSize= Rift::toOvr(windowSize);
     glConfig.OGL.Header.Multisample = 1;
+#if defined(OVR_OS_WIN32)
     glConfig.OGL.Window = 0;
+#elif defined(OVR_OS_LINUX)
+    glConfig.OGL.Win = 0;
+    glConfig.OGL.Disp = 0;
+#endif
 
     int distortionCaps = ovrDistortionCap_Vignette
       | ovrDistortionCap_Chromatic

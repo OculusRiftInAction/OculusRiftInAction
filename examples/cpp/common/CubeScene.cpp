@@ -1,6 +1,6 @@
 #include "Common.h"
 #include "CubeScene.h"
-#include <glm/gtx/string_cast.hpp>
+//#include <glm/gtx/string_cast.hpp>
 
 CubeScene::CubeScene() {
   ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
