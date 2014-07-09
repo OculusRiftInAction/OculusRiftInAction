@@ -1,67 +1,20 @@
 <html>
 <head>
-<title>Conway's Game of Life on GPU</title>
-
-<script id="shader-vs" type="x-shader/x-vertex"> 
-  attribute vec3 aPos;
-  attribute vec2 aTexCoord;
-  varying   vec2 vTexCoord;
-void main(void) {
-   gl_Position = vec4(aPos, 1.);
-   vTexCoord = aTexCoord;
-}
-</script> 
-
-<script id="shader-fs" type="x-shader/x-fragment"> 
-precision mediump float;
-  uniform sampler2D uTexSamp;
-  varying vec2 vTexCoord;
-  const float d = 1./512.;
-void main(void) {
-   float c = texture2D(uTexSamp, vTexCoord).x;
-   int s = 0;
-   if (texture2D(uTexSamp, vTexCoord + vec2(0., d)).x > 0.) s++;
-   if (texture2D(uTexSamp, vTexCoord - vec2(0., d)).x > 0.) s++;
-   if (texture2D(uTexSamp, vTexCoord + vec2(d, 0.)).x > 0.) s++;
-   if (texture2D(uTexSamp, vTexCoord - vec2(d, 0.)).x > 0.) s++;
-   if (texture2D(uTexSamp, vTexCoord + vec2(d, d)).x > 0.) s++;
-   if (texture2D(uTexSamp, vTexCoord - vec2(d, d)).x > 0.) s++;
-   if (texture2D(uTexSamp, vTexCoord + vec2(d, -d)).x > 0.) s++;
-   if (texture2D(uTexSamp, vTexCoord - vec2(d, -d)).x > 0.) s++;
-   if (c > 0.){
-     if ((s == 2) || (s == 3)) gl_FragColor = vec4(1.);
-     else gl_FragColor = vec4(vec3(0.),1.);}
-   else if (s == 3) gl_FragColor = vec4(1.);
-        else gl_FragColor = vec4(vec3(0.),1.);
-}
-</script> 
- 
-<script id="shader-fs-show" type="x-shader/x-fragment"> 
-precision mediump float;
-  uniform sampler2D uTexSamp;
-  varying vec2 vTexCoord;
-void main(void) {
-   gl_FragColor = texture2D(uTexSamp, vTexCoord);
-}
-</script> 
+<title>Distortion shader experiment</title>
 
 <script id="shader-vs-distort" type="x-shader/x-vertex">
 uniform vec2 EyeToSourceUVScale;
 uniform vec2 EyeToSourceUVOffset;
 attribute vec2 Position;
-attribute vec4 Color;
 attribute vec2 TexCoord0;
-varying vec4 oColor;
 varying vec2 oTexCoord0;
 void main()
 {
-   gl_Position.x = Position.x;
-   gl_Position.y = Position.y;
-   gl_Position.z = 0.5;
-   gl_Position.w = 1.0;
-   oTexCoord0 = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;
+   gl_Position = vec4(Position, 0.0, 1.0);
+   oTexCoord0 = TexCoord0;
+   oTexCoord0 *= EyeToSourceUVScale;
+   oTexCoord0 += EyeToSourceUVOffset;
    oTexCoord0.y = 1.0 - oTexCoord0.y;
-   oColor = Color;
 }
 </script> 
 
@@ -84,6 +37,10 @@ void main()
 </script>
 
 <script type="text/javascript">
+
+var eyeMeshes = [mesh.left, mesh.right];
+var compileError;
+
 function getShader ( gl, id ){
    var shaderScript = document.getElementById ( id );
    var str = "";
@@ -106,118 +63,150 @@ function getShader ( gl, id ){
    if (!compiled) {
      var compilationLog = gl.getShaderInfoLog(shader);
      console.log('Shader compiler log: ' + compilationLog);
+     document.getElementById("errors").value = compilationLog;
+     gl.deleteShader(shader);
+     return null;
    }
    return shader;
 }
 
-var gl, prog, prog_show, prog_distort; 
-var FBO, FBO2, texture, texture2, animation;
-var delay = 10, density = .24, it = 1, frames = 0, time, timer;
+var sceneImageSources = [
+    "https://s3.amazonaws.com/Oculus/Tuscany_Undistorted_Left.png",
+    "https://s3.amazonaws.com/Oculus/Tuscany_Undistorted_Right.png"
+];
+
+var loadedTextureCount = 0;
+
+var sceneTextures;
+var animation;
+var delay = 10, it = 1, frames = 0, time, timer;
+var gl, prog_distort, scaleLoc, offsetLoc, distortVaos; 
+
+function handleTextureLoaded(tex) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex.image);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);  
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  if (++loadedTextureCount == 2) {
+    animation = "animate";
+    anim();
+  }
+}
+
+function reloadDistortion() {
+   document.getElementById ( "shader-vs-distort" ).textContent =
+    document.getElementById("vertEdit").value; 
+
+   document.getElementById ( "shader-fs-distort" ).textContent =
+    document.getElementById("fragEdit").value;
+
+    var vertexShader = getShader( gl, "shader-vs-distort" );
+    if (null == vertexShader) {
+        return;
+    }
+    
+    var fragmentShader = getShader( gl, "shader-fs-distort" );
+    if (null == fragmentShader) {
+        return;
+    }
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vertexShader);
+    gl.attachShader(prog, fragmentShader);
+    gl.linkProgram(prog);
+    var linked = gl.getProgramParameter(prog, gl.LINK_STATUS);
+    if (!linked) {
+      var linkLog = gl.getProgramInfoLog(prog);
+      console.log('Program Link Loglog: ' + linkLog);
+      document.getElementById("errors").value = linkLog;
+      gl.deleteProgram(prog);
+      return;
+    }
+    document.getElementById("errors").value = "";
+    prog_distort = prog;
+    scaleLoc = gl.getUniformLocation(prog_distort, "EyeToSourceUVScale");
+    offsetLoc = gl.getUniformLocation(prog_distort, "EyeToSourceUVOffset");
+}
 
 function main() {
    clearInterval(timer);
    var c = document.getElementById("c");
-   try { gl = c.getContext("experimental-webgl", {depth : false } );
+   try {
+     gl = c.getContext("experimental-webgl", {depth : false } );
+     vaoExt = gl.getExtension('OES_vertex_array_object');
    } catch(e) {}
-   if ( !gl ) {alert("Your browser does not support WebGL"); return;}
+   if ( !gl || !vaoExt ) {alert("Your browser does not support WebGL"); return;}
 
-   vaoExt = gl.getExtension('OES_vertex_array_object');
+   sceneTextures = [gl.createTexture(), gl.createTexture()];
+   /*
+   FIXME why doesn't this work?
+   for (i = 0; i < 2; ++i) {
+     (function(){
+       sceneTextures[i].image = new Image();
+       sceneTextures[i].image.crossOrigin = "anonymous";
+       sceneTextures[i].image.onload = function() {
+         handleTextureLoaded(sceneTextures[i]); 
+       }
+       sceneTextures[i].image.src = sceneImageSources[i];
+     }());
+   }
+   */
+   sceneTextures[0].image = new Image();
+   sceneTextures[0].image.crossOrigin = "anonymous";
+   sceneTextures[0].image.onload = function() {
+     handleTextureLoaded(sceneTextures[0]); 
+   }
+   sceneTextures[0].image.src = sceneImageSources[0];
 
-   prog  = gl.createProgram();
-   gl.attachShader(prog, getShader( gl, "shader-vs" ));
-   gl.attachShader(prog, getShader( gl, "shader-fs" ));
-   gl.linkProgram(prog);
-   computeVao = vaoExt.createVertexArrayOES();
+   sceneTextures[1].image = new Image();
+   sceneTextures[1].image.crossOrigin = "anonymous";
+   sceneTextures[1].image.onload = function() {
+     handleTextureLoaded(sceneTextures[1]); 
+   }
+   sceneTextures[1].image.src = sceneImageSources[1];
 
-   vaoExt.bindVertexArrayOES(computeVao);
-   var posBuffer = gl.createBuffer();
-   gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-   var vertices = new Float32Array([-1,-1,0, 1,-1,0, -1,1,0, 1,1,0]);
-   var aPosLoc = gl.getAttribLocation(prog, "aPos");
-   gl.enableVertexAttribArray( aPosLoc );
-   var aTexLoc = gl.getAttribLocation(prog, "aTexCoord");
-   gl.enableVertexAttribArray( aTexLoc );
-   var texCoords = new Float32Array([0,0, 1,0, 0,1, 1,1]);
-   var texCoordOffset = vertices.byteLength;
-   gl.bufferData(gl.ARRAY_BUFFER,
-       texCoordOffset + texCoords.byteLength, gl.STATIC_DRAW);
-   gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices);
-   gl.bufferSubData(gl.ARRAY_BUFFER, texCoordOffset, texCoords);
-   gl.vertexAttribPointer(aPosLoc, 3, gl.FLOAT, gl.FALSE, 0, 0);
-   gl.vertexAttribPointer(aTexLoc, 2, gl.FLOAT, gl.FALSE, 0, texCoordOffset);
-   vaoExt.bindVertexArrayOES(null);
+   document.getElementById("vertEdit").value = 
+     document.getElementById ( "shader-vs-distort" ).textContent;
 
-   prog_show  = gl.createProgram();
-   gl.attachShader(prog_show, getShader( gl, "shader-vs" ));
-   gl.attachShader(prog_show, getShader( gl, "shader-fs-show" ));
-   gl.linkProgram(prog_show);
+   document.getElementById("fragEdit").value = 
+     document.getElementById ( "shader-fs-distort" ).textContent;
 
-   prog_distort  = gl.createProgram();
-   gl.attachShader(prog_distort, getShader( gl, "shader-vs-distort" ));
-   gl.attachShader(prog_distort, getShader( gl, "shader-fs-distort" ));
-   gl.linkProgram(prog_distort);
-   gl.useProgram(prog_distort);
+   (function() {
+     prog_distort  = gl.createProgram();
+     gl.attachShader(prog_distort, getShader( gl, "shader-vs-distort" ));
+     gl.attachShader(prog_distort, getShader( gl, "shader-fs-distort" ));
+     gl.linkProgram(prog_distort);
+     gl.useProgram(prog_distort);
+     scaleLoc = gl.getUniformLocation(prog_distort, "EyeToSourceUVScale");
+     offsetLoc = gl.getUniformLocation(prog_distort, "EyeToSourceUVOffset");
+     var PosLoc = gl.getAttribLocation(prog_distort, "Position");
+     var TexLoc = gl.getAttribLocation(prog_distort, "TexCoord0");
 
-   var scaleLoc = gl.getUniformLocation(prog_distort, "EyeToSourceUVScale");
-   gl.uniform2f(scaleLoc, mesh.left.scale[0], mesh.left.scale[1]);
-   var scaleLoc = gl.getUniformLocation(prog_distort, "EyeToSourceUVOffset");
-   gl.uniform2f(scaleLoc, mesh.left.offset[0], mesh.left.offset[1]);
+     distortVaos = [ vaoExt.createVertexArrayOES(), vaoExt.createVertexArrayOES() ];
+     for (i = 0; i < 2; ++i) {
+       vaoExt.bindVertexArrayOES(distortVaos[i]);
+       var distortIndexBuffer = gl.createBuffer();
+       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, distortIndexBuffer);
+       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, 
+         new Int16Array(eyeMeshes[i].mesh.indices), gl.STATIC_DRAW);
 
-   var distortVertices = new Float32Array(mesh.left.mesh.vertices);
-   var distortIndices = new Int16Array(mesh.left.mesh.indices);
-   distortVao = vaoExt.createVertexArrayOES();
-   vaoExt.bindVertexArrayOES(distortVao);
-
-   var distortIndexBuffer = gl.createBuffer();
-   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, distortIndexBuffer);
-   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, distortIndices, gl.STATIC_DRAW);
-
-   var distortVertexBuffer = gl.createBuffer();
-   gl.bindBuffer(gl.ARRAY_BUFFER, distortVertexBuffer);
-   gl.bufferData(gl.ARRAY_BUFFER, distortVertices, gl.STATIC_DRAW);
-   
-   var PosLoc = gl.getAttribLocation(prog_distort, "Position");
-   gl.enableVertexAttribArray( PosLoc );
-   gl.vertexAttribPointer(PosLoc, 2, gl.FLOAT, gl.FALSE, 40, 0);
-   var TexLoc = gl.getAttribLocation(prog_distort, "TexCoord0");
-   gl.enableVertexAttribArray( TexLoc );
-   gl.vertexAttribPointer(TexLoc, 2, gl.FLOAT, gl.FALSE, 40, 24);
-   vaoExt.bindVertexArrayOES(null);
-
-   texture = gl.createTexture();
-   gl.bindTexture(gl.TEXTURE_2D, texture);
-   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-   var pixels = [], tSize = 512;
-   for(var i = 0; i<tSize; i++)
-     for(var j = 0; j<tSize; j++)
-       if(Math.random() > density) pixels.push( 0, 0,0,0 );
-       else pixels.push( 255, 0,0,0 );
-   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tSize, tSize, 0, gl.RGBA,
-       gl.UNSIGNED_BYTE, new Uint8Array(pixels));
-   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-   texture2 = gl.createTexture();
-
-   gl.bindTexture(gl.TEXTURE_2D, texture2);
-   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tSize, tSize, 0, gl.RGBA,
-       gl.UNSIGNED_BYTE, new Uint8Array(pixels));
-   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-//   gl.uniform1i(gl.getUniformLocation(prog, "uTexSamp"), 0);
-   FBO = gl.createFramebuffer();
-   gl.bindFramebuffer(gl.FRAMEBUFFER, FBO);
-   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-       gl.TEXTURE_2D, texture, 0);
-   FBO2 = gl.createFramebuffer();
-   gl.bindFramebuffer(gl.FRAMEBUFFER, FBO2);
-   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-       gl.TEXTURE_2D, texture2, 0);
+       var distortVertexBuffer = gl.createBuffer();
+       gl.bindBuffer(gl.ARRAY_BUFFER, distortVertexBuffer);
+       gl.bufferData(gl.ARRAY_BUFFER, 
+         new Float32Array(eyeMeshes[i].mesh.vertices), gl.STATIC_DRAW);
+       gl.enableVertexAttribArray( PosLoc );
+       gl.vertexAttribPointer(PosLoc, 2, gl.FLOAT, gl.FALSE, 40, 0);
+       gl.enableVertexAttribArray( TexLoc );
+       gl.vertexAttribPointer(TexLoc, 2, gl.FLOAT, gl.FALSE, 40, 24);
+       vaoExt.bindVertexArrayOES(null);     }
+   }());
    timer = setInterval(fr, 500);
    time = new Date().getTime();
-   animation = "animate";
-   anim();
 }
+
 function anim(){
    draw();
    switch ( animation ){
@@ -227,39 +216,32 @@ function anim(){
        main(); break;
    }
 }
+
 function draw(){
-   gl.useProgram(prog);
-   vaoExt.bindVertexArrayOES(computeVao);
-   if (it > 0){ 
-     gl.bindTexture(gl.TEXTURE_2D, texture);
-     gl.bindFramebuffer(gl.FRAMEBUFFER, FBO2);}
-   else{
-     gl.bindTexture(gl.TEXTURE_2D, texture2);
-     gl.bindFramebuffer(gl.FRAMEBUFFER, FBO);
-   }
-   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-   gl.flush();
-   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-   var distort = false;
-   if (distort) {
-     gl.useProgram(prog_distort);
-    vaoExt.bindVertexArrayOES(distortVao);
-    gl.drawElements(gl.TRIANGLES, mesh.left.mesh.indices.length, 
-       gl.UNSIGNED_SHORT, 0);
-   } else {
-     gl.useProgram(prog_show);
-     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+   var distort = true;
+   gl.clearColor(0.1, 0.1, 0.1, 1.0);
+   gl.clear(gl.COLOR_BUFFER_BIT);
+   for (i = 0; i < 2; ++i) {
+     if (distort) {
+       gl.useProgram(prog_distort);
+       gl.uniform2f(scaleLoc, eyeMeshes[i].scale[0], eyeMeshes[i].scale[1]);
+       gl.uniform2f(offsetLoc, eyeMeshes[i].offset[0], eyeMeshes[i].offset[1]);
+       gl.bindTexture(gl.TEXTURE_2D, sceneTextures[i]);
+       vaoExt.bindVertexArrayOES(distortVaos[i]);
+       gl.drawElements(gl.TRIANGLES, mesh.left.mesh.indices.length, 
+          gl.UNSIGNED_SHORT, 0);
+     } else {
+       gl.useProgram(prog_show);
+       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+     }
    }
    gl.flush();
-   it = -it;  frames++;
+   frames++;
 }
 function setDelay(v) {
   delay = parseInt(v);
 }
-function setDensity(v) {
-  density = v.valueOf();
-  animation = "reset";
-}
+
 function fr(){
   var ti = new Date().getTime();
   var fps = Math.round(1000*frames/(ti - time));
@@ -273,24 +255,27 @@ function fr(){
 </style>
 </head>
 <body onload="main()">
-<table><tr><td>
-<canvas id="c" width="512" height="512"></canvas>
-<br><button onclick='animation="reset"'>Reset</button>
-delay(ms)<input size="2" value="3" onchange="setDelay( this.value )">
-density<input size="3" value="0.04" onchange="setDensity(this.value)">
-fps<input size="2" id="framerate">
-</td><td>
-<h1>Conway's Game of Life on GPU</h1>
+<table border="1">
+<tr><td>
+<h1>Distortion effects</h1>
+</td></tr>
+<tr>
+    <td><canvas id="c" width="1280" height="800"></canvas></td>
+    <td>
+    Vertex Shader<br/>
+    <textarea id="vertEdit" rows="20" cols="40"  onchange="reloadDistortion()"></textarea><br/>
+    Fragment Shader<br/>
+    <textarea id="fragEdit" rows="20" cols="40" onchange="reloadDistortion()"></textarea><br/>
+    Errors<br/>
+    <textarea id="errors" rows="4" cols="40" readonly="readonly"></textarea><br/>
+    </td>
+</tr>
+<tr><td>
 
-<br>One more 2D Life but only 7kb in one piece.
-On HD 4850 I've got ~80 frames per sec.
-<br>Random life-forms are funny but they freeze quickly :)
-<br><a href="http://en.wikipedia.org/wiki/Conway%27s_Game_of_Life">Conway's
-Game of Life (wiki)</a>
-</td></tr></table>
-
-<hr><a href="../webgl.htm">WebGL</a>
-&nbsp; &nbsp; <i>updated</i> 25 Apr 2010
+<br>
+fps<input size="2" id="framerate" readonly="readonly">
+</td><td></td></tr>
+</table>
 </body>
 </html>
 
