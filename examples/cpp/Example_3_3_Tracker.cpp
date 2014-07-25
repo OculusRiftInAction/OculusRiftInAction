@@ -16,13 +16,12 @@ public:
       FAIL("Unable to open HMD");
     }
     
-    if (!ovrHmd_StartSensor(hmd, ovrSensorCap_Orientation, 0)) {
+    if (!ovrHmd_ConfigureTracking(hmd, ovrTrackingCap_Orientation, 0)) {
       FAIL("Unable to locate Rift sensor device");
     }
   }
 
   virtual ~SensorFusionExample() {
-    ovrHmd_StopSensor(hmd);
     ovrHmd_Destroy(hmd);
   }
 
@@ -55,7 +54,7 @@ public:
       break;
 
     case GLFW_KEY_R:
-      ovrHmd_ResetSensor(hmd);
+      ovrHmd_RecenterPose(hmd);
       return;
     }
 
@@ -63,10 +62,10 @@ public:
   }
 
   void update() {
-    ovrSensorState sensorState = ovrHmd_GetSensorState(hmd, 0);
-    ovrPoseStatef & poseState = sensorState.Recorded;
+    ovrTrackingState sensorState = ovrHmd_GetTrackingState(hmd, 0);
+    ovrPoseStatef & poseState = sensorState.HeadPose;
     orientation = Rift::fromOvr(
-      poseState.Pose.Orientation);
+      poseState.ThePose.Orientation);
     linearA = Rift::fromOvr(
       poseState.LinearAcceleration);
     angularV = Rift::fromOvr(

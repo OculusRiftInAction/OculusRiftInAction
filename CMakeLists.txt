@@ -96,11 +96,6 @@ set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND EXAMPLE_LIBS glew)
 
-add_subdirectory(libraries/jansson)
-set_target_properties(jansson PROPERTIES FOLDER "3rdparty")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/jansson/src)
-list(APPEND EXAMPLE_LIBS jansson)
-
 add_subdirectory(libraries/OculusSDK/Bindings/C)
 set_target_properties(OVR_C PROPERTIES FOLDER "3rdparty")
 include_directories(libraries/OculusSDK/Bindings/C/Include)

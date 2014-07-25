@@ -39,7 +39,7 @@ void CubeScene::onKey(int key, int scancode, int action, int mods) {
     switch (key) {
     case GLFW_KEY_R:
       resetCamera();
-      ovrHmd_ResetSensor(hmd);
+      ovrHmd_RecenterPose(hmd);
       return;
     }
   }

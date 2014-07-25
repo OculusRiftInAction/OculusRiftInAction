@@ -51,9 +51,9 @@ public:
 
   void renderScene() {
     int currentEye = getCurrentEye();
-    ovrGLTexture & eyeTex = eyeTextures[currentEye];
-    const ovrSizei & texSize = eyeTex.Texture.Header.TextureSize;
-    ovrRecti & rvp = eyeTex.Texture.Header.RenderViewport;
+    ovrTexture & eyeTex = eyeTextures[currentEye];
+    const ovrSizei & texSize = eyeTex.Header.TextureSize;
+    ovrRecti & rvp = eyeTex.Header.RenderViewport;
     rvp.Size.w = texSize.w * texRes;
     rvp.Size.h = texSize.h * texRes;
     glViewport(

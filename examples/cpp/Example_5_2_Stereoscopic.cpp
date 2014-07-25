@@ -42,7 +42,7 @@ public:
     gl::MatrixStack & mv = gl::Stacks::modelview();
 
     for (int i = 0; i < ovrEye_Count; ++i) {
-      ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
+      ovrEyeType eye = hmd->EyeRenderOrder[i];
       PerEyeArg & eyeArgs = eyes[eye];
       gl::viewport(eyeArgs.viewportPosition, EYE_SIZE);
       gl::Stacks::with_push(mv, [&]{
