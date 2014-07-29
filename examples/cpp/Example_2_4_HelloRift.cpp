@@ -1,6 +1,10 @@
 #include "Common.h"
 #include <OVR_CAPI_GL.h>
 
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+
+#include <GLFW/glfw3native.h>
 #define DISTORT
 
 struct EyeArgs {
@@ -15,7 +19,7 @@ void swapBufferCallback(void * userData) {
 
 class HelloRift : public GlfwApp {
 protected:
-  ovrHmd                  hmd;
+  ovrHmd                  hmd{ 0 };
   EyeArgs                 perEyeArgs[2];
   ovrTexture              textures[2];
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
@@ -23,13 +27,8 @@ protected:
 
 public:
   HelloRift() {
-    hmd = ovrHmd_Create(0);
-    ovrHmd_ConfigureTracking(hmd, 
-      ovrTrackingCap_Orientation |
-      ovrTrackingCap_MagYawCorrection |
-      ovrTrackingCap_Position , 0);
-    windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
-    windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
+    windowPosition = glm::ivec2(0, 0);
+    windowSize = glm::uvec2(100, 100);
   }
 
   ~HelloRift() {
@@ -46,6 +45,18 @@ public:
     glfwWindowHint(GLFW_DECORATED, 0);
 
     createWindow(windowSize, windowPosition);
+    ovr_Initialize();
+    hmd = ovrHmd_Create(0);
+    ovrHmd_ConfigureTracking(hmd,
+      ovrTrackingCap_Orientation |
+      ovrTrackingCap_MagYawCorrection |
+      ovrTrackingCap_Position, 0);
+    windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
+    windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
+    glfwSetWindowPos(window, windowPosition.x, windowPosition.y);
+    glfwSetWindowSize(window, windowSize.x, windowSize.y);
+    
+    ovrHmd_AttachToWindow(hmd, glfwGetWin32Window(window), nullptr, nullptr);
 
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
@@ -159,5 +170,5 @@ public:
   }
 };
 
-RUN_OVR_APP(HelloRift);
+RUN_APP(HelloRift);
 

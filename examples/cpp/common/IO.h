@@ -22,8 +22,8 @@ template<class From> char * read_cast(From v) {
 
 template<size_t Size, typename T> std::istream &
 readStream(std::istream & in, T (&array)[Size]) {
-	size_t s = Size;
-	size_t ts = sizeof(T);
+    size_t s = Size;
+    size_t ts = sizeof(T);
 
   return in.read(read_cast(array), s * ts);
 }

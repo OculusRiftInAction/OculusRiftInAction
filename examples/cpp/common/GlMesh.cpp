@@ -104,7 +104,7 @@ void Mesh::addVertex(const glm::vec4 & vertex) {
 
 void Mesh::addVertex(const glm::vec3 & vertex) {
   positions.push_back(glm::vec4(transform(model.top(), vertex), 1));
-	indices.push_back((GLuint)indices.size());
+    indices.push_back((GLuint)indices.size());
 }
 
 void Mesh::addMesh(const Mesh & mesh, bool forceColor) {
@@ -211,12 +211,12 @@ gl::GeometryPtr Mesh::getGeometry(GLenum elementType) const {
   switch (elementType) {
   case GL_LINES:
     elements = (unsigned int)indices.size() / 2;
-	  verticesPerElement = 2;
-	  break;
+      verticesPerElement = 2;
+      break;
   case GL_TRIANGLES:
     elements = (unsigned int)indices.size() / 3;
-	  verticesPerElement = 3;
-	  break;
+      verticesPerElement = 3;
+      break;
   case GL_TRIANGLE_STRIP:
     elements = (unsigned int)indices.size();
     verticesPerElement = 1;
@@ -226,7 +226,7 @@ gl::GeometryPtr Mesh::getGeometry(GLenum elementType) const {
     verticesPerElement = 1;
     break;
   default:
-	  throw std::runtime_error("unsupported geometry type");
+      throw std::runtime_error("unsupported geometry type");
   }
   return gl::GeometryPtr(new gl::Geometry(vertices, indices, elements, flags, elementType, verticesPerElement));
 }

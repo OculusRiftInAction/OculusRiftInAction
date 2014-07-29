@@ -116,7 +116,6 @@ public:
     if (NULL == hmd) {
       hmd = ovrHmd_CreateDebug(defaultHmdType);
     }
-    //ovrHmd_GetDesc(hmd, &hmdDesc);
     hmdNativeResolution = glm::ivec2(hmd->Resolution.w, hmd->Resolution.h);
     hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
   }
