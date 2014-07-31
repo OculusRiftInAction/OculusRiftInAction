@@ -6,14 +6,15 @@ public:
 
   int run() {
     ovrHmd hmd = ovrHmd_Create(0);
-    if (!hmd || !ovrHmd_StartSensor(hmd, ovrSensorCap_Orientation, 0)) {
+    if (!hmd || !ovrHmd_ConfigureTracking(hmd,
+        ovrTrackingCap_Orientation, 0)) {
       SAY_ERR("Unable to detect Rift head tracker");
       return -1;
     }
     for (int i = 0; i < 10; ++i) {
-      ovrSensorState state = ovrHmd_GetSensorState(hmd, 0);
+      ovrTrackingState state = ovrHmd_GetTrackingState(hmd, 0);
       
-      ovrQuatf orientation = state.Recorded.Pose.Orientation;
+      ovrQuatf orientation = state.HeadPose.ThePose.Orientation;
       glm::quat q = glm::make_quat(&orientation.x);
       glm::vec3 euler = glm::eulerAngles(q);
 
@@ -23,7 +24,6 @@ public:
         euler.y * RADIANS_TO_DEGREES);
       Platform::sleepMillis(1000);
     }
-    ovrHmd_StopSensor(hmd);
     ovrHmd_Destroy(hmd);
     return 0;
   }

@@ -2,7 +2,6 @@
 
 class SensorFusionPredictionExample : public GlfwApp {
   ovrHmd hmd;
-  ovrSensorState sensorState;
   float predictionValue{ 0.030 };
   bool renderSensors{ false };
 
@@ -17,7 +16,7 @@ public:
       FAIL("Unable to open HMD");
     }
 
-    if (!ovrHmd_StartSensor(hmd, 0, 0)) {
+    if (!ovrHmd_ConfigureTracking(hmd, ovrTrackingCap_Orientation, 0)) {
       FAIL("Unable to locate Rift sensor device");
     }
   }
@@ -51,7 +50,7 @@ public:
 
     switch (key) {
     case GLFW_KEY_R:
-      ovrHmd_ResetSensor(hmd);
+      ovrHmd_RecenterPose(hmd);
       return;
     case GLFW_KEY_UP:
       predictionValue *= 1.5f;
@@ -64,10 +63,11 @@ public:
   }
 
   void update() {
-    sensorState = ovrHmd_GetSensorState(hmd, ovr_GetTimeInSeconds() + predictionValue);
+    ovrTrackingState predictedState = ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds() + predictionValue);
+    ovrTrackingState recordedState = ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds());
     // Update the modelview to reflect the orientation of the Rift
-    actual = glm::mat4_cast(Rift::fromOvr(sensorState.Recorded.Pose.Orientation));
-    predicted = glm::mat4_cast(Rift::fromOvr(sensorState.Predicted.Pose.Orientation)); 
+    actual = glm::mat4_cast(Rift::fromOvr(recordedState.HeadPose.ThePose.Orientation));
+    predicted = glm::mat4_cast(Rift::fromOvr(predictedState.HeadPose.ThePose.Orientation));
   }
 
   void draw() {

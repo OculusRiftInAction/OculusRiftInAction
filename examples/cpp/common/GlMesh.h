@@ -49,9 +49,9 @@ struct Mesh {
 
   void compare(const Mesh & mesh) const {
     size_t size = positions.size();
-	size_t osize = mesh.positions.size();
+    size_t osize = mesh.positions.size();
     assert(size == osize);
-	for (size_t i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
       const glm::vec4 & pos = positions[i];
       const glm::vec4 & opos = mesh.positions[i];
       assert(pos == opos);

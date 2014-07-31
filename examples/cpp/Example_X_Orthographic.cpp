@@ -4,7 +4,7 @@ class SimpleScene : public RiftApp {
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
   float scaleFactor = 1;
-  
+
 
 public:
   SimpleScene() {
@@ -76,15 +76,16 @@ public:
 //      glMatrixMode(GL_MODELVIEW);
       mv.identity();
 //      glLoadMatrixf(glm::value_ptr(mv.top()));
-      
-      static Text::FontPtr font = 
+      glm::vec2 cursor = glm::vec2(-0.5, -0.5);
+      static Text::FontPtr font =
         GlUtils::getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
-      font->renderString("World", glm::vec2(-0.5, -0.5));
+      font->renderString("World", cursor );
       mv.scale(0.5f);
+      cursor = glm::vec2(0);
       GlUtils::drawQuad(glm::vec2(-QUAD_SIZE), glm::vec2(QUAD_SIZE));
       GlUtils::getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF)->
-        renderString("Hello", glm::vec2(0), 12, 100);
-      
+        renderString("Hello", cursor , 12, 100);
+
     });
 
     GlUtils::drawAngleTicks();

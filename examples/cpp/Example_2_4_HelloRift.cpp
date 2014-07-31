@@ -1,42 +1,30 @@
 #include "Common.h"
 #include <OVR_CAPI_GL.h>
 
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+
+#include <GLFW/glfw3native.h>
 #define DISTORT
 
 struct EyeArgs {
   glm::mat4               projection;
   glm::mat4               viewOffset;
   gl::FrameBufferWrapper  framebuffer;
-  ovrGLTexture            textures;
 };
 
 class HelloRift : public GlfwApp {
 protected:
-  ovrHmd                  hmd;
-  ovrHmdDesc              hmdDesc;
+  ovrHmd                  hmd{ 0 };
   EyeArgs                 perEyeArgs[2];
+  ovrTexture              textures[2];
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
   float                   ipd{ OVR_DEFAULT_IPD };
 
 public:
   HelloRift() {
-    hmd = ovrHmd_Create(0);
-    ovrHmd_GetDesc(hmd, &hmdDesc);
-    ovrHmd_StartSensor(hmd, 0, 0);
-    windowPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
-    // The HMDInfo gives us the position of the Rift in desktop
-    // coordinates as well as the native resolution of the Rift
-    // display panel, but NOT the current resolution of the signal
-    // being sent to the Rift.
-    GLFWmonitor * hmdMonitor =
-        GlfwApp::getMonitorAtPosition(windowPosition);
-    if (hmdMonitor) {
-      // For the current resoltuion we must find the appropriate GLFW monitor
-      const GLFWvidmode * videoMode = glfwGetVideoMode(hmdMonitor);
-      windowSize = glm::ivec2(videoMode->width, videoMode->height);
-    } else {
-      windowSize = glm::ivec2(1280, 800);
-    }
+    windowPosition = glm::ivec2(0, 0);
+    windowSize = glm::uvec2(100, 100);
   }
 
   ~HelloRift() {
@@ -44,10 +32,33 @@ public:
     hmd = 0;
   }
 
+  virtual void finishFrame() {
+    /*
+     * The parent class calls glfwSwapBuffers in finishFrame,
+     * but with the Oculus SDK, the SDK it responsible for buffer
+     * swapping, so we have to override the method and ensure it
+     * does nothing, otherwise the dual buffer swaps will
+     * cause a constant flickering of the display.
+     */
+  }
+
+
   virtual void createRenderingTarget() {
     glfwWindowHint(GLFW_DECORATED, 0);
 
     createWindow(windowSize, windowPosition);
+    ovr_Initialize();
+    hmd = ovrHmd_Create(0);
+    ovrHmd_ConfigureTracking(hmd,
+      ovrTrackingCap_Orientation |
+      ovrTrackingCap_MagYawCorrection |
+      ovrTrackingCap_Position, 0);
+    windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
+    windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
+    glfwSetWindowPos(window, windowPosition.x, windowPosition.y);
+    glfwSetWindowSize(window, windowSize.x, windowSize.y);
+    
+    ovrHmd_AttachToWindow(hmd, glfwGetWin32Window(window), nullptr, nullptr);
 
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
@@ -59,21 +70,22 @@ public:
     ovrFovPort eyeFovPorts[2];
     for_each_eye([&](ovrEyeType eye){
       EyeArgs & eyeArgs = perEyeArgs[eye];
-      ovrTextureHeader & eyeTextureHeader = eyeArgs.textures.OGL.Header;
-      eyeFovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
-      eyeTextureHeader.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
+      ovrTextureHeader & eyeTextureHeader = textures[eye].Header;
+      eyeFovPorts[eye] = hmd->DefaultEyeFov[eye];
+      eyeTextureHeader.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmd->DefaultEyeFov[eye], 1.0f);
       eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.RenderViewport.Pos.x = 0;
       eyeTextureHeader.RenderViewport.Pos.y = 0;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
       eyeArgs.framebuffer.init(Rift::fromOvr(eyeTextureHeader.TextureSize));
-      eyeArgs.textures.OGL.TexId = eyeArgs.framebuffer.color->texture;
+      ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArgs.framebuffer.color->texture;
     });
 
-    ovrGLConfig cfg;
+    ovrGLConfig cfg; 
+    memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize = hmdDesc.Resolution;
+    cfg.OGL.Header.RTSize = hmd->Resolution;
     cfg.OGL.Header.Multisample = 1;
 
 #ifdef OVR_OS_WINDOWS
@@ -83,7 +95,7 @@ public:
     cfg.OGL.Win = 0;
 #endif
 
-    int distortionCaps = ovrDistortionCap_TimeWarp | ovrDistortionCap_Chromatic | ovrDistortionCap_Vignette | ovrDistortionCap_NoSwapBuffers;
+    int distortionCaps = ovrDistortionCap_TimeWarp | ovrDistortionCap_Chromatic | ovrDistortionCap_Vignette;
 
     ovrEyeRenderDesc              eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
@@ -105,7 +117,7 @@ public:
 
     switch (key) {
     case GLFW_KEY_R:
-      ovrHmd_ResetSensor(hmd);
+      ovrHmd_RecenterPose(hmd);
       break;
 
     default:
@@ -122,25 +134,26 @@ public:
 
   void draw() {
     static int frameIndex = 0;
+    static ovrPosef eyePoses[2];
     ovrHmd_BeginFrame(hmd, frameIndex++);
     glEnable(GL_DEPTH_TEST);
     for( int i = 0; i < 2; ++i) {
-      ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
+      ovrEyeType eye = hmd->EyeRenderOrder[i];
       EyeArgs & eyeArgs = perEyeArgs[eye];
       gl::Stacks::projection().top() = eyeArgs.projection;
       gl::MatrixStack & mv = gl::Stacks::modelview();
 
       eyeArgs.framebuffer.activate();
-      ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
+      eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose
-        mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(renderPose)) * mv.top();
+        mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(eyePoses[eye])) * mv.top();
         renderScene();
       });
-      ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeArgs.textures.Texture);
       eyeArgs.framebuffer.deactivate();
     };
-    ovrHmd_EndFrame(hmd);
+    GLenum err = glGetError();
+    ovrHmd_EndFrame(hmd, eyePoses, textures);
   }
 
   virtual void renderScene() {
@@ -157,5 +170,5 @@ public:
   }
 };
 
-RUN_OVR_APP(HelloRift);
+RUN_APP(HelloRift);
 

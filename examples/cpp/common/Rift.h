@@ -106,20 +106,18 @@ typedef RiftLookupTexture::Ptr RiftLookupTexturePtr;
 class RiftManagerApp {
 protected:
   ovrHmd hmd;
-  ovrHmdDesc hmdDesc;
 
   glm::uvec2 hmdNativeResolution;
   glm::ivec2 hmdDesktopPosition;
 
 public:
-  RiftManagerApp() {
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK1) {
     hmd = ovrHmd_Create(0);
     if (NULL == hmd) {
-      hmd = ovrHmd_CreateDebug(ovrHmd_CrystalCoveProto);
+      hmd = ovrHmd_CreateDebug(defaultHmdType);
     }
-    ovrHmd_GetDesc(hmd, &hmdDesc);
-    hmdNativeResolution = glm::ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
-    hmdDesktopPosition = glm::ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
+    hmdNativeResolution = glm::ivec2(hmd->Resolution.w, hmd->Resolution.h);
+    hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
   }
 
   virtual ~RiftManagerApp() {
@@ -233,7 +231,7 @@ public:
 protected:
   glm::mat4 player;
   ovrPosef  headPose;
-  ovrGLTexture eyeTextures[2];
+  ovrTexture eyeTextures[2];
 
 private:
   ovrEyeRenderDesc eyeRenderDescs[2];

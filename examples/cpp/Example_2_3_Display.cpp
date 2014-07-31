@@ -11,12 +11,9 @@ RiftDisplay() {
     FAIL("Unable to detect Rift display");
   }
 
-  ovrHmdDesc hmdDesc;
-  ovrHmd_GetDesc(hmd, &hmdDesc);
-
   windowPosition = glm::ivec2(
-      hmdDesc.WindowsPos.x,
-      hmdDesc.WindowsPos.y);
+      hmd->WindowsPos.x,
+      hmd->WindowsPos.y);
 
   GLFWmonitor * hmdMonitor =
       GlfwApp::getMonitorAtPosition(windowPosition);
