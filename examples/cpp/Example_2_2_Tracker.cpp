@@ -6,7 +6,8 @@ public:
 
   int run() {
     ovrHmd hmd = ovrHmd_Create(0);
-    if (!hmd || !ovrHmd_ConfigureTracking(hmd, ovrTrackingCap_Orientation, 0)) {
+    if (!hmd || !ovrHmd_ConfigureTracking(hmd,
+        ovrTrackingCap_Orientation, 0)) {
       SAY_ERR("Unable to detect Rift head tracker");
       return -1;
     }

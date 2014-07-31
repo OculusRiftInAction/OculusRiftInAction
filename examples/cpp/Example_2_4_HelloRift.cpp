@@ -13,10 +13,6 @@ struct EyeArgs {
   gl::FrameBufferWrapper  framebuffer;
 };
 
-void swapBufferCallback(void * userData) {
-  glfwSwapBuffers((GLFWwindow*)userData);
-}
-
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
@@ -37,7 +33,13 @@ public:
   }
 
   virtual void finishFrame() {
-
+    /*
+     * The parent class calls glfwSwapBuffers in finishFrame,
+     * but with the Oculus SDK, the SDK it responsible for buffer
+     * swapping, so we have to override the method and ensure it
+     * does nothing, otherwise the dual buffer swaps will
+     * cause a constant flickering of the display.
+     */
   }
 
 
@@ -80,7 +82,8 @@ public:
       ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArgs.framebuffer.color->texture;
     });
 
-    ovrGLConfig cfg; memset(&cfg, 0, sizeof(ovrGLConfig));
+    ovrGLConfig cfg; 
+    memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.RTSize = hmd->Resolution;
     cfg.OGL.Header.Multisample = 1;
@@ -97,7 +100,6 @@ public:
     ovrEyeRenderDesc              eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, eyeFovPorts, eyeRenderDescs);
-    //ovrHmd_SetSwapBuffersCallback(hmd, swapBufferCallback, window);
 
     for_each_eye([&](ovrEyeType eye){
       EyeArgs & eyeArgs = perEyeArgs[eye];
@@ -148,12 +150,10 @@ public:
         mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(eyePoses[eye])) * mv.top();
         renderScene();
       });
-      //ovrHmd_EndEyeRender(hmd, eye, renderPose, &eyeArgs.textures.Texture);
       eyeArgs.framebuffer.deactivate();
     };
     GLenum err = glGetError();
     ovrHmd_EndFrame(hmd, eyePoses, textures);
-//    glfwSwapBuffers(window);
   }
 
   virtual void renderScene() {
