@@ -20,16 +20,31 @@ protected:
   ovrTexture              textures[2];
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
   float                   ipd{ OVR_DEFAULT_IPD };
+  glm::mat4               player;
 
 public:
   HelloRift() {
-    windowPosition = glm::ivec2(0, 0);
-    windowSize = glm::uvec2(100, 100);
+    ovr_Initialize();
+    hmd = ovrHmd_Create(0);
+    ovrHmd_ConfigureTracking(hmd,
+      ovrTrackingCap_Orientation |
+      ovrTrackingCap_MagYawCorrection |
+      ovrTrackingCap_Position, 0);
+    windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
+    windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
+    resetPosition();
   }
 
   ~HelloRift() {
     ovrHmd_Destroy(hmd);
     hmd = 0;
+  }
+
+  virtual void resetPosition() {
+    static const glm::vec3 EYE = glm::vec3(0, eyeHeight, ipd * 5);
+    static const glm::vec3 LOOKAT = glm::vec3(0, eyeHeight, 0);
+    player = glm::inverse(glm::lookAt(EYE, LOOKAT, GlUtils::UP));
+    ovrHmd_RecenterPose(hmd);
   }
 
   virtual void finishFrame() {
@@ -42,22 +57,9 @@ public:
      */
   }
 
-
   virtual void createRenderingTarget() {
     glfwWindowHint(GLFW_DECORATED, 0);
-
     createWindow(windowSize, windowPosition);
-    ovr_Initialize();
-    hmd = ovrHmd_Create(0);
-    ovrHmd_ConfigureTracking(hmd,
-      ovrTrackingCap_Orientation |
-      ovrTrackingCap_MagYawCorrection |
-      ovrTrackingCap_Position, 0);
-    windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
-    windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
-    glfwSetWindowPos(window, windowPosition.x, windowPosition.y);
-    glfwSetWindowSize(window, windowSize.x, windowSize.y);
-    
     ovrHmd_AttachToWindow(hmd, glfwGetWin32Window(window), nullptr, nullptr);
 
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
@@ -88,14 +90,19 @@ public:
     cfg.OGL.Header.RTSize = hmd->Resolution;
     cfg.OGL.Header.Multisample = 1;
 
-#ifdef OVR_OS_WINDOWS
-    cfg.OGL.Window = 0;
-#elif defined(OVR_OS_LINUX)
-    cfg.OGL.Disp = 0;
-    cfg.OGL.Win = 0;
-#endif
+    ON_WINDOWS([&]{
+      cfg.OGL.Window = 0;
+    });
 
-    int distortionCaps = ovrDistortionCap_TimeWarp | ovrDistortionCap_Chromatic | ovrDistortionCap_Vignette;
+    ON_LINUX([&]{
+      cfg.OGL.Disp = 0;
+      cfg.OGL.Win = 0;
+    });
+
+    int distortionCaps = 
+      ovrDistortionCap_TimeWarp | 
+      ovrDistortionCap_Chromatic | 
+      ovrDistortionCap_Vignette;
 
     ovrEyeRenderDesc              eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
@@ -111,13 +118,36 @@ public:
   }
 
   void onKey(int key, int scancode, int action, int mods) {
-    if (GLFW_PRESS != action) {
+    if (CameraControl::instance().onKey(key, scancode, action, mods)) {
       return;
     }
 
+    if (GLFW_PRESS != action) {
+      GlfwApp::onKey(key, scancode, action, mods);
+      return;
+    }
+
+    int caps = ovrHmd_GetEnabledCaps(hmd);
     switch (key) {
+    case GLFW_KEY_V:
+      if (caps & ovrHmdCap_NoVSync) {
+        ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_NoVSync);
+      } else {
+        ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_NoVSync);
+      }
+      break;
+
+    case GLFW_KEY_P:
+      if (caps & ovrHmdCap_LowPersistence) {
+        ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_LowPersistence);
+      }
+      else {
+        ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_LowPersistence);
+      }
+      break;
+
     case GLFW_KEY_R:
-      ovrHmd_RecenterPose(hmd);
+      resetPosition();
       break;
 
     default:
@@ -127,9 +157,8 @@ public:
   }
 
   virtual void update() {
-    static const glm::vec3 EYE = glm::vec3(0, eyeHeight, ipd * 5);
-    static const glm::vec3 LOOKAT = glm::vec3(0, eyeHeight, 0);
-    gl::Stacks::modelview().top() = glm::lookAt(EYE, LOOKAT, GlUtils::UP);
+    CameraControl::instance().applyInteraction(player);
+    gl::Stacks::modelview().top() = glm::inverse(player);
   }
 
   void draw() {
@@ -152,16 +181,20 @@ public:
       });
       eyeArgs.framebuffer.deactivate();
     };
-    GLenum err = glGetError();
     ovrHmd_EndFrame(hmd, eyePoses, textures);
   }
 
   virtual void renderScene() {
     glClear(GL_DEPTH_BUFFER_BIT);
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    GlUtils::renderFloorGrid(glm::mat4());
+    GlUtils::renderFloor();
 
     gl::MatrixStack & mv = gl::Stacks::modelview();
+    mv.with_push([&]{
+      mv.translate(glm::vec3(0, 0, ipd * -5));
+      GlUtils::renderManikin();
+    });
+
     mv.with_push([&]{
       mv.translate(glm::vec3(0, eyeHeight, 0));
       mv.scale(ipd);
