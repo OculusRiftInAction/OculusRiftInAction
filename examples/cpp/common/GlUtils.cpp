@@ -1140,5 +1140,48 @@ void GlUtils::dancingCubes(int elements, float elapsed) {
     mv.pop();
   }
 
+}
 
+void GlUtils::renderFloor() {
+  using namespace gl;
+  static GeometryPtr g;
+  static float FLOOR_DIMENSION = 100.0f;
+  if (!g) {
+    Mesh m;
+    m.addTexCoord(glm::vec2(FLOOR_DIMENSION, FLOOR_DIMENSION));
+    m.addVertex(glm::vec3(FLOOR_DIMENSION, 0, FLOOR_DIMENSION));
+
+    m.addTexCoord(glm::vec2(FLOOR_DIMENSION, -FLOOR_DIMENSION));
+    m.addVertex(glm::vec3(FLOOR_DIMENSION, 0, -FLOOR_DIMENSION));
+
+    m.addTexCoord(glm::vec2(-FLOOR_DIMENSION, FLOOR_DIMENSION));
+    m.addVertex(glm::vec3(-FLOOR_DIMENSION, 0, FLOOR_DIMENSION));
+
+    m.addTexCoord(glm::vec2(-FLOOR_DIMENSION, -FLOOR_DIMENSION));
+    m.addVertex(glm::vec3(-FLOOR_DIMENSION, 0, -FLOOR_DIMENSION));
+    g = m.getGeometry(GL_TRIANGLE_STRIP);
+  }
+  static Texture2dPtr t;
+  if (!t) {
+    t = getImageAsTexture(Resource::IMAGES_FLOOR_PNG);
+    t->bind();
+    t->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+    t->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    t->generateMipmap();
+    Texture2d::unbind();
+  }
+
+  ProgramPtr program = getProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
+  t->bind();
+  renderGeometry(g, program);
+  Texture2d::unbind();
+}
+
+void GlUtils::renderManikin() {
+  static gl::GeometryPtr manikin;
+  if (!manikin) {
+    manikin = GlUtils::getMesh(Resource::MESHES_MANIKIN_CTM).getGeometry();
+  }
+  static gl::ProgramPtr lit = GlUtils::getProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
+  GlUtils::renderGeometry(manikin, lit);
 }

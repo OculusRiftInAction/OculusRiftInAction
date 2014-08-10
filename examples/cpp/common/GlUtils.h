@@ -206,6 +206,10 @@ public:
     scaleRenderGrid(100.0, position);
   }
 
+  static void renderFloor();
+
+  static void renderManikin();
+
   static void renderFloorGrid(const glm::vec3 & position) {
     renderFloorGrid(glm::vec2(position.x, position.z));
   }
