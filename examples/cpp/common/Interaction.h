@@ -138,7 +138,7 @@ public:
   void read() {
     if (glfwJoystickPresent(glfwIndex)) {
       int axisCount = 0;
-      const float * joyAxes = glfwGetJoystickAxes(0, &axisCount);
+      const float * joyAxes = glfwGetJoystickAxes(glfwIndex, &axisCount);
       if (axisCount != axes.size()) {
         axes.resize(axisCount);
       }
@@ -156,7 +156,7 @@ public:
       memcpy(&axes[0], joyAxes, sizeof(float) * axisCount);
       int buttonCount = 0;
       const uint8_t * joyButtons =
-          glfwGetJoystickButtons(0, &buttonCount);
+        glfwGetJoystickButtons(glfwIndex, &buttonCount);
 
       //    {
       //      std::string buttonReport;

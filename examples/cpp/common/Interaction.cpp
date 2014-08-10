@@ -193,18 +193,29 @@ void CameraControl::applyInteraction(glm::mat4 & camera) {
 //  int spnav_sensitivity(double sens);
 
 #endif
+  static bool joysetup = false;
+  static bool x52present = false;
+  static std::shared_ptr<GlfwJoystick> joystick;
 
-  if (glfwJoystickPresent(0)) {
-    static const char * joyName = glfwGetJoystickName(0);
-    static bool x52present =
-        std::string(joyName).find("X52") !=
-            std::string::npos;
-
-    static std::shared_ptr<GlfwJoystick> joystick(
-        x52present ?
-            (GlfwJoystick*)new SaitekX52Pro::Controller(0) :
-            (GlfwJoystick*)new Xbox::Controller(0)
+  if (!joysetup) {
+    joysetup = true;
+    for (int i = 0; i < 10; ++i) {
+      if (glfwJoystickPresent(i)) {
+        const char * joyName = glfwGetJoystickName(i);
+        x52present =
+          std::string(joyName).find("X52") !=
+          std::string::npos;
+        joystick = std::shared_ptr<GlfwJoystick>(
+          x52present ?
+          (GlfwJoystick*)new SaitekX52Pro::Controller(i) :
+          (GlfwJoystick*)new Xbox::Controller(i)
         );
+        break;
+      }
+    }
+  }
+
+  if (joystick) {
     joystick->read();
     glm::vec3 translation;
     glm::quat rotation;
