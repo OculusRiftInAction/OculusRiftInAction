@@ -66,7 +66,7 @@ public:
     glfwWindowHint(GLFW_DECORATED, 0);
     createWindow(windowSize, windowPosition);
     ovrHmd_AttachToWindow(hmd, glfwGetWin32Window(window), nullptr, nullptr);
-
+    ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
     }
