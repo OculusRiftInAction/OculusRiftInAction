@@ -50,6 +50,7 @@ public:
   virtual void createFullscreenWindow(const glm::uvec2 & size, GLFWmonitor * targetMonitor);
   virtual void destroyWindow();
   virtual void onKey(int key, int scancode, int action, int mods);
+  virtual void onMouseButton(int button, int action, int mods);
   virtual void draw();
   virtual void update();
   virtual void renderStringAt(const std::string & string, float x, float y) {

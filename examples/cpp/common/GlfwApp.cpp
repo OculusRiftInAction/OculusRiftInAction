@@ -77,6 +77,11 @@ void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action,
   instance->onKey(key, scancode, action, mods);
 }
 
+void glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+  GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
+  instance->onMouseButton(button, action, mods);
+}
+
 void glfwErrorCallback(int error, const char* description) {
   FAIL(description);
 }
@@ -154,6 +159,7 @@ void GlfwApp::onCreate() {
   windowAspectInverse = 1.0f / windowAspect;
   glfwSetWindowUserPointer(window, this);
   glfwSetKeyCallback(window, glfwKeyCallback);
+  glfwSetMouseButtonCallback(window, glfwMouseButtonCallback);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
 
@@ -350,6 +356,11 @@ void GlfwApp::onKey(int key, int scancode, int action, int mods) {
 #endif
   }
 }
+
+void GlfwApp::onMouseButton(int button, int action, int mods) {
+
+}
+
 
 void GlfwApp::draw() {
 }
