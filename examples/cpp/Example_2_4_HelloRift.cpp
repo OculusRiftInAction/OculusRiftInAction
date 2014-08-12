@@ -26,6 +26,11 @@ public:
   HelloRift() {
     ovr_Initialize();
     hmd = ovrHmd_Create(0);
+    if (nullptr == hmd) {
+      ovrHmdType type = ovrHmd_DK2;
+
+      hmd = ovrHmd_CreateDebug(type);
+    }
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_MagYawCorrection |
@@ -118,6 +123,15 @@ public:
   }
 
   void onKey(int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS) {
+      static ovrHSWDisplayState hswDisplayState;
+      ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
+      if (hswDisplayState.Displayed) {
+        ovrHmd_DismissHSWDisplay(hmd);
+        return;
+      }
+    }
+
     if (CameraControl::instance().onKey(key, scancode, action, mods)) {
       return;
     }
