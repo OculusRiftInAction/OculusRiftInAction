@@ -53,6 +53,25 @@
 #include <OVR_CAPI.h>
 #include <OVR_CAPI_GL.h>
 
+
+#if defined(OVR_OS_WIN32)
+#define ON_WINDOWS(runnable) runnable()
+#else
+#define ON_WINDOWS(runnable) 
+#endif
+
+#if defined(OVR_OS_MAC)
+#define ON_MAC(runnable) runnable()
+#else
+#define ON_MAC(runnable) 
+#endif
+
+#if defined(OVR_OS_LINUX)
+#define ON_LINUX(runnable) runnable()
+#else
+#define ON_LINUX(runnable) 
+#endif
+
 #include <GlDebug.h>
 #include <GlMethods.h>
 
@@ -152,4 +171,3 @@ public:
 
 #include "Rift.h"
 #include "OpenCV.h"
-

@@ -104,8 +104,13 @@ void Mesh::addVertex(const glm::vec4 & vertex) {
 
 void Mesh::addVertex(const glm::vec3 & vertex) {
   positions.push_back(glm::vec4(transform(model.top(), vertex), 1));
-    indices.push_back((GLuint)indices.size());
+  indices.push_back((GLuint)indices.size());
 }
+
+void Mesh::addTexCoord(const glm::vec2 & texCoord) {
+  texCoords.push_back(texCoord);
+}
+
 
 void Mesh::addMesh(const Mesh & mesh, bool forceColor) {
   int indexOffset = positions.size();

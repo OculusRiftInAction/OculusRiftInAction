@@ -77,6 +77,11 @@ void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action,
   instance->onKey(key, scancode, action, mods);
 }
 
+void glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+  GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
+  instance->onMouseButton(button, action, mods);
+}
+
 void glfwErrorCallback(int error, const char* description) {
   FAIL(description);
 }
@@ -154,6 +159,7 @@ void GlfwApp::onCreate() {
   windowAspectInverse = 1.0f / windowAspect;
   glfwSetWindowUserPointer(window, this);
   glfwSetKeyCallback(window, glfwKeyCallback);
+  glfwSetMouseButtonCallback(window, glfwMouseButtonCallback);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
 
@@ -212,10 +218,6 @@ void GlfwApp::preCreate() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#ifdef __APPLE__
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#endif
 #ifdef RIFT_DEBUG
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 #endif
@@ -351,6 +353,11 @@ void GlfwApp::onKey(int key, int scancode, int action, int mods) {
   }
 }
 
+void GlfwApp::onMouseButton(int button, int action, int mods) {
+
+}
+
+
 void GlfwApp::draw() {
 }
 
@@ -369,72 +376,3 @@ GLFWmonitor * GlfwApp::getMonitorAtPosition(const glm::ivec2 & position) {
   }
   return nullptr;
 }
-
-/*
-#define MK(X, Y, Z) \
-X Y; memset(&Y, 0, sizeof(X)); Y.Z = sizeof(X);
-bool GlfwApp::getCurrentResolution(const std::string & displayName, long displayId, glm::ivec2 & size, glm::ivec2 & position) {
-  int count;
-  // Try a cross-platform mechanism for fetching the information
-  GLFWmonitor ** monitors = glfwGetMonitors(&count);
-  for (int i = 0; i < count; ++i) {
-    std::string monitorName = glfwGetMonitorName(monitors[i]);
-//    std::wstring deviceName = glfwGetWin32DeviceName(monitors[i]);
-    if (monitorName == displayName) {
-      glfwGetMonitorPos(monitors[i], &position.x, &position.y);
-      const GLFWvidmode * mode = glfwGetVideoMode(monitors[i]);
-      size.x = mode->width;
-      size.y = mode->height;
-      return true;
-    }
-  }
-
-#ifdef WIN32
-  MK(DISPLAY_DEVICEA, dd, cb);
-  DWORD deviceNum = 0;
-  while (EnumDisplayDevicesA(NULL, deviceNum, &dd, 0)){
-    MK(DEVMODEA, deviceMode, dmSize);
-    EnumDisplaySettingsExA(dd.DeviceName, ENUM_CURRENT_SETTINGS, &deviceMode, 0);
-
-    if (displayName == std::string(dd.DeviceName)) {
-      size.x = deviceMode.dmPelsWidth;
-      size.y = deviceMode.dmPelsHeight;
-      position.x = deviceMode.dmPosition.x;
-      position.y = deviceMode.dmPosition.y;
-      return true;
-    }
-
-    MK(DISPLAY_DEVICEA, dd2, cb);
-    DWORD monitorNum = 0;
-    while (EnumDisplayDevicesA(dd.DeviceName, monitorNum, &dd2, 0)) {
-      if (displayName == std::string(dd2.DeviceName)) {
-        size.x = deviceMode.dmPelsWidth;
-        size.y = deviceMode.dmPelsHeight;
-        position.x = deviceMode.dmPosition.x;
-        position.y = deviceMode.dmPosition.y;
-        return true;
-      }
-      monitorNum++;
-    }
-    deviceNum++;
-  }
-#elif __APPLE__
-    uint32_t monitorCount;
-    CGGetOnlineDisplayList(0, NULL, &monitorCount);
-    std::vector<CGDirectDisplayID> displays(monitorCount);
-    CGGetOnlineDisplayList(monitorCount, &displays[0], &monitorCount);
-    for (int i = 0;  i < monitorCount;  i++) {
-        if (displayId == displays[i]) {
-            CGRect rect = CGDisplayBounds (displays[i]);
-            size.x = rect.size.width;
-            size.y = rect.size.height;
-            position.x = rect.origin.x;
-            position.y = rect.origin.y;
-            return true;
-        }
-    }
-#else
-#endif
-  return false;
-}
-*/
