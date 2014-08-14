@@ -1,11 +1,18 @@
 #include "Common.h"
 #include <OVR_CAPI_GL.h>
 
+#if defined(OVR_OS_WIN32)
 #define GLFW_EXPOSE_NATIVE_WIN32
 #define GLFW_EXPOSE_NATIVE_WGL
+#elif defined(OVR_OS_MAC)
+#define GLFW_EXPOSE_NATIVE_COCOA
+#define GLFW_EXPOSE_NATIVE_NSGL
+#elif defined(OVR_OS_LINUX)
+#define GLFW_EXPOSE_NATIVE_X11
+#define GLFW_EXPOSE_NATIVE_GLX
+#endif
 
 #include <GLFW/glfw3native.h>
-#define DISTORT
 
 struct EyeArgs {
   glm::mat4               projection;
@@ -27,13 +34,10 @@ public:
     ovr_Initialize();
     hmd = ovrHmd_Create(0);
     if (nullptr == hmd) {
-      ovrHmdType type = ovrHmd_DK2;
-
-      hmd = ovrHmd_CreateDebug(type);
+      hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
     }
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
-      ovrTrackingCap_MagYawCorrection |
       ovrTrackingCap_Position, 0);
     windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
     windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
@@ -65,7 +69,19 @@ public:
   virtual void createRenderingTarget() {
     glfwWindowHint(GLFW_DECORATED, 0);
     createWindow(windowSize, windowPosition);
-    ovrHmd_AttachToWindow(hmd, glfwGetWin32Window(window), nullptr, nullptr);
+
+    void * windowIdentifier = nullptr;
+    ON_WINDOWS([&]{
+      windowIdentifier = glfwGetWin32Window(window);
+    });
+    ON_MAC([&]{
+      windowIdentifier = glfwGetCocoaWindow(window);
+    });
+    ON_LINUX([&]{
+      windowIdentifier = glfwGetX11Window(window);
+    });
+
+    ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
     ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
     if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
