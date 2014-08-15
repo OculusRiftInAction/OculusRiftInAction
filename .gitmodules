@@ -25,6 +25,3 @@
 [submodule "examples/python"]
 	path = examples/python
 	url = https://github.com/jherico/pyovr-examples.git
-[submodule "libraries/jansson"]
-	path = libraries/jansson
-	url = git@github.com:akheron/jansson.git
