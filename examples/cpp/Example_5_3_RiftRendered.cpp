@@ -1,8 +1,6 @@
 #include "Common.h"
 #include "CubeScene.h"
 
-static const glm::uvec2 WINDOW_SIZE(1280, 800);
-
 struct PerEyeArg {
   glm::mat4                     modelviewOffset;
   glm::mat4                     projection;
@@ -16,7 +14,6 @@ class CubeScene_Rift: public CubeScene {
 
 public:
   CubeScene_Rift() {
-    windowSize = WINDOW_SIZE;
   }
 
   virtual void initGl() {

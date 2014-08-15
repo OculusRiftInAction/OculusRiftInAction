@@ -19,7 +19,6 @@ protected:
 
 public:
   virtual ~UndistortedExample() {
-    ovrHmd_Destroy(hmd);
   }
 
   void initGl() {
