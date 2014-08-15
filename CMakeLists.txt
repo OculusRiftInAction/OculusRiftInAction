@@ -39,7 +39,6 @@ endif()
 if(RIFT_DEBUG)
    message("Debug build, resources will be loaded from disk")
    set(OVR_DEBUG_BUILD 1)
-   add_definitions(-DOVR_DEBUG_BUILD)
 else() 
    message("Release build, resources will be loaded from executable/bundle")
 endif()
@@ -84,7 +83,6 @@ if (NOT(EXISTS ${OVR_DIR} AND IS_DIRECTORY ${OVR_DIR}))
 endif()
 
 # Add debug output from the Oculus SDK
-add_definitions(-DOVR_BUILD_DEBUG)
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(libraries/OculusSDK/LibOVR)
