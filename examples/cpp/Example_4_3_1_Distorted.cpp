@@ -8,7 +8,7 @@ Resource SCENE_IMAGES[2] = {
 class DistortedExample : public RiftGlfwApp {
 protected:
   gl::Texture2dPtr sceneTextures[2];
-  ovrGLTexture eyeTextures[2];
+  ovrTexture eyeTextures[2];
   ovrEyeRenderDesc eyeRenderDescs[2];
 
 public:
@@ -17,6 +17,7 @@ public:
 
   void initGl() {
     RiftGlfwApp::initGl();
+    glDisable(GL_BLEND);
 
     for_each_eye([&](ovrEyeType eye){
       glm::uvec2 textureSize;
@@ -27,7 +28,7 @@ public:
         sizeof(eyeTextures[eye]));
 
       ovrTextureHeader & eyeTextureHeader =
-        eyeTextures[eye].OGL.Header;
+        eyeTextures[eye].Header;
 
       eyeTextureHeader.TextureSize = Rift::toOvr(textureSize);
       eyeTextureHeader.RenderViewport.Size =
@@ -35,32 +36,46 @@ public:
 
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
-      eyeTextures[eye].OGL.TexId =
+      ((ovrGLTextureData&)eyeTextures[eye]).TexId =
         sceneTextures[eye]->texture;
     });
 
-    ovrGLConfig glConfig;
+    ovrRenderAPIConfig config;
     //ovrRenderAPIConfig cfg;
-    memset(&glConfig, 0, sizeof(glConfig));
-    glConfig.OGL.Header.API = ovrRenderAPI_OpenGL;
-    glConfig.OGL.Header.RTSize= Rift::toOvr(windowSize);
-    glConfig.OGL.Header.Multisample = 1;
+    memset(&config, 0, sizeof(config));
+    config.Header.API = ovrRenderAPI_OpenGL;
+    config.Header.RTSize = Rift::toOvr(windowSize);
+    config.Header.Multisample = 1;
 #if defined(OVR_OS_WIN32)
-    glConfig.OGL.Window = 0;
+    ((ovrGLConfigData&)config).Window = 0;
 #elif defined(OVR_OS_LINUX)
-    glConfig.OGL.Win = 0;
-    glConfig.OGL.Disp = 0;
+    ((ovrGLConfigData&)config).Win = 0;
+    ((ovrGLConfigData&)config).Disp = 0;
 #endif
 
-    int distortionCaps = ovrDistortionCap_Vignette
+    int distortionCaps = 
+      ovrDistortionCap_Vignette
       | ovrDistortionCap_Chromatic
-      | ovrDistortionCap_TimeWarp
-      ;
-    int configResult = ovrHmd_ConfigureRendering(hmd, &glConfig.Config,
-      distortionCaps, hmdDesc.DefaultEyeFov, eyeRenderDescs);
+      | ovrDistortionCap_TimeWarp;
+
+    int configResult = ovrHmd_ConfigureRendering(hmd, &config,
+      distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
     }
+  }
+
+
+  void onKey(int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS) {
+      static ovrHSWDisplayState hswDisplayState;
+      ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
+      if (hswDisplayState.Displayed) {
+        ovrHmd_DismissHSWDisplay(hmd);
+        return;
+      }
+    }
+    RiftGlfwApp::onKey(key, scancode, action, mods);
   }
 
   virtual void finishFrame() {
@@ -68,14 +83,15 @@ public:
 
   void draw() {
     static int frameIndex = 0;
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     ovrHmd_BeginFrame(hmd, frameIndex++);
+    static ovrPosef poses[2];
     for (int i = 0; i < 2; ++i) {
-      ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
-      ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
-      ovrHmd_EndEyeRender(hmd, eye, renderPose,
-        &eyeTextures[eye].Texture);
+      ovrEyeType eye = hmd->EyeRenderOrder[i];
+      poses[eye] = ovrHmd_GetEyePose(hmd, eye);
     }
-    ovrHmd_EndFrame(hmd);
+    ovrHmd_EndFrame(hmd, poses, eyeTextures);
   }
 };
 

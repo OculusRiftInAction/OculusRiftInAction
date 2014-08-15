@@ -12,7 +12,7 @@ public:
 
   void draw() {
     glm::ivec2 position(0, 0);
-    glm::uvec2 eyeSize(hmdDesc.Resolution.w / 2, hmdDesc.Resolution.h);
+    glm::uvec2 eyeSize(hmd->Resolution.w / 2, hmd->Resolution.h);
     gl::scissor(position, eyeSize);
     gl::clearColor(Colors::red);
     glClear(GL_COLOR_BUFFER_BIT);

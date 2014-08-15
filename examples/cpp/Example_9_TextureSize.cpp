@@ -66,7 +66,7 @@ public:
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
       GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-      GlUtils::renderFloorGrid(player);
+      GlUtils::renderFloor();
       gl::Stacks::with_push(mv, [&]{
         mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
         GlUtils::drawColorCube(true);

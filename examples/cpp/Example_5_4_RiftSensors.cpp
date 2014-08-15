@@ -1,8 +1,6 @@
 #include "Common.h"
 #include "CubeScene.h"
 
-static const glm::uvec2 WINDOW_SIZE(1280, 800);
-
 struct PerEyeArg {
   glm::mat4                     modelviewOffset;
   glm::mat4                     projection;
@@ -16,11 +14,9 @@ class CubeScene_RiftSensors: public CubeScene {
 
 public:
   CubeScene_RiftSensors() {
-    windowSize = WINDOW_SIZE;
     if (!ovrHmd_ConfigureTracking(hmd, 
         ovrTrackingCap_Orientation |
-        ovrTrackingCap_Position |
-        ovrTrackingCap_MagYawCorrection, 0)) {
+        ovrTrackingCap_Position, 0)) {
       SAY("Warning: Unable to locate Rift sensor device.  This demo is boring now.");
     }
   }

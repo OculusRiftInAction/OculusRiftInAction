@@ -68,7 +68,7 @@ void CubeScene::resetCamera() {
 
 void CubeScene::drawCubeScene() {
   GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-  GlUtils::renderFloorGrid(glm::mat4(1));
+  GlUtils::renderFloor();
 
   program->use();
 
