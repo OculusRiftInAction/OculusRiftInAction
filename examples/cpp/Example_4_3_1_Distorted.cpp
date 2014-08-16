@@ -1,8 +1,13 @@
 #include "Common.h"
 
-Resource SCENE_IMAGES[2] = {
-  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_PNG,
-  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_PNG
+Resource SCENE_IMAGES_DK1[2] = {
+  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_DK1_PNG,
+  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_DK1_PNG
+};
+
+Resource SCENE_IMAGES_DK2[2] = {
+  Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_DK2_PNG,
+  Resource::IMAGES_TUSCANY_UNDISTORTED_RIGHT_DK2_PNG
 };
 
 class DistortedExample : public RiftGlfwApp {
@@ -19,10 +24,15 @@ public:
     RiftGlfwApp::initGl();
     glDisable(GL_BLEND);
 
+    Resource * sceneImages = SCENE_IMAGES_DK2;
+    if (hmd->Type == ovrHmd_DK1) {
+      sceneImages = SCENE_IMAGES_DK1;
+    }
+
     for_each_eye([&](ovrEyeType eye){
       glm::uvec2 textureSize;
       GlUtils::getImageAsTexture(sceneTextures[eye],
-        SCENE_IMAGES[eye], textureSize);
+        sceneImages[eye], textureSize);
 
       memset(eyeTextures + eye, 0,
         sizeof(eyeTextures[eye]));
@@ -60,6 +70,7 @@ public:
 
     int configResult = ovrHmd_ConfigureRendering(hmd, &config,
       distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
+    ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
     }
