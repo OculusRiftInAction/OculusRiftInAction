@@ -1,6 +1,5 @@
 #include "Common.h"
 #include "CubeScene.h"
-//#include <glm/gtx/string_cast.hpp>
 
 CubeScene::CubeScene() {
   ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
@@ -25,7 +24,6 @@ void CubeScene::initGl() {
   cubeTransforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd, ipd, ipd)));
   cubeTransforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight / 2, 0)), glm::vec3(ipd / 2, eyeHeight, ipd / 2)));
   (new gl::VertexBuffer(cubeTransforms))->bind();
-  cube->bindVertexArray();
   cube->addInstanceVertexArray();
   gl::VertexArray::unbind();
 }

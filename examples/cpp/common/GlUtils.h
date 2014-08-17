@@ -28,7 +28,8 @@
 class GlUtils {
 public:
   static void drawColorCube(bool lit = false);
-  static void drawQuad(const glm::vec2 & min = glm::vec2(-1),
+  static void drawQuad(
+      const glm::vec2 & min = glm::vec2(-1),
       const glm::vec2 & max = glm::vec2(1));
   static void drawAngleTicks();
   static void draw3dGrid();
@@ -169,54 +170,8 @@ public:
 
   static void tumble(const glm::vec3 & camera = glm::vec3(0, 0, 1));
 
-  static glm::vec2 quantize(const glm::vec2 & t, float scale) {
-    float width = scale * 2.0f;
-    glm::vec2 t2 = t + scale;
-    glm::vec2 t3 = glm::floor(t2 / width) * width;
-    return t3;
-  }
-
-  static void scaleRenderGrid(float scale, const glm::vec2 & p) {
-    glm::vec2 p3 = quantize(p, scale);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    mv.push().translate(glm::vec3(p3.x - scale, 0, p3.y - scale)).scale(
-      scale);
-    GlUtils::draw3dGrid();
-    mv.pop();
-
-    mv.push().translate(glm::vec3(p3.x - scale, 0, p3.y + scale)).scale(
-      scale);
-    GlUtils::draw3dGrid();
-    mv.pop();
-
-    mv.push().translate(glm::vec3(p3.x + scale, 0, p3.y - scale)).scale(
-      scale);
-    GlUtils::draw3dGrid();
-    mv.pop();
-
-    mv.push().translate(glm::vec3(p3.x + scale, 0, p3.y + scale)).scale(
-      scale);
-    GlUtils::draw3dGrid();
-    mv.pop();
-  }
-
-  static void renderFloorGrid(const glm::vec2 & position) {
-    scaleRenderGrid(1.0, position);
-    scaleRenderGrid(10.0, position);
-    scaleRenderGrid(100.0, position);
-  }
-
   static void renderFloor();
-
   static void renderManikin();
-
-  static void renderFloorGrid(const glm::vec3 & position) {
-    renderFloorGrid(glm::vec2(position.x, position.z));
-  }
-
-  static void renderFloorGrid(const glm::mat4 & camera) {
-    renderFloorGrid(glm::vec2(camera[3].x, camera[3].z));
-  }
 
   static void cubeRecurse(int depth = 6, float elapsed = Platform::elapsedSeconds());
   static void dancingCubes(int elements = 8, float elapsed = Platform::elapsedSeconds());
