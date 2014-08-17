@@ -148,7 +148,7 @@ public:
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    GlUtils::renderFloorGrid(player);
+    GlUtils::renderFloor();
     gl::MatrixStack & mv = gl::Stacks::modelview();
     gl::Stacks::with_push(mv, [&]{
       mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);

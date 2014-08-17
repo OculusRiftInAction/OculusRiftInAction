@@ -1,7 +1,4 @@
 #include "Common.h"
-#include <fstream>
-#include <sys/types.h>
-#include <sys/stat.h>
 
 Resource SCENE_IMAGES_DK1[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_DK1_PNG,

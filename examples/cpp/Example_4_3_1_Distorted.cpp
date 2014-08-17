@@ -14,15 +14,11 @@ class DistortedExample : public RiftGlfwApp {
 protected:
   gl::Texture2dPtr sceneTextures[2];
   ovrTexture eyeTextures[2];
-  ovrEyeRenderDesc eyeRenderDescs[2];
 
 public:
-  virtual ~DistortedExample() {
-  }
-
+  
   void initGl() {
     RiftGlfwApp::initGl();
-    glDisable(GL_BLEND);
 
     Resource * sceneImages = SCENE_IMAGES_DK2;
     if (hmd->Type == ovrHmd_DK1) {
@@ -51,7 +47,6 @@ public:
     });
 
     ovrRenderAPIConfig config;
-    //ovrRenderAPIConfig cfg;
     memset(&config, 0, sizeof(config));
     config.Header.API = ovrRenderAPI_OpenGL;
     config.Header.RTSize = Rift::toOvr(windowSize);
@@ -65,28 +60,15 @@ public:
 
     int distortionCaps = 
       ovrDistortionCap_Vignette
-      | ovrDistortionCap_Chromatic
-      | ovrDistortionCap_TimeWarp;
+      | ovrDistortionCap_Chromatic;
 
+    ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &config,
       distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
-    ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
     }
-  }
-
-
-  void onKey(int key, int scancode, int action, int mods) {
-    if (action == GLFW_PRESS) {
-      static ovrHSWDisplayState hswDisplayState;
-      ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
-      if (hswDisplayState.Displayed) {
-        ovrHmd_DismissHSWDisplay(hmd);
-        return;
-      }
-    }
-    RiftGlfwApp::onKey(key, scancode, action, mods);
+    ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
   }
 
   virtual void finishFrame() {
@@ -94,14 +76,9 @@ public:
 
   void draw() {
     static int frameIndex = 0;
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    ovrHmd_BeginFrame(hmd, frameIndex++);
     static ovrPosef poses[2];
-    for (int i = 0; i < 2; ++i) {
-      ovrEyeType eye = hmd->EyeRenderOrder[i];
-      poses[eye] = ovrHmd_GetEyePose(hmd, eye);
-    }
+    glClear(GL_COLOR_BUFFER_BIT);
+    ovrHmd_BeginFrame(hmd, frameIndex++);
     ovrHmd_EndFrame(hmd, poses, eyeTextures);
   }
 };
