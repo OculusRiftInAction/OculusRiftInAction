@@ -38,7 +38,7 @@ public:
   }
 
   virtual void draw() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_DEPTH_BUFFER_BIT);
     gl::MatrixStack & mv = gl::Stacks::modelview();
 
     for (int i = 0; i < ovrEye_Count; ++i) {

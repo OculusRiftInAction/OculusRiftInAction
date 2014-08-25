@@ -29,6 +29,15 @@ void CubeScene::initGl() {
 }
 
 void CubeScene::onKey(int key, int scancode, int action, int mods) {
+  ovrHSWDisplayState hswState;
+  if (GLFW_PRESS == action) {
+    ovrHmd_GetHSWDisplayState(hmd, &hswState);
+    if (hswState.Displayed) {
+      ovrHmd_DismissHSWDisplay(hmd);
+      return;
+    }
+  }
+
   if (CameraControl::instance().onKey(key, scancode, action, mods)) {
     return;
   }

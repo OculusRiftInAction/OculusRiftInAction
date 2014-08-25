@@ -23,7 +23,10 @@ class ClientSideDistortionExample : public RiftGlfwApp {
 
 public:
   ClientSideDistortionExample() {
-    ovrHmd_StartSensor(hmd, 0, 0);
+    ovrHmd_ConfigureTracking(hmd, 
+      ovrTrackingCap_Orientation |
+      ovrTrackingCap_Position, 0);
+    ovrHmd_ResetFrameTiming(hmd, 0);
     player = glm::inverse(glm::lookAt(
       glm::vec3(0, eyeHeight, ipd * 4),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
@@ -34,7 +37,7 @@ public:
     RiftGlfwApp::initGl();
     for_each_eye([&](ovrEyeType eye){
       EyeArg & eyeArg = eyeArgs[eye];
-      ovrFovPort fov = hmdDesc.DefaultEyeFov[eye];
+      ovrFovPort fov = hmd->DefaultEyeFov[eye];
       ovrEyeRenderDesc renderDesc = ovrHmd_GetRenderDesc(hmd, eye, fov);
 
       // Set up the per-eye projection matrix
@@ -43,7 +46,7 @@ public:
       eyeArg.viewOffset = glm::translate(glm::mat4(), Rift::fromOvr(renderDesc.ViewAdjust));
       ovrRecti texRect;
       texRect.Size = ovrHmd_GetFovTextureSize(hmd, eye,
-        hmdDesc.DefaultEyeFov[eye], 1.0f);
+        hmd->DefaultEyeFov[eye], 1.0f);
       texRect.Pos.x = texRect.Pos.y = 0;
 
       eyeArg.frameBuffer.init(Rift::fromOvr(texRect.Size));
@@ -70,12 +73,12 @@ public:
       eyeArg.meshVbo->load(bufferSize, eyeArg.mesh.pVertexData);
 
       size_t stride = sizeof(ovrDistortionVertex);
-      size_t offset = offsetof(ovrDistortionVertex, Pos);
+      size_t offset = offsetof(ovrDistortionVertex, ScreenPosNDC);
       glEnableVertexAttribArray(gl::Attribute::Position);
       glVertexAttribPointer(gl::Attribute::Position, 2, GL_FLOAT, GL_FALSE,
         stride, (void*)offset);
 
-      offset = offsetof(ovrDistortionVertex, TexG);
+      offset = offsetof(ovrDistortionVertex, TanEyeAnglesG);
       glEnableVertexAttribArray(gl::Attribute::TexCoord0);
       glVertexAttribPointer(gl::Attribute::TexCoord0, 2, GL_FLOAT, GL_FALSE,
         stride, (void*)offset);
@@ -98,18 +101,18 @@ public:
     static int frameIndex = 0;
     ovrFrameTiming timing = ovrHmd_BeginFrameTiming(hmd, frameIndex++);
     for (int i = 0; i < 2; ++i) {
-      const ovrEyeType eye = hmdDesc.EyeRenderOrder[i];
+      const ovrEyeType eye = hmd->EyeRenderOrder[i];
       const EyeArg & eyeArg = eyeArgs[eye];
       // Set up the per-eye projection matrix
       gl::Stacks::projection().top() = eyeArg.projection;
-
+      
+      ovrPosef pose = ovrHmd_GetEyePose(hmd, eye);
       eyeArg.frameBuffer.activate();
       gl::MatrixStack & mv = gl::Stacks::modelview();
       gl::Stacks::with_push([&]{
-        ovrSensorState ss = ovrHmd_GetSensorState(hmd, timing.EyeScanoutSeconds[eye]);
         // Set up the per-eye modelview matrix
         // Apply the head pose
-        mv.preMultiply(glm::inverse(Rift::fromOvr(ss.Predicted.Pose)));
+        mv.preMultiply(glm::inverse(Rift::fromOvr(pose)));
         // Apply the per-eye offset
         mv.preMultiply(eyeArg.viewOffset);
         renderScene();

@@ -99,7 +99,6 @@ set_target_properties(OVR_C PROPERTIES FOLDER "3rdparty")
 include_directories(libraries/OculusSDK/Bindings/C/Include)
 list(APPEND EXAMPLE_LIBS OVR_C)
 
-
 ###############################################################################
 #
 # Non-Oculus third party dependencies 

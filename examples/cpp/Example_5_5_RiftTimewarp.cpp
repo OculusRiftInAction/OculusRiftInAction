@@ -7,19 +7,20 @@ struct PerEyeArg {
   gl::FrameBufferWrapper        frameBuffer;
 };
 
-class CubeScene_RiftSensors: public CubeScene {
+class CubeScene_RiftTimewarp: public CubeScene {
   PerEyeArg   eyes[2];
   ovrTexture  textures[2];
   int         frameIndex{ 0 };
 
 public:
-  CubeScene_RiftSensors() {
+  CubeScene_RiftTimewarp() {
     if (!ovrHmd_ConfigureTracking(hmd, 
         ovrTrackingCap_Orientation |
         ovrTrackingCap_Position, 0)) {
       SAY("Warning: Unable to locate Rift sensor device.  This demo is boring now.");
     }
   }
+
 
   virtual void initGl() {
     CubeScene::initGl();
@@ -30,7 +31,10 @@ public:
     cfg.Header.RTSize = hmd->Resolution;
     cfg.Header.Multisample = 1;
 
-    int distortionCaps = ovrDistortionCap_Chromatic;
+    int distortionCaps = 
+      ovrDistortionCap_Chromatic |
+      ovrDistortionCap_Vignette |
+      ovrDistortionCap_TimeWarp;
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
       distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
@@ -59,6 +63,8 @@ public:
   virtual void finishFrame() {
   }
 
+  ovrPosef eyePoses[2];
+
   virtual void draw() {
     ovrHmd_BeginFrame(hmd, frameIndex++);
     ovrPosef eyePoses[2];
@@ -83,6 +89,10 @@ public:
 
     ovrHmd_EndFrame(hmd, eyePoses, textures);
   }
+
+
+  
+
 };
 
-RUN_OVR_APP(CubeScene_RiftSensors);
+RUN_OVR_APP(CubeScene_RiftTimewarp);
