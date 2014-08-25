@@ -99,12 +99,6 @@ set_target_properties(OVR_C PROPERTIES FOLDER "3rdparty")
 include_directories(libraries/OculusSDK/Bindings/C/Include)
 list(APPEND EXAMPLE_LIBS OVR_C)
 
-
-include_directories(/progra~1/VideoLAN/VLC/sdk/include)
-link_directories(/progra~1/VideoLAN/VLC/sdk/lib)
-list(APPEND EXAMPLE_LIBS libvlc libvlccore)
-
-
 ###############################################################################
 #
 # Non-Oculus third party dependencies 
