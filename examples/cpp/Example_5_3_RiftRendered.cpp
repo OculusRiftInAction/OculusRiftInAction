@@ -25,7 +25,9 @@ public:
     cfg.Header.RTSize = hmd->Resolution;
     cfg.Header.Multisample = 1;
 
-    int distortionCaps = ovrDistortionCap_Chromatic;
+    int distortionCaps = 
+      ovrDistortionCap_Chromatic |
+      ovrDistortionCap_Vignette;
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
         distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
@@ -35,12 +37,13 @@ public:
       ovrFovPort fov = hmd->DefaultEyeFov[eye];
       ovrTextureHeader & textureHeader = textures[eye].Header;
       ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
+      eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
+
       textureHeader.API = ovrRenderAPI_OpenGL;
       textureHeader.TextureSize = texSize;
       textureHeader.RenderViewport.Size = texSize;
       textureHeader.RenderViewport.Pos.x = 0;
       textureHeader.RenderViewport.Pos.y = 0;
-      eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
       ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArg.frameBuffer.color->texture;
 
       ovrVector3f offset = eyeRenderDescs[eye].ViewAdjust;
@@ -62,8 +65,6 @@ public:
       ovrEyeType eye = hmd->EyeRenderOrder[i];
       PerEyeArg & eyeArgs = eyes[eye];
       gl::Stacks::projection().top() = eyeArgs.projection;
-
-      eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
 
       eyeArgs.frameBuffer.withFramebufferActive([&]{
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

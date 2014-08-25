@@ -1185,3 +1185,30 @@ void GlUtils::renderManikin() {
   static gl::ProgramPtr lit = GlUtils::getProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
   GlUtils::renderGeometry(manikin, lit);
 }
+
+void GlUtils::renderCubeScene(float ipd, float eyeHeight) {
+  renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+  renderFloor();
+
+  static gl::ProgramPtr program;
+  static gl::GeometryPtr cube;
+  if (!program) {
+    program = getProgram(Resource::SHADERS_CHAPTER5_VS, Resource::SHADERS_CHAPTER5_FS);
+    cube = getColorCubeGeometry();
+    std::vector<glm::mat4> cubeTransforms;
+    cubeTransforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd)));
+    cubeTransforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight / 2, 0)), glm::vec3(ipd / 2, eyeHeight, ipd / 2)));
+    (new gl::VertexBuffer(cubeTransforms))->bind();
+    cube->addInstanceVertexArray();
+  }
+
+  program->use();
+  gl::Stacks::lights().apply(*program);
+  gl::Stacks::projection().apply(*program);
+  gl::Stacks::modelview().apply(*program);
+  cube->bindVertexArray();
+  cube->drawInstanced(2);
+  gl::VertexArray::unbind();
+  gl::Program::clear();
+
+}
