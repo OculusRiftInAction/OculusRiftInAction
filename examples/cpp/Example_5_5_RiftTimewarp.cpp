@@ -90,6 +90,30 @@ public:
     ovrHmd_EndFrame(hmd, eyePoses, textures);
   }
 
+  void onKey(int key, int scancode, int action, int mods) {
+    ovrHSWDisplayState hswState;
+    if (GLFW_PRESS == action) {
+      ovrHmd_GetHSWDisplayState(hmd, &hswState);
+      if (hswState.Displayed) {
+        ovrHmd_DismissHSWDisplay(hmd);
+        return;
+      }
+    }
+
+    if (CameraControl::instance().onKey(key, scancode, action, mods)) {
+      return;
+    }
+
+    if (GLFW_PRESS == action) {
+      switch (key) {
+      case GLFW_KEY_P:
+        toggleCap(ovrHmdCap_LowPersistence);
+        return;
+      }
+    }
+
+    CubeScene::onKey(key, scancode, action, mods);
+  }
 
   
 
