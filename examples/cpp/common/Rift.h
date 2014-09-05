@@ -210,18 +210,24 @@ public:
   virtual ~RiftGlfwApp() {
   }
 
-  virtual void viewport(ovrEyeType eye) {
-    glm::uvec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
-    gl::viewport(viewportPosition, glm::uvec2(windowSize.x / 2, windowSize.y));
+  int getEnabledCaps() {
+    return ovrHmd_GetEnabledCaps(hmd);
   }
 
-
-  void leftEyeViewport() {
-    viewport(ovrEye_Left);
+  void enableCaps(int caps) {
+    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() | caps);
   }
 
-  void rightEyeViewport() {
-    viewport(ovrEye_Right);
+  void toggleCap(ovrHmdCaps cap) {
+    if (cap & getEnabledCaps()) {
+      disableCaps(cap);
+    } else {
+      enableCaps(cap);
+    }
+  }
+
+  void disableCaps(int caps) {
+    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() &  ~caps);
   }
 };
 
