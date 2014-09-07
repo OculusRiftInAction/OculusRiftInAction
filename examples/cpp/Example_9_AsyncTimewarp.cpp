@@ -86,6 +86,16 @@ public:
         case GLFW_KEY_R:
           resetCamera();
           return;
+        case GLFW_KEY_P:
+          {
+            int caps = ovrHmd_GetEnabledCaps(hmd);
+            if (caps & ovrHmdCap_LowPersistence) {
+              ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_LowPersistence);
+            } else {
+              ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_LowPersistence);
+            }
+          }
+          return;
         }
       }
       RiftGlfwApp::onKey(key, scancode, action, mods);
@@ -94,7 +104,7 @@ public:
 
   void resetCamera() {
     player = glm::inverse(glm::lookAt(
-      glm::vec3(0, eyeHeight, 0.5f),  // Position of the camera
+      glm::vec3(0, eyeHeight, 0.3f),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
       GlUtils::Y_AXIS));           // Camera up axis
     ovrHmd_RecenterPose(hmd);
@@ -152,7 +162,8 @@ public:
       mv.postMultiply(glm::inverse(player));
       GlUtils::renderCubeScene(ipd, eyeHeight);
     });
-    renderStringAt(Platform::format("Per Eye Delay %dms", perEyeDelay), glm::vec2(-0.5, 0.5));
+    std::string maxfps = perEyeDelay ? Platform::format("%0.2f", 500.0f / perEyeDelay) : "N/A";
+    renderStringAt(Platform::format("Per Eye Delay %dms\nMax FPS %s", perEyeDelay, maxfps.c_str()), glm::vec2(-0.5, 0.5));
     // Simulate some really slow rendering
     if (0 != perEyeDelay) {
       Platform::sleepMillis(perEyeDelay);

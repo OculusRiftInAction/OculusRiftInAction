@@ -1193,20 +1193,20 @@ void GlUtils::renderCubeScene(float ipd, float eyeHeight) {
   static gl::ProgramPtr program;
   static gl::GeometryPtr cube;
   if (!program) {
-    program = getProgram(Resource::SHADERS_CHAPTER5_VS, Resource::SHADERS_CHAPTER5_FS);
+    program = getProgram(Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
     cube = getColorCubeGeometry();
-    std::vector<glm::mat4> cubeTransforms;
-    cubeTransforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd)));
-    (new gl::VertexBuffer(cubeTransforms))->bind();
-    cube->addInstanceVertexArray();
   }
 
   program->use();
   gl::Stacks::lights().apply(*program);
   gl::Stacks::projection().apply(*program);
-  gl::Stacks::modelview().apply(*program);
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.withPush([&]{
+    mv.translate(glm::vec3(0, eyeHeight, 0)).scale(glm::vec3(ipd)).apply(*program);
+  });
+//  mv.apply(*program);
   cube->bindVertexArray();
-  cube->drawInstanced(2);
+  cube->draw();
   gl::VertexArray::unbind();
   gl::Program::clear();
 
