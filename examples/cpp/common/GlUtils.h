@@ -172,7 +172,7 @@ public:
 
   static void renderFloor();
   static void renderManikin();
-  static void renderCubeScene(float ipd, float eyeHeight);
+  static void renderCubeScene(float ipd = OVR_DEFAULT_IPD, float eyeHeight = OVR_DEFAULT_EYE_HEIGHT);
 
   static void cubeRecurse(int depth = 6, float elapsed = Platform::elapsedSeconds());
   static void dancingCubes(int elements = 8, float elapsed = Platform::elapsedSeconds());
