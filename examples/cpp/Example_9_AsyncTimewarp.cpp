@@ -13,17 +13,18 @@ class SimpleScene : public RiftGlfwApp {
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
   ovrEyeRenderDesc eyeRenderDescs[2];
-  gl::FrameBufferWrapper frameBuffers[2][2];
   glm::mat4 projections[2];
   ovrTexture eyeTextures[2];
   ovrPosef eyePoses[2];
   glm::mat4 player;
+  volatile int perEyeDelay = 0;
+  int frameIndex{ 0 };
+  volatile int textureIds[2];
   ovrEyeType currentEye;
   std::unique_ptr<std::thread> threadPtr;
   std::mutex ovrLock;
   GLFWwindow * renderWindow;
-  GLsync eyeFences[2];
-  int backBuffers[2];
+  volatile bool running{ true };
 
 public:
   SimpleScene() {
@@ -34,8 +35,6 @@ public:
       SAY_ERR("Could not attach to sensor device");
     }
     for_each_eye([&](ovrEyeType eye){
-      eyeFences[eye] = 0;
-      backBuffers[eye] = 0;
       textureIds[eye] = 0;
     });
 
@@ -59,6 +58,12 @@ public:
   }
 
   ~SimpleScene() {
+    // Release the distortion lock
+    running = false;
+    // Hack find a cleaner way of shutting down the rendering thread
+    Platform::sleepMillis(10);
+    ovrLock.unlock();
+    threadPtr->join();
   }
 
 
@@ -69,17 +74,21 @@ public:
       if (action == GLFW_PRESS) {
         switch (key) {
         case GLFW_KEY_HOME:
-          break;
+          if (0 == perEyeDelay) {
+            perEyeDelay = 1;
+          } else {
+            perEyeDelay <<= 1;
+          }
+          return;
         case GLFW_KEY_END:
-          break;
+          perEyeDelay >>= 1;
+          return;
         case GLFW_KEY_R:
           resetCamera();
-          break;
+          return;
         }
       }
-      else {
-        RiftGlfwApp::onKey(key, scancode, action, mods);
-      }
+      RiftGlfwApp::onKey(key, scancode, action, mods);
     }
   }
 
@@ -131,19 +140,41 @@ public:
     renderWindow = glfwCreateWindow(100, 100, "Ofscreen", nullptr, window);
 
     threadPtr = std::unique_ptr<std::thread>(new std::thread(&SimpleScene::runOvrThread, this));
-//    threadPtr->join();
     glfwMakeContextCurrent(window);
   }
 
-  int frameIndex{ 0 };
-  volatile int textureIds[2];
+
+  void renderScene() {
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    gl::MatrixStack & mv = gl::Stacks::modelview();
+    mv.withPush([&]{
+      mv.postMultiply(glm::inverse(player));
+      GlUtils::renderCubeScene(ipd, eyeHeight);
+    });
+    renderStringAt(Platform::format("Per Eye Delay %dms", perEyeDelay), glm::vec2(-0.5, 0.5));
+    // Simulate some really slow rendering
+    if (0 != perEyeDelay) {
+      Platform::sleepMillis(perEyeDelay);
+    }
+  }
 
   void runOvrThread() {
+    // Make the shared context current
     glfwMakeContextCurrent(renderWindow);
+    // Each thread requires it's own glewInit call.
     glewInit();
 
-    // Allocate the frameBuffer that will hold the scene, and then be
-    // re-rendered to the screen with distortion
+    // Synchronization to determine when a given eye's render commands have completed
+    GLsync eyeFences[2]{0, 0};
+    // The index of the current rendering target framebuffer.  
+    int backBuffers[2]{0, 0};
+    // The pose for each rendered framebuffer
+    ovrPosef backPoses[2];
+
+    // Offscreen rendering targets.  two for each eye.
+    // One is used for rendering while the other is used for distortion
+    gl::FrameBufferWrapper frameBuffers[2][2];
     for_each_eye([&](ovrEyeType eye) {
       glm::uvec2 frameBufferSize = Rift::fromOvr(eyeTextures[0].Header.TextureSize);
       for (int i = 0; i < 2; ++i) {
@@ -151,23 +182,27 @@ public:
       }
     });
 
-    while (true) {
-      for_each_eye([&](ovrEyeType eye) {
-        if (0 != eyeFences[eye]) {
-          GLenum result = glClientWaitSync(eyeFences[eye], GL_SYNC_FLUSH_COMMANDS_BIT, 0);
-          switch (result) {
-          case GL_ALREADY_SIGNALED:
-          case GL_CONDITION_SATISFIED:
-            eyeFences[eye] = 0;
-            int bufferIndex = backBuffers[eye];
-            textureIds[eye] = frameBuffers[bufferIndex][eye].color->texture;
-            backBuffers[eye] = (bufferIndex + 1) % 2;
-            break;
-          }
-        }
-      });
-
+    while (running) {
       for (int i = 0; i < 2; ++i) {
+        for_each_eye([&](ovrEyeType eye) {
+          if (0 != eyeFences[eye]) {
+            GLenum result = glClientWaitSync(eyeFences[eye], GL_SYNC_FLUSH_COMMANDS_BIT, 0);
+            switch (result) {
+            case GL_ALREADY_SIGNALED:
+            case GL_CONDITION_SATISFIED:
+              withLock(ovrLock, [&]{
+                eyeFences[eye] = 0;
+                int bufferIndex = backBuffers[eye];
+                textureIds[eye] = frameBuffers[bufferIndex][eye].color->texture;
+                backBuffers[eye] = (bufferIndex + 1) % 2;
+                eyePoses[eye] = backPoses[eye];
+              });
+              break;
+            }
+          }
+        });
+
+
         ovrEyeType eye = hmd->EyeRenderOrder[i];
         if (0 != eyeFences[eye]) {
           continue;
@@ -178,13 +213,18 @@ public:
         gl::Stacks::with_push(mv, [&]{
           const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
 
+          // We can only acquire an eye pose between beginframe and endframe.
+          // So we've arranged for the lock to be only open at those points.  
+          // The main thread will spend most of it's time in the wait.
           ::withLock(ovrLock, [&]{
-            eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
+            if (running) {
+              backPoses[eye] = ovrHmd_GetEyePose(hmd, eye);
+            }
           });
 
           {
             // Apply the head pose
-            glm::mat4 m = Rift::fromOvr(eyePoses[eye]);
+            glm::mat4 m = Rift::fromOvr(backPoses[eye]);
             mv.preMultiply(glm::inverse(m));
             // Apply the per-eye offset
             glm::vec3 eyeOffset = Rift::fromOvr(erd.ViewAdjust);
@@ -198,12 +238,9 @@ public:
           renderScene();
           frameBuffer.deactivate();
           eyeFences[eye] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-          glFlush();
-          textureIds[eye] = frameBuffer.color->texture;
         });
       }
     }
-
   }
 
 
@@ -211,7 +248,11 @@ public:
     auto frameTime = ovrHmd_BeginFrame(hmd, frameIndex++);
     ovrLock.unlock();
 
-    ovr_WaitTillTime(frameTime.TimewarpPointSeconds - 0.002);
+    if (0 == frameTime.TimewarpPointSeconds) {
+      ovr_WaitTillTime(frameTime.TimewarpPointSeconds - 0.002);
+    } else {
+      ovr_WaitTillTime(frameTime.NextFrameSeconds - 0.008);
+    }
 
     // Grab the most recent textures
     for_each_eye([&](ovrEyeType eye) {
@@ -221,17 +262,6 @@ public:
 
     ovrLock.lock();
     ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
-  }
-
-  void renderScene() {
-    glEnable(GL_DEPTH_TEST);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    mv.withPush([&]{
-      mv.postMultiply(glm::inverse(player));
-      GlUtils::renderCubeScene(ipd, eyeHeight);
-      GlUtils::cubeRecurse(10);
-    });
   }
 };
 
