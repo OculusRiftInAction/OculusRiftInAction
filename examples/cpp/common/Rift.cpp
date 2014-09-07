@@ -3,7 +3,7 @@
 
 RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
   Platform::sleepMillis(200);
-  if (!ovrHmd_ConfigureTracking(hmd, 
+  if (!ovrHmd_ConfigureTracking(hmd,
     ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0)) {
     SAY_ERR("Could not attach to sensor device");
   }
@@ -56,6 +56,9 @@ void RiftApp::initGl() {
   int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
     distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
 
+#ifdef _DEBUG
+  ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
+#endif
   float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
   for_each_eye([&](ovrEyeType eye){
     const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];

@@ -1197,7 +1197,6 @@ void GlUtils::renderCubeScene(float ipd, float eyeHeight) {
     cube = getColorCubeGeometry();
     std::vector<glm::mat4> cubeTransforms;
     cubeTransforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight, 0)), glm::vec3(ipd)));
-    cubeTransforms.push_back(glm::scale(glm::translate(glm::mat4(), glm::vec3(0, eyeHeight / 2, 0)), glm::vec3(ipd / 2, eyeHeight, ipd / 2)));
     (new gl::VertexBuffer(cubeTransforms))->bind();
     cube->addInstanceVertexArray();
   }
