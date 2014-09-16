@@ -26,6 +26,8 @@ function(make_example FILE PROJECT_FOLDER)
 
     if(WIN32)
         add_executable(${EXECUTABLE} WIN32 ${SOURCE_FILES})
+        list(APPEND EXAMPLE_LIBS d3d11)
+        list(APPEND EXAMPLE_LIBS dxgi)
     elseif(APPLE)
         list(APPEND SOURCE_FILES ${ALL_RESOURCES})
         foreach(resource_file ${ALL_RESOURCES}) 
