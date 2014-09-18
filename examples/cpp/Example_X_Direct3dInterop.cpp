@@ -1,940 +1,34 @@
 #include "Common.h"
+
 #ifdef OVR_OS_WIN32
 
 #define OVR_D3D_VERSION 11
-#include <../../../LibOVR/Src/Kernel/OVR_Math.h>
-#include <../../../LibOVR/Src/Kernel/OVR_Array.h>
-#include <../../../LibOVR/Src/Kernel/OVR_String.h>
-#include <../../../LibOVR/Src/Kernel/OVR_Color.h>
-#include <../../../LibOVR/Src/Kernel/OVR_Log.h>
-#include <d3d11.h>
+#include <../../../LibOVR/Src/Kernel/OVR_Types.h>
+#include <../../../LibOVR/Src/Kernel/OVR_RefCount.h>
 #include <OVR_CAPI_D3D.h>
 #include <GL/wglew.h>
-#undef new
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+#include <GLFW/glfw3native.h>
 
-
-
-class GlStubWindow : public GlfwApp {
-public:
-  GlStubWindow() {
-    createRenderingTarget();
-    if (!window) {
-      FAIL("Unable to create OpenGL window");
-    }
-  }
-
-  ~GlStubWindow() {
-    glfwDestroyWindow(window);
-  }
-
-  virtual void createRenderingTarget() {
-    glfwWindowHint(GLFW_VISIBLE, 0);
-    createWindow(glm::uvec2(320, 180), glm::ivec2(100, 100));
-  }
-
-  //virtual void finishFrame() {
-  //  /*
-  //  * The parent class calls glfwSwapBuffers in finishFrame,
-  //  * but with the Oculus SDK, the SDK it responsible for buffer
-  //  * swapping, so we have to override the method and ensure it
-  //  * does nothing, otherwise the dual buffer swaps will
-  //  * cause a constant flickering of the display.
-  //  */
-  //}
-};
-
-
-
-namespace OVR {
-  namespace RenderTiny {
-    class RenderDevice;
-
-    enum MapFlags
-    {
-      Map_Discard = 1,
-      Map_Read = 2, // do not use
-      Map_Unsynchronized = 4, // like D3D11_MAP_NO_OVERWRITE
-    };
-
-    enum TextureFormat
-    {
-      Texture_RGBA = 0x0100,
-      Texture_Depth = 0x8000,
-      Texture_TypeMask = 0xff00,
-      Texture_SamplesMask = 0x00ff,
-      Texture_RenderTarget = 0x10000,
-      Texture_GenMipmaps = 0x20000,
-    };
-
-    // Texture sampling modes.
-    enum SampleMode
-    {
-      Sample_Linear = 0,
-      Sample_Nearest = 1,
-      Sample_Anisotropic = 2,
-      Sample_FilterMask = 3,
-
-      Sample_Repeat = 0,
-      Sample_Clamp = 4,
-      Sample_ClampBorder = 8, // If unsupported Clamp is used instead.
-      Sample_AddressMask = 12,
-
-      Sample_Count = 13,
-    };
-
-    class Texture : public RefCountBase<Texture>
-    {
-    public:
-      RenderDevice*                   Ren;
-      Ptr<ID3D11Texture2D>            Tex;
-      Ptr<ID3D11ShaderResourceView>   TexSv;
-      Ptr<ID3D11RenderTargetView>     TexRtv;
-      Ptr<ID3D11DepthStencilView>     TexDsv;
-      mutable Ptr<ID3D11SamplerState> Sampler;
-      int                             Width, Height;
-      int                             Samples;
-
-      Texture(RenderDevice* r, int fmt, int w, int h);
-      virtual ~Texture();
-
-      virtual int GetWidth() const    { return Width; }
-      virtual int GetHeight() const   { return Height; }
-      virtual int GetSamples() const  { return Samples; }
-
-      virtual void SetSampleMode(int sm);
-
-      // Updates texture to point to specified resources
-      //  - used for slave rendering.
-      void UpdatePlaceholderTexture(ID3D11Texture2D* texture, ID3D11ShaderResourceView* psrv)
-      {
-        Tex = texture;
-        TexSv = psrv;
-        TexRtv.Clear();
-        TexDsv.Clear();
-
-        D3D11_TEXTURE2D_DESC desc;
-        texture->GetDesc(&desc);
-        Width = desc.Width;
-        Height = desc.Height;
-      }
-    };
-
-    //-----------------------------------------------------------------------------------
-
-    enum DisplayMode
-    {
-      Display_Window = 0,
-      Display_Fullscreen = 1
-    };
-
-
-    // Rendering parameters used by RenderDevice::CreateDevice.
-    struct RendererParams
-    {
-      int     Multisample;
-      int     Fullscreen;
-      // Resolution of the rendering buffer used during creation.
-      // Allows buffer of different size then the widow if not zero.
-      Sizei   Resolution;
-
-      // Windows - Monitor name for fullscreen mode.
-      String  MonitorName;
-      // MacOS
-      long    DisplayId;
-
-      RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0), Resolution(0) {}
-
-      bool IsDisplaySet() const
-      {
-        return MonitorName.GetLength() || DisplayId;
-      }
-    };
-
-    class RenderDevice : public RefCountBase<RenderDevice>
-    {
-
-
-    protected:
-      int             WindowWidth, WindowHeight;
-      RendererParams  Params;
-      Matrix4f        Proj;
-
-    public:
-      enum CompareFunc
-      {
-        Compare_Always = 0,
-        Compare_Less = 1,
-        Compare_Greater = 2,
-        Compare_Count
-      };
-
-      Ptr<IDXGIFactory>           DXGIFactory;
-      HWND                        Window;
-
-      Ptr<ID3D11Device>           Device;
-      Ptr<ID3D11DeviceContext>    Context;
-      Ptr<IDXGISwapChain>         SwapChain;
-      Ptr<IDXGIAdapter>           Adapter;
-      Ptr<IDXGIOutput>            FullscreenOutput;
-      int                         FSDesktopX, FSDesktopY;
-      Ptr<ID3D11Texture2D>        BackBuffer;
-      Ptr<ID3D11RenderTargetView> BackBufferRT;
-      Ptr<Texture>                CurRenderTarget;
-      Ptr<Texture>                CurDepthBuffer;
-      Ptr<ID3D11RasterizerState>  Rasterizer;
-      Ptr<ID3D11BlendState>       BlendState;
-      D3D11_VIEWPORT              D3DViewport;
-
-      Ptr<ID3D11DepthStencilState> DepthStates[1 + 2 * Compare_Count];
-      Ptr<ID3D11DepthStencilState> CurDepthState;
-      Ptr<ID3D11InputLayout>      ModelVertexIL;
-
-      Ptr<ID3D11SamplerState>     SamplerStates[Sample_Count];
-      Array<Ptr<Texture> >        DepthBuffers;
-
-    public:
-
-      RenderDevice(const RendererParams& p, HWND window);
-      virtual ~RenderDevice();
-
-      // Implement static initializer function to create this class.
-      // Creates a new rendering device
-      static RenderDevice* CreateDevice(const RendererParams& rp, void* oswnd);
-
-      // Constructor helper
-      void  initShadersAndStates();
-      void        UpdateMonitorOutputs();
-
-      void         SetViewport(int x, int y, int w, int h) { SetViewport(Recti(x, y, w, h)); }
-      // Set viewport ignoring any adjustments used for the stereo mode.
-      virtual void SetViewport(const Recti& vp);
-      virtual void SetFullViewport();
-
-      virtual bool SetParams(const RendererParams& newParams);
-      const RendererParams& GetParams() const { return Params; }
-
-      virtual void Present(bool vsyncEnabled);
-
-      // Waits for rendering to complete; important for reducing latency.
-      virtual void WaitUntilGpuIdle();
-
-      // Don't call these directly, use App/Platform instead
-      virtual bool SetFullscreen(DisplayMode fullscreen);
-
-      virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1);
-
-      // Resources
-      virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount = 1);
-
-      // Placeholder texture to come in externally
-      virtual Texture* CreatePlaceholderTexture(int format);
-
-      Texture* GetDepthBuffer(int w, int h, int ms);
-
-      // Begin drawing directly to the currently selected render target, no post-processing.
-      virtual void BeginRendering();
-
-      // Begin drawing the primary scene, starting up whatever post-processing may be needed.
-      virtual void BeginScene();
-      virtual void FinishScene();
-
-      // Texture must have been created with Texture_RenderTarget. Use NULL for the default render target.
-      // NULL depth buffer means use an internal, temporary one.
-      virtual void SetRenderTarget(Texture* color,
-        Texture* depth = NULL,
-        Texture* stencil = NULL);
-      void SetDefaultRenderTarget() { SetRenderTarget(NULL, NULL); }
-      virtual void SetDepthMode(bool enable, bool write, CompareFunc func = Compare_Less);
-
-      virtual Matrix4f GetProjection() const { return Proj; }
-      bool                RecreateSwapChain();
-      ID3D11SamplerState* GetSamplerState(int sm);
-    };
-
-    int GetNumMipLevels(int w, int h);
-
-    // Filter an rgba image with a 2x2 box filter, for mipmaps.
-    // Image size must be a power of 2.
-    void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest);
-  }
-}
+HINSTANCE           hInstance = NULL;
 
 //Anything including this file, uses these
 using namespace OVR;
-using namespace OVR::RenderTiny;
 
 
-#include <d3dcompiler.h>
+class Texture : public RefCountBase<Texture>
+{
+public:
+  Ptr<ID3D11Texture2D>            Tex;
+  Ptr<ID3D11ShaderResourceView>   TexSv;
+  int                             Width, Height;
 
-namespace OVR {
-  namespace RenderTiny {
+  Texture(int w, int h)
+    : Tex(NULL), TexSv(NULL), Width(w), Height(h) { }
 
-    //-------------------------------------------------------------------------------------
-    // ***** Texture
-    // 
-    Texture::Texture(RenderDevice* ren, int fmt, int w, int h)
-      : Ren(ren), Tex(NULL), TexSv(NULL), TexRtv(NULL), TexDsv(NULL), Width(w), Height(h)
-    {
-      OVR_UNUSED(fmt);
-      Sampler = Ren->GetSamplerState(0);
-    }
-
-    Texture::~Texture()
-    {
-    }
-
-    void Texture::SetSampleMode(int sm)
-    {
-      Sampler = Ren->GetSamplerState(sm);
-    }
-
-    //-------------------------------------------------------------------------------------
-    // ***** Render Device
-
-    RenderDevice::RenderDevice(const RendererParams& p, HWND window)
-    {
-      RECT rc;
-      if (p.Resolution == Sizei(0))
-      {
-        GetClientRect(window, &rc);
-        WindowWidth = rc.right - rc.left;
-        WindowHeight = rc.bottom - rc.top;
-      }
-      else
-      {
-        // TBD: Rename from WindowHeight or use Resolution from params for surface
-        WindowWidth = p.Resolution.w;
-        WindowHeight = p.Resolution.h;
-      }
-
-      Window = window;
-      Params = p;
-
-      DXGIFactory = NULL;
-      HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
-      if (FAILED(hr))
-        return;
-
-      // Find the adapter & output (monitor) to use for fullscreen, based on the reported name of the HMD's monitor.
-      if (Params.MonitorName.GetLength() > 0)
-      {
-        for (UINT AdapterIndex = 0;; AdapterIndex++)
-        {
-          Adapter = NULL;
-          HRESULT hr = DXGIFactory->EnumAdapters(AdapterIndex, &Adapter.GetRawRef());
-          if (hr == DXGI_ERROR_NOT_FOUND)
-            break;
-
-          DXGI_ADAPTER_DESC Desc;
-          Adapter->GetDesc(&Desc);
-
-          UpdateMonitorOutputs();
-
-          if (FullscreenOutput)
-            break;
-        }
-
-        if (!FullscreenOutput)
-          Adapter = NULL;
-      }
-
-      if (!Adapter)
-      {
-        DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
-      }
-
-      int flags = 0;
-      //int flags =  D3D11_CREATE_DEVICE_DEBUG;    
-
-      Device = NULL;
-      Context = NULL;
-      hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
-        NULL, flags, NULL, 0, D3D11_SDK_VERSION,
-        &Device.GetRawRef(), NULL, &Context.GetRawRef());
-
-      if (FAILED(hr))
-        return;
-
-      if (!RecreateSwapChain())
-        return;
-
-      if (Params.Fullscreen)
-        SwapChain->SetFullscreenState(1, FullscreenOutput);
-
-      initShadersAndStates();
-    }
-
-    // Constructor helper
-    void  RenderDevice::initShadersAndStates()
-    {
-      CurRenderTarget = NULL;
-      D3D11_BLEND_DESC bm;
-      memset(&bm, 0, sizeof(bm));
-      bm.RenderTarget[0].BlendEnable = true;
-      bm.RenderTarget[0].BlendOp = bm.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-      bm.RenderTarget[0].SrcBlend = bm.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
-      bm.RenderTarget[0].DestBlend = bm.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
-      bm.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-      BlendState = NULL;
-      Device->CreateBlendState(&bm, &BlendState.GetRawRef());
-
-      D3D11_RASTERIZER_DESC rs;
-      memset(&rs, 0, sizeof(rs));
-      rs.AntialiasedLineEnable = true;
-      rs.CullMode = D3D11_CULL_BACK;
-      rs.DepthClipEnable = true;
-      rs.FillMode = D3D11_FILL_SOLID;
-      Rasterizer = NULL;
-      Device->CreateRasterizerState(&rs, &Rasterizer.GetRawRef());
-      SetDepthMode(0, 0);
-    }
-
-    RenderDevice::~RenderDevice()
-    {
-      if (SwapChain && Params.Fullscreen)
-      {
-        SwapChain->SetFullscreenState(false, NULL);
-      }
-    }
-
-    // Implement static initializer function to create this class.
-    RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
-    {
-      RenderDevice* p = new RenderDevice(rp, (HWND)oswnd);
-      if (p)
-      {
-        if (!p->Device)
-        {
-          p->Release();
-          p = 0;
-        }
-      }
-      return p;
-    }
-
-    // Fallback monitor enumeration in case newly plugged in monitor wasn't detected.
-    // Added originally for the FactoryTest app.
-    // New Outputs don't seem to be detected unless adapter is re-created, but that would also
-    // require us to re-initialize D3D11 (recreating objects, etc). This bypasses that for "fake"
-    // fullscreen modes.
-    BOOL CALLBACK MonitorEnumFunc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
-    {
-      RenderDevice* renderer = (RenderDevice*)dwData;
-
-      MONITORINFOEX monitor;
-      monitor.cbSize = sizeof(monitor);
-
-      if (::GetMonitorInfo(hMonitor, &monitor) && monitor.szDevice[0])
-      {
-        DISPLAY_DEVICE dispDev;
-        memset(&dispDev, 0, sizeof(dispDev));
-        dispDev.cb = sizeof(dispDev);
-
-        if (::EnumDisplayDevices(monitor.szDevice, 0, &dispDev, 0))
-        {
-          if (strstr(String(dispDev.DeviceName).ToCStr(), renderer->GetParams().MonitorName.ToCStr()))
-          {
-            renderer->FSDesktopX = monitor.rcMonitor.left;
-            renderer->FSDesktopY = monitor.rcMonitor.top;
-            return FALSE;
-          }
-        }
-      }
-
-      return TRUE;
-    }
-
-
-    void RenderDevice::UpdateMonitorOutputs()
-    {
-      HRESULT hr;
-
-      bool deviceNameFound = false;
-
-      for (UINT OutputIndex = 0;; OutputIndex++)
-      {
-        Ptr<IDXGIOutput> Output;
-        hr = Adapter->EnumOutputs(OutputIndex, &Output.GetRawRef());
-        if (hr == DXGI_ERROR_NOT_FOUND)
-        {
-          break;
-        }
-
-        DXGI_OUTPUT_DESC OutDesc;
-        Output->GetDesc(&OutDesc);
-
-        MONITORINFOEX monitor;
-        monitor.cbSize = sizeof(monitor);
-        if (::GetMonitorInfo(OutDesc.Monitor, &monitor) && monitor.szDevice[0])
-        {
-          DISPLAY_DEVICE dispDev;
-          memset(&dispDev, 0, sizeof(dispDev));
-          dispDev.cb = sizeof(dispDev);
-
-          if (::EnumDisplayDevices(monitor.szDevice, 0, &dispDev, 0))
-          {
-            if (strstr(String(dispDev.DeviceName).ToCStr(), Params.MonitorName.ToCStr()))
-            {
-              deviceNameFound = true;
-              FullscreenOutput = Output;
-              FSDesktopX = monitor.rcMonitor.left;
-              FSDesktopY = monitor.rcMonitor.top;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!deviceNameFound && !Params.MonitorName.IsEmpty())
-      {
-        EnumDisplayMonitors(0, 0, MonitorEnumFunc, (LPARAM)this);
-      }
-    }
-
-    bool RenderDevice::RecreateSwapChain()
-    {
-      DXGI_SWAP_CHAIN_DESC scDesc;
-      memset(&scDesc, 0, sizeof(scDesc));
-      scDesc.BufferCount = 2;
-      scDesc.BufferDesc.Width = WindowWidth;
-      scDesc.BufferDesc.Height = WindowHeight;
-      scDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-      scDesc.BufferDesc.RefreshRate.Numerator = 0;
-      scDesc.BufferDesc.RefreshRate.Denominator = 1;
-      scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-      scDesc.OutputWindow = Window;
-      scDesc.SampleDesc.Count = Params.Multisample;
-      scDesc.SampleDesc.Quality = 0;
-      scDesc.Windowed = (Params.Fullscreen != Display_Fullscreen);
-      scDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-      scDesc.SwapEffect = DXGI_SWAP_EFFECT_SEQUENTIAL;
-
-      if (SwapChain)
-      {
-        SwapChain->SetFullscreenState(FALSE, NULL);
-        SwapChain->Release();
-        SwapChain = NULL;
-      }
-
-      Ptr<IDXGISwapChain> newSC;
-      if (FAILED(DXGIFactory->CreateSwapChain(Device, &scDesc, &newSC.GetRawRef())))
-        return false;
-      SwapChain = newSC;
-
-      BackBuffer = NULL;
-      BackBufferRT = NULL;
-      HRESULT hr = SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&BackBuffer.GetRawRef());
-      if (FAILED(hr))
-        return false;
-
-      hr = Device->CreateRenderTargetView(BackBuffer, NULL, &BackBufferRT.GetRawRef());
-      if (FAILED(hr))
-        return false;
-
-      Texture* depthBuffer = GetDepthBuffer(WindowWidth, WindowHeight, Params.Multisample);
-      CurDepthBuffer = depthBuffer;
-      if (CurRenderTarget == NULL)
-      {
-        Context->OMSetRenderTargets(1, &BackBufferRT.GetRawRef(), depthBuffer->TexDsv);
-      }
-      return true;
-    }
-
-    bool RenderDevice::SetParams(const RendererParams& newParams)
-    {
-      String oldMonitor = Params.MonitorName;
-
-      Params = newParams;
-      if (newParams.MonitorName != oldMonitor)
-      {
-        UpdateMonitorOutputs();
-      }
-
-      return RecreateSwapChain();
-    }
-
-
-    bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
-    {
-      if (fullscreen == Params.Fullscreen)
-        return true;
-
-      HRESULT hr = SwapChain->SetFullscreenState(fullscreen, fullscreen ? FullscreenOutput : NULL);
-      if (FAILED(hr))
-      {
-        return false;
-      }
-
-      Params.Fullscreen = fullscreen;
-      return true;
-    }
-
-    void RenderDevice::SetViewport(const Recti& vp)
-    {
-      D3DViewport.Width = (float)vp.w;
-      D3DViewport.Height = (float)vp.h;
-      D3DViewport.MinDepth = 0;
-      D3DViewport.MaxDepth = 1;
-      D3DViewport.TopLeftX = (float)vp.x;
-      D3DViewport.TopLeftY = (float)vp.y;
-      Context->RSSetViewports(1, &D3DViewport);
-    }
-
-    void RenderDevice::SetFullViewport()
-    {
-      D3DViewport.Width = (float)WindowWidth;
-      D3DViewport.Height = (float)WindowHeight;
-      D3DViewport.MinDepth = 0;
-      D3DViewport.MaxDepth = 1;
-      D3DViewport.TopLeftX = 0;
-      D3DViewport.TopLeftY = 0;
-      Context->RSSetViewports(1, &D3DViewport);
-    }
-
-    static int GetDepthStateIndex(bool enable, bool write, RenderDevice::CompareFunc func)
-    {
-      if (!enable)
-        return 0;
-      return 1 + int(func) * 2 + write;
-    }
-
-    void RenderDevice::SetDepthMode(bool enable, bool write, CompareFunc func)
-    {
-      int index = GetDepthStateIndex(enable, write, func);
-      if (DepthStates[index])
-      {
-        CurDepthState = DepthStates[index];
-        Context->OMSetDepthStencilState(DepthStates[index], 0);
-        return;
-      }
-
-      D3D11_DEPTH_STENCIL_DESC dss;
-      memset(&dss, 0, sizeof(dss));
-      dss.DepthEnable = enable;
-      switch (func)
-      {
-      case Compare_Always:  dss.DepthFunc = D3D11_COMPARISON_ALWAYS;  break;
-      case Compare_Less:    dss.DepthFunc = D3D11_COMPARISON_LESS;    break;
-      case Compare_Greater: dss.DepthFunc = D3D11_COMPARISON_GREATER; break;
-      default:
-        OVR_ASSERT(0);
-      }
-      dss.DepthWriteMask = write ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
-      Device->CreateDepthStencilState(&dss, &DepthStates[index].GetRawRef());
-      Context->OMSetDepthStencilState(DepthStates[index], 0);
-      CurDepthState = DepthStates[index];
-    }
-
-    Texture* RenderDevice::GetDepthBuffer(int w, int h, int ms)
-    {
-      for (unsigned i = 0; i < DepthBuffers.GetSize(); i++)
-      {
-        if (w == DepthBuffers[i]->Width && h == DepthBuffers[i]->Height &&
-          ms == DepthBuffers[i]->Samples)
-          return DepthBuffers[i];
-      }
-
-      Ptr<Texture> newDepth = *CreateTexture(Texture_Depth | Texture_RenderTarget | ms, w, h, NULL);
-      if (newDepth == NULL)
-      {
-        OVR_DEBUG_LOG(("Failed to get depth buffer."));
-        return NULL;
-      }
-
-      DepthBuffers.PushBack(newDepth);
-      return newDepth.GetPtr();
-    }
-
-    void RenderDevice::Clear(float r, float g, float b, float a, float depth)
-    {
-      const float color[] = { r, g, b, a };
-
-      // Needed for each eye to do its own clear, since ClearRenderTargetView doesn't honor viewport.    
-
-      // Save state that is affected by clearing this way
-      ID3D11DepthStencilState* oldDepthState = CurDepthState;
-      SetDepthMode(true, true, Compare_Always);
-      Context->IASetInputLayout(ModelVertexIL);
-      Context->GSSetShader(NULL, NULL, 0);
-
-      ID3D11ShaderResourceView* sv[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-      // Clear Viewport   
-      Context->OMSetBlendState(NULL, NULL, 0xffffffff);
-      Context->Draw(4, 0);
-
-      // reset
-      CurDepthState = oldDepthState;
-      Context->OMSetDepthStencilState(CurDepthState, 0);
-    }
-
-
-    ID3D11SamplerState* RenderDevice::GetSamplerState(int sm)
-    {
-      if (SamplerStates[sm])
-        return SamplerStates[sm];
-
-      D3D11_SAMPLER_DESC ss;
-      memset(&ss, 0, sizeof(ss));
-      if (sm & Sample_Clamp)
-        ss.AddressU = ss.AddressV = ss.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-      else if (sm & Sample_ClampBorder)
-        ss.AddressU = ss.AddressV = ss.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
-      else
-        ss.AddressU = ss.AddressV = ss.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-
-      if (sm & Sample_Nearest)
-      {
-        ss.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-      }
-      else if (sm & Sample_Anisotropic)
-      {
-        ss.Filter = D3D11_FILTER_ANISOTROPIC;
-        ss.MaxAnisotropy = 8;
-      }
-      else
-      {
-        ss.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-      }
-      ss.MaxLOD = 15;
-      Device->CreateSamplerState(&ss, &SamplerStates[sm].GetRawRef());
-      return SamplerStates[sm];
-    }
-
-    // Placeholder texture to come in externally in slave rendering mode
-    Texture* RenderDevice::CreatePlaceholderTexture(int format)
-    {
-      Texture* newTex = new Texture(this, format, 0, 0);
-      newTex->Samples = 1;
-
-      return newTex;
-    }
-
-
-    Texture* RenderDevice::CreateTexture(int format, int width, int height, const void* data, int mipcount)
-    {
-      OVR_UNUSED(mipcount);
-
-      DXGI_FORMAT d3dformat;
-      int         bpp;
-      switch (format & Texture_TypeMask)
-      {
-      case Texture_RGBA:
-        bpp = 4;
-        d3dformat = DXGI_FORMAT_R8G8B8A8_UNORM;
-        break;
-      case Texture_Depth:
-        bpp = 0;
-        d3dformat = DXGI_FORMAT_D32_FLOAT;
-        break;
-      default:
-        return NULL;
-      }
-
-      int samples = (format & Texture_SamplesMask);
-      if (samples < 1)
-      {
-        samples = 1;
-      }
-
-      Texture* NewTex = new Texture(this, format, width, height);
-      NewTex->Samples = samples;
-
-      D3D11_TEXTURE2D_DESC dsDesc;
-      dsDesc.Width = width;
-      dsDesc.Height = height;
-      dsDesc.MipLevels = (format == (Texture_RGBA | Texture_GenMipmaps) && data) ? GetNumMipLevels(width, height) : 1;
-      dsDesc.ArraySize = 1;
-      dsDesc.Format = d3dformat;
-      dsDesc.SampleDesc.Count = samples;
-      dsDesc.SampleDesc.Quality = 0;
-      dsDesc.Usage = D3D11_USAGE_DEFAULT;
-      dsDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-      dsDesc.CPUAccessFlags = 0;
-      dsDesc.MiscFlags = 0;
-
-      if (format & Texture_RenderTarget)
-      {
-        if ((format & Texture_TypeMask) == Texture_Depth)
-        { // We don't use depth textures, and creating them in d3d10 requires different options.
-          dsDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-        }
-        else
-        {
-          dsDesc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-        }
-      }
-
-      HRESULT hr = Device->CreateTexture2D(&dsDesc, NULL, &NewTex->Tex.GetRawRef());
-      if (FAILED(hr))
-      {
-        OVR_DEBUG_LOG_TEXT(("Failed to create 2D D3D texture."));
-        NewTex->Release();
-        return NULL;
-      }
-      if (dsDesc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
-      {
-        Device->CreateShaderResourceView(NewTex->Tex, NULL, &NewTex->TexSv.GetRawRef());
-      }
-
-      if (data)
-      {
-        Context->UpdateSubresource(NewTex->Tex, 0, NULL, data, width * bpp, width * height * bpp);
-        if (format == (Texture_RGBA | Texture_GenMipmaps))
-        {
-          int srcw = width, srch = height;
-          int level = 0;
-          uint8_t* mipmaps = NULL;
-          do
-          {
-            level++;
-            int mipw = srcw >> 1;
-            if (mipw < 1)
-            {
-              mipw = 1;
-            }
-            int miph = srch >> 1;
-            if (miph < 1)
-            {
-              miph = 1;
-            }
-            if (mipmaps == NULL)
-            {
-              mipmaps = (uint8_t*)OVR_ALLOC(mipw * miph * 4);
-            }
-            FilterRgba2x2(level == 1 ? (const uint8_t*)data : mipmaps, srcw, srch, mipmaps);
-            Context->UpdateSubresource(NewTex->Tex, level, NULL, mipmaps, mipw * bpp, miph * bpp);
-            srcw = mipw;
-            srch = miph;
-          } while (srcw > 1 || srch > 1);
-
-          if (mipmaps != NULL)
-          {
-            OVR_FREE(mipmaps);
-          }
-        }
-      }
-
-      if (format & Texture_RenderTarget)
-      {
-        if ((format & Texture_TypeMask) == Texture_Depth)
-        {
-          Device->CreateDepthStencilView(NewTex->Tex, NULL, &NewTex->TexDsv.GetRawRef());
-        }
-        else
-        {
-          Device->CreateRenderTargetView(NewTex->Tex, NULL, &NewTex->TexRtv.GetRawRef());
-        }
-      }
-
-      return NewTex;
-    }
-
-    // Rendering
-    void RenderDevice::BeginRendering()
-    {
-      Context->RSSetState(Rasterizer);
-    }
-
-    void RenderDevice::BeginScene()
-    {
-      BeginRendering();
-    }
-
-    void RenderDevice::FinishScene()
-    {
-      SetRenderTarget(0);
-    }
-
-    void RenderDevice::SetRenderTarget(Texture* colorTex,
-      Texture* depth,
-      Texture* stencil)
-    {
-      OVR_UNUSED(stencil);
-
-      CurRenderTarget = (Texture*)colorTex;
-      if (colorTex == NULL)
-      {
-        Texture* newDepthBuffer = GetDepthBuffer(WindowWidth, WindowHeight, Params.Multisample);
-        if (newDepthBuffer == NULL)
-        {
-          OVR_DEBUG_LOG(("New depth buffer creation failed."));
-        }
-        if (newDepthBuffer != NULL)
-        {
-          CurDepthBuffer = GetDepthBuffer(WindowWidth, WindowHeight, Params.Multisample);
-          Context->OMSetRenderTargets(1, &BackBufferRT.GetRawRef(), CurDepthBuffer->TexDsv);
-        }
-        return;
-      }
-      if (depth == NULL)
-      {
-        depth = GetDepthBuffer(colorTex->GetWidth(), colorTex->GetHeight(), CurRenderTarget->Samples);
-      }
-
-      CurDepthBuffer = (Texture*)depth;
-      Context->OMSetRenderTargets(1, &((Texture*)colorTex)->TexRtv.GetRawRef(), ((Texture*)depth)->TexDsv);
-    }
-
-
-    void RenderDevice::Present(bool vsyncEnabled)
-    {
-      SwapChain->Present(vsyncEnabled ? 1 : 0, 0);
-    }
-
-    void RenderDevice::WaitUntilGpuIdle()
-    {
-      // Flush and Stall CPU while waiting for GPU to complete rendering all of the queued draw calls
-      D3D11_QUERY_DESC queryDesc = { D3D11_QUERY_EVENT, 0 };
-      Ptr<ID3D11Query> query;
-      BOOL             done = FALSE;
-
-      if (Device->CreateQuery(&queryDesc, &query.GetRawRef()) == S_OK)
-      {
-        Context->End(query);
-        do {} while (!done && !FAILED(Context->GetData(query, &done, sizeof(BOOL), 0)));
-      }
-    }
-
-    int GetNumMipLevels(int w, int h)
-    {
-      int n = 1;
-      while (w > 1 || h > 1)
-      {
-        w >>= 1;
-        h >>= 1;
-        n++;
-      }
-      return n;
-    }
-
-    void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest)
-    {
-      for (int j = 0; j < (h & ~1); j += 2)
-      {
-        const uint8_t* psrc = src + (w * j * 4);
-        uint8_t*       pdest = dest + ((w >> 1) * (j >> 1) * 4);
-
-        for (int i = 0; i < w >> 1; i++, psrc += 8, pdest += 4)
-        {
-          pdest[0] = (((int)psrc[0]) + psrc[4] + psrc[w * 4 + 0] + psrc[w * 4 + 4]) >> 2;
-          pdest[1] = (((int)psrc[1]) + psrc[5] + psrc[w * 4 + 1] + psrc[w * 4 + 5]) >> 2;
-          pdest[2] = (((int)psrc[2]) + psrc[6] + psrc[w * 4 + 2] + psrc[w * 4 + 6]) >> 2;
-          pdest[3] = (((int)psrc[3]) + psrc[7] + psrc[w * 4 + 3] + psrc[w * 4 + 7]) >> 2;
-        }
-      }
-    }
-
-  }
-}
-
-
-template<typename T, typename F>
-void populateSharedPtr(std::shared_ptr<T> & ptr, F function) {
-  T * rawPtr;
-  function(&rawPtr);
-  ptr = std::shared_ptr<T>(rawPtr);
-}
-
+  virtual ~Texture() { }
+};
 
 class RiftStubApp {
 protected:
@@ -960,107 +54,195 @@ public:
   }
 };
 
-HWND                hWnd = NULL;
-HINSTANCE           hInstance = NULL;
-POINT               WindowCenter;
+template <typename T, typename F> 
+void populateSharedPointer(std::shared_ptr<T> & ptr, F lambda) {
+  T * rawPtr;
+  lambda(rawPtr);
+  ptr = std::shared_ptr<T>(rawPtr);
+}
 
-// User inputs
-bool                Quit = 0;
+class DxStubWindow {
+protected:
+  const uint32_t              WindowWidth, WindowHeight;
+  Ptr<IDXGIFactory>           DXGIFactory{ NULL };
+  HWND                        Window{ NULL };
+  HWND                        GlWindow;
+  Ptr<ID3D11Device>           Device{ NULL };
+  Ptr<ID3D11DeviceContext>    Context{ NULL };
+  Ptr<IDXGISwapChain>         SwapChain{ NULL };
+  Ptr<IDXGIAdapter>           Adapter{ NULL };
+  Ptr<IDXGIOutput>            FullscreenOutput{ NULL };
+  Ptr<ID3D11Texture2D>        BackBuffer;
+  Ptr<ID3D11RenderTargetView> BackBufferRT;
+  D3D11_VIEWPORT              D3DViewport;
 
-LRESULT CALLBACK systemWindowProc(HWND arg_hwnd, UINT msg, WPARAM wp, LPARAM lp)
-{
-  switch (msg)
+  static LRESULT CALLBACK systemWindowProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
   {
-  case(WM_NCCREATE) : hWnd = arg_hwnd; break;
-
-  case WM_MOUSEMOVE:	{
-    // Convert mouse motion to be relative
-    // (report the offset and re-center).
-    POINT newPos = { LOWORD(lp), HIWORD(lp) };
-    ::ClientToScreen(hWnd, &newPos);
-    if ((newPos.x == WindowCenter.x) && (newPos.y == WindowCenter.y))
+    DxStubWindow * pParent = (DxStubWindow *)GetWindowLongPtr(hWnd, GWL_USERDATA);
+    switch (msg)
+    {
+    case WM_CREATE:
+      pParent = (DxStubWindow*)((LPCREATESTRUCT)lp)->lpCreateParams;
+      SetWindowLongPtr(hWnd, GWL_USERDATA, (LONG_PTR)pParent);
       break;
-    ::SetCursorPos(WindowCenter.x, WindowCenter.y);
-    break;
+
+    case WM_SETFOCUS:
+      SetFocus(pParent->GlWindow);
+      break;
+    }
+
+    return DefWindowProc(hWnd, msg, wp, lp);
   }
 
-  case WM_MOVE:		RECT r;
-    GetClientRect(hWnd, &r);
-    WindowCenter.x = r.right / 2;
-    WindowCenter.y = r.bottom / 2;
-    ::ClientToScreen(hWnd, &WindowCenter);
-    break;
+public:
+  DxStubWindow(HWND glWindow, uint32_t w, uint32_t h) : WindowHeight(h), WindowWidth(w), GlWindow(glWindow) {
+    // We're using the DLL version of the SDK, so we need to populate our own allocator
+    if (nullptr == Allocator::GetInstance()) {
+      Allocator::setInstance(new DefaultAllocator());
+    }
 
-  case WM_CREATE:     SetTimer(hWnd, 0, 100, NULL); break;
-  case WM_TIMER:      KillTimer(hWnd, 0);
+    // Register window class
+    {
+      WNDCLASS wc;
+      memset(&wc, 0, sizeof(wc));
+      wc.lpszClassName = L"OVRAppWindow";
+      wc.style = CS_OWNDC;
+      wc.lpfnWndProc = systemWindowProc;
+      wc.cbWndExtra = NULL;
+      ATOM windowClass = RegisterClass(&wc);
+      if (!windowClass) {
+        FAIL("Unable to register window class");
+      }
+    }
 
-  case WM_SETFOCUS:
-    SetCursorPos(WindowCenter.x, WindowCenter.y);
-    SetCapture(hWnd);
-    ShowCursor(FALSE);
-    break;
-  case WM_KILLFOCUS:
-    ReleaseCapture();
-    ShowCursor(TRUE);
-    break;
+    // Create the D3D window (can't be invisible sadly)
+    {
+      DWORD wsStyle = WS_POPUP | WS_VISIBLE | WS_SYSMENU;
+      DWORD sizeDivisor = 2;
+      RECT winSize = { 0, 0, w / 64, h / 64 };
+      AdjustWindowRect(&winSize, wsStyle, false);
+      Window = CreateWindowExA(WS_EX_TOOLWINDOW, "OVRAppWindow", "OculusRoomTiny",
+        wsStyle, 0, 0, winSize.right - winSize.left, winSize.bottom - winSize.top,
+        NULL, NULL, hInstance, this);
 
-  case WM_QUIT:
-  case WM_CLOSE:      Quit = true;
-    return 0;
+      if (!Window) {
+        FAIL("Unable to create DX window");
+      }
+    }
+
+    HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
+    if (FAILED(hr)) {
+      FAIL("Unable to create DXGI Factory");
+    }
+    DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+
+    int flags = 0;
+    //int flags =  D3D11_CREATE_DEVICE_DEBUG;    
+    hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
+      NULL, flags, NULL, 0, D3D11_SDK_VERSION,
+      &Device.GetRawRef(), NULL, &Context.GetRawRef());
+    if (FAILED(hr)) {
+      FAIL("Unable to create D3D11 Device & Context");
+    }
+    if (!RecreateSwapChain()) {
+      FAIL("Unable to create swap chain");
+    }
+    SwapChain->SetFullscreenState(1, FullscreenOutput);
   }
 
-  return DefWindowProc(hWnd, msg, wp, lp);
-}
+  ~DxStubWindow() {
+    if (SwapChain) {
+      SwapChain->SetFullscreenState(false, NULL);
+    }
+  }
 
 
-HWND Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSampleCount, bool UseAppWindowFrame, RenderDevice ** returnedDevice)
-{
-  RendererParams  renderParams;
-
-  // Window
-  WNDCLASS wc;
-  memset(&wc, 0, sizeof(wc));
-  wc.lpszClassName = L"OVRAppWindow";
-  wc.style = CS_OWNDC;
-  wc.lpfnWndProc = systemWindowProc;
-  wc.cbWndExtra = NULL;
-  RegisterClass(&wc);
-
-  DWORD wsStyle = WS_POPUP;
-  DWORD sizeDivisor = 1;
-
-  if (UseAppWindowFrame)
+  bool RecreateSwapChain()
   {
-    // If using our driver, displaya window frame with a smaller window.
-    // Original HMD resolution is still passed into the renderer for proper swap chain.
-    wsStyle |= WS_OVERLAPPEDWINDOW;
-    renderParams.Resolution = vp.GetSize();
-    sizeDivisor = 2;
+    DXGI_SWAP_CHAIN_DESC scDesc;
+    memset(&scDesc, 0, sizeof(scDesc));
+    scDesc.BufferCount = 2;
+    scDesc.BufferDesc.Width = WindowWidth;
+    scDesc.BufferDesc.Height = WindowHeight;
+    scDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    scDesc.BufferDesc.RefreshRate.Numerator = 0;
+    scDesc.BufferDesc.RefreshRate.Denominator = 1;
+    scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    scDesc.OutputWindow = Window;
+    scDesc.SampleDesc.Count = 1;
+    scDesc.SampleDesc.Quality = 0;
+    scDesc.Windowed = FALSE;
+    scDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    scDesc.SwapEffect = DXGI_SWAP_EFFECT_SEQUENTIAL;
+
+    if (SwapChain)
+    {
+      SwapChain->SetFullscreenState(FALSE, NULL);
+      SwapChain->Release();
+      SwapChain = NULL;
+    }
+
+    Ptr<IDXGISwapChain> newSC;
+    if (FAILED(DXGIFactory->CreateSwapChain(Device, &scDesc, &newSC.GetRawRef())))
+      return false;
+    SwapChain = newSC;
+
+    BackBuffer = NULL;
+    BackBufferRT = NULL;
+    HRESULT hr = SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&BackBuffer.GetRawRef());
+    if (FAILED(hr))
+      return false;
+
+    hr = Device->CreateRenderTargetView(BackBuffer, NULL, &BackBufferRT.GetRawRef());
+    if (FAILED(hr))
+      return false;
+    return true;
   }
 
-  RECT winSize = { 0, 0, vp.w / sizeDivisor, vp.h / sizeDivisor };
-  AdjustWindowRect(&winSize, wsStyle, false);
-  hWnd = CreateWindowA("OVRAppWindow", "OculusRoomTiny",
-    wsStyle | WS_VISIBLE,
-    vp.x, vp.y,
-    winSize.right - winSize.left, winSize.bottom - winSize.top,
-    NULL, NULL, hInstance, NULL);
+  Texture* CreateTexture(int width, int height)
+  {
+    Texture* NewTex = new Texture(width, height);
+    D3D11_TEXTURE2D_DESC dsDesc;
+    dsDesc.Width = width;
+    dsDesc.Height = height;
+    dsDesc.MipLevels = 1;
+    dsDesc.ArraySize = 1;
+    dsDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    dsDesc.SampleDesc.Count = 1;
+    dsDesc.SampleDesc.Quality = 0;
+    dsDesc.Usage = D3D11_USAGE_DEFAULT;
+    dsDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    dsDesc.CPUAccessFlags = 0;
+    dsDesc.MiscFlags = 0;
 
-  POINT center = { vp.w / 2 / sizeDivisor, vp.h / 2 / sizeDivisor };
-  ::ClientToScreen(hWnd, &center);
-  WindowCenter = center;
+    HRESULT hr = Device->CreateTexture2D(&dsDesc, NULL, &NewTex->Tex.GetRawRef());
+    if (FAILED(hr)) {
+      NewTex->Release();
+      return NULL;
+    }
+    Device->CreateShaderResourceView(NewTex->Tex, NULL, &NewTex->TexSv.GetRawRef());
+    return NewTex;
+  }
+};
 
-  if (!hWnd) return(NULL);
+class GlStubWindow : public GlfwApp {
+public:
+  GlStubWindow() {
+    createRenderingTarget();
+    if (!window) {
+      FAIL("Unable to create OpenGL window");
+    }
+  }
 
-  // Graphics
-  renderParams.Multisample = multiSampleCount;
-  renderParams.Fullscreen = fullscreen;
-  Allocator::setInstance(new DefaultAllocator());
-  Allocator * pAllocator = Allocator::GetInstance();
-  *returnedDevice = RenderDevice::CreateDevice(renderParams, (void*)hWnd);
+  ~GlStubWindow() {
+    glfwDestroyWindow(window);
+  }
 
-  return(hWnd);
-}
+  virtual void createRenderingTarget() {
+    createWindow(glm::uvec2(320, 180), glm::ivec2(100, 100));
+  }
+};
+
 
 
 struct EyeArgs {
@@ -1069,9 +251,8 @@ struct EyeArgs {
   gl::FrameBufferWrapper  framebuffer;
 };
 
-class HelloRift : public GlStubWindow, RiftStubApp {
+class HelloRift : public GlStubWindow, RiftStubApp, DxStubWindow {
 protected:
-  HWND              dxWnd;
   EyeArgs           perEyeArgs[2];
   ovrTexture        textures[2];
   float             eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
@@ -1080,15 +261,18 @@ protected:
   HANDLE            gl_handleD3D;
   HANDLE            gl_handles[2];
   Texture *         pTextures[2];
-  RenderDevice*     pRender;
 
 public:
+  static void GlfwMoveCallback(GLFWwindow* window, int x, int y) {
+    HelloRift * instance = (HelloRift *)glfwGetWindowUserPointer(window);
+    instance->onWindowMove(x, y);
+  }
 
 
-  HelloRift() {
-    dxWnd = Util_InitWindowAndGraphics(Recti(0, 0, 1920, 1080), 1, 1, true, &pRender);
-    gl_handleD3D = wglDXOpenDeviceNV(pRender->Device);
-    ovrHmd_AttachToWindow(hmd, dxWnd, nullptr, nullptr);
+  HelloRift() : DxStubWindow(glfwGetWin32Window(window), hmd->Resolution.w, hmd->Resolution.h) {
+    gl_handleD3D = wglDXOpenDeviceNV(Device);
+    glfwSetWindowPosCallback(window, GlfwMoveCallback);
+    ovrHmd_AttachToWindow(hmd, Window, nullptr, nullptr);
 
     for_each_eye([&](ovrEyeType eye){
       EyeArgs & eyeArgs = perEyeArgs[eye];
@@ -1101,14 +285,14 @@ public:
       eyeTextureHeader.RenderViewport.Pos.y = 0;
       eyeTextureHeader.API = ovrRenderAPI_D3D11;
       ovrD3D11Texture & d3dTexture = (ovrD3D11Texture&)textures[eye];
-      pTextures[eye] = pRender->CreateTexture(Texture_RGBA, eyeTextureHeader.TextureSize.w, eyeTextureHeader.TextureSize.h, nullptr);
+      pTextures[eye] = CreateTexture(eyeTextureHeader.TextureSize.w, eyeTextureHeader.TextureSize.h);
       d3dTexture.D3D11.pTexture = pTextures[eye]->Tex;
       d3dTexture.D3D11.pSRView = pTextures[eye]->TexSv;
       eyeArgs.framebuffer.color = gl::FrameBufferWrapper::ColorTexturePtr(new gl::Texture2d());
       ID3D11Texture2D * texHandle = d3dTexture.D3D11.pTexture;
       gl_handles[eye] = wglDXRegisterObjectNV(gl_handleD3D, texHandle, eyeArgs.framebuffer.color->texture,
         GL_TEXTURE_2D,
-        WGL_ACCESS_READ_WRITE_NV);
+        WGL_ACCESS_WRITE_DISCARD_NV);
     });
     BOOL success = wglDXLockObjectsNV(gl_handleD3D, 2, gl_handles);
     if (!success) {
@@ -1129,10 +313,10 @@ public:
     cfg.D3D11.Header.API = ovrRenderAPI_D3D11;
     cfg.D3D11.Header.RTSize = hmd->Resolution;
     cfg.D3D11.Header.Multisample = 1;
-    cfg.D3D11.pDevice = pRender->Device;
-    cfg.D3D11.pSwapChain = pRender->SwapChain;
-    cfg.D3D11.pDeviceContext = pRender->Context;
-    cfg.D3D11.pBackBufferRT = pRender->BackBufferRT;
+    cfg.D3D11.pDevice = Device;
+    cfg.D3D11.pSwapChain = SwapChain;
+    cfg.D3D11.pDeviceContext = Context;
+    cfg.D3D11.pBackBufferRT = BackBufferRT;
 
     int distortionCaps =
       ovrDistortionCap_TimeWarp |
@@ -1161,6 +345,10 @@ public:
   ~HelloRift() {
     ovrHmd_Destroy(hmd);
     hmd = 0;
+  }
+
+  void onWindowMove(int x, int y) {
+    SetWindowPos(Window, HWND_BOTTOM, x + 10, y + 10, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
   }
 
   virtual void resetPosition() {
@@ -1195,8 +383,7 @@ public:
     case GLFW_KEY_V:
       if (caps & ovrHmdCap_NoVSync) {
         ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_NoVSync);
-      }
-      else {
+      } else {
         ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_NoVSync);
       }
       break;
@@ -1204,14 +391,21 @@ public:
     case GLFW_KEY_P:
       if (caps & ovrHmdCap_LowPersistence) {
         ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_LowPersistence);
-      }
-      else {
+      } else {
         ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_LowPersistence);
       }
       break;
 
     case GLFW_KEY_R:
       resetPosition();
+      break;
+
+    case GLFW_KEY_H:
+      if (IsWindowVisible(Window)) {
+        ShowWindow(Window, SW_HIDE);
+      } else {
+        ShowWindow(Window, SW_SHOW);
+      }
       break;
 
     default:
@@ -1231,9 +425,6 @@ public:
     static ovrPosef eyePoses[2];
     gl::MatrixStack & mv = gl::Stacks::modelview();
     ovrHmd_BeginFrame(hmd, frameIndex++);
-    pRender->BeginScene();
-    pRender->Clear();
-
     glEnable(GL_DEPTH_TEST);
     if (!wglDXLockObjectsNV(gl_handleD3D, 2, gl_handles)) {
       FAIL("Could not lock objects");
@@ -1242,6 +433,7 @@ public:
       ovrEyeType eye = hmd->EyeRenderOrder[i];
       EyeArgs & eyeArgs = perEyeArgs[eye];
       gl::Stacks::projection().top() = eyeArgs.projection;
+      gl::Stacks::projection().scale(glm::vec3(1, -1, 1));
 
       eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
       eyeArgs.framebuffer.activate();
@@ -1255,7 +447,6 @@ public:
     if (!wglDXUnlockObjectsNV(gl_handleD3D, 2, gl_handles)) {
       FAIL("Could not unlock objects");
     }
-    pRender->FinishScene();
     ovrHmd_EndFrame(hmd, eyePoses, textures);
   }
 
@@ -1279,26 +470,18 @@ public:
   }
 
   int run() {
-    // Processes messages and calls OnIdle() to do rendering.
-    while (!Quit)
-    {
+    MSG msg;
+    while (!glfwWindowShouldClose(window))  {
       glfwPollEvents();
-      MSG msg;
       if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
       {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-      }
-      else
-      {
+      } else {
         update();
         draw();
-
-        // Keep sleeping when we're minimized.
-        if (IsIconic(hWnd)) Sleep(10);
       }
     }
-
     return 0;
   }
 };
