@@ -139,11 +139,9 @@ void Font::read(const void * data, size_t size) {
 
   std::vector<TextureVertex> vertexData;
   std::vector<GLuint> indexData;
-  float texH = 0, texW = 0, texA = 0;
   int characters = 0;
   std::for_each(mMetrics.begin(), mMetrics.end(),
       [&] ( MetricsData::reference & md ) {
-        uint16_t id = md.first;
         Font::Metrics & m = md.second;
         ++characters;
         GLuint index = (GLuint)vertexData.size();

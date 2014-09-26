@@ -151,7 +151,7 @@ public:
       GLFWmonitor ** monitors = glfwGetMonitors(&monitorCount);
       for (int i = 0; i < monitorCount; ++i) {
         GLFWmonitor * monitor = monitors[i];
-        if (monitors[i] != primaryMonitor) {
+        if (monitor != primaryMonitor) {
           hmdMonitor = monitors[i];
           break;
         }
@@ -210,6 +210,11 @@ public:
   virtual ~RiftGlfwApp() {
   }
 
+  virtual void viewport(ovrEyeType eye) {
+    glm::uvec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
+    gl::viewport(viewportPosition, glm::uvec2(windowSize.x / 2, windowSize.y));
+  }
+    
   int getEnabledCaps() {
     return ovrHmd_GetEnabledCaps(hmd);
   }
