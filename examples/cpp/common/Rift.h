@@ -111,13 +111,16 @@ protected:
   glm::ivec2 hmdDesktopPosition;
 
 public:
-  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK1) {
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
     hmd = ovrHmd_Create(0);
     if (NULL == hmd) {
       hmd = ovrHmd_CreateDebug(defaultHmdType);
+      hmdDesktopPosition = glm::ivec2(100, 100);
+    }
+    else {
+      hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
     }
     hmdNativeResolution = glm::ivec2(hmd->Resolution.w, hmd->Resolution.h);
-    hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
   }
 
   virtual ~RiftManagerApp() {
@@ -174,7 +177,7 @@ public:
     } else {
       // If we've got a fake rift and we're NOT fullscreen,
       // use the DK1 resolution
-      windowSize = glm::uvec2(1280, 800);
+      windowSize = hmdNativeResolution;
     }
 
     // if we're using a fake rift
