@@ -15,6 +15,11 @@ public:
   ~SimpleScene() {
   }
 
+  virtual void update() {
+    // Auto-cycle the res
+//    texRes = (sin(ovr_GetTimeInSeconds()) + 1.0f) / 2.0f;
+  }
+
   virtual void onKey(int key, int scancode, int action, int mods) {
     if (!CameraControl::instance().onKey(key, scancode, action, mods)) {
       static const float ROOT_2 = sqrt(2.0f);
@@ -23,7 +28,7 @@ public:
         switch (key) {
         case GLFW_KEY_HOME:
           if (texRes < 0.95f) {
-            texRes *= ROOT_2;
+            texRes = std::min(texRes * ROOT_2, 1.0f);
           }
           break;
         case GLFW_KEY_END:
@@ -36,24 +41,25 @@ public:
           break;
         }
       } else {
-        RiftGlfwApp::onKey(key, scancode, action, mods);
+        RiftApp::onKey(key, scancode, action, mods);
       }
     }
   }
 
   void resetCamera() {
     player = glm::inverse(glm::lookAt(
-      glm::vec3(0, eyeHeight, 1),  // Position of the camera
+      glm::vec3(0, eyeHeight, 0.4),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
       GlUtils::Y_AXIS));           // Camera up axis
+    ovrHmd_RecenterPose(hmd);
   }
 
 
   void renderScene() {
     int currentEye = getCurrentEye();
     ovrTexture & eyeTex = eyeTextures[currentEye];
-    const ovrSizei & texSize = eyeTex.Header.TextureSize;
     ovrRecti & rvp = eyeTex.Header.RenderViewport;
+    const ovrSizei & texSize = eyeTex.Header.TextureSize;
     rvp.Size.w = texSize.w * texRes;
     rvp.Size.h = texSize.h * texRes;
     glViewport(
@@ -62,6 +68,10 @@ public:
 
     glEnable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    std::string maxfps = Platform::format("%0.2f", texRes);
+    float mp = rvp.Size.w * rvp.Size.h;
+    mp /= 1000000;
+    std::string message = Platform::format("Texture Scale %0.2f\nMegapixels per eye: %0.2f", texRes, mp);
     gl::MatrixStack & mv = gl::Stacks::modelview();
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
@@ -72,6 +82,7 @@ public:
         GlUtils::drawColorCube(true);
       });
     });
+    GlfwApp::renderStringAt(message, glm::vec2(-0.5f, 0.5f));
   }
 };
 
