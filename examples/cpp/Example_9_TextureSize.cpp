@@ -1,23 +1,21 @@
 #include "Common.h"
 
-class SimpleScene: public RiftApp {
+class DynamicFramebufferScaleExample : public RiftApp {
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
   float texRes{ 1.0f };
 
 public:
-  SimpleScene() {
-    ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
-    eyeHeight = ovrHmd_GetFloat(hmd, OVR_KEY_PLAYER_HEIGHT, OVR_DEFAULT_PLAYER_HEIGHT);
+  DynamicFramebufferScaleExample() {
+    ipd = ovrHmd_GetFloat(hmd, 
+      OVR_KEY_IPD, 
+      OVR_DEFAULT_IPD);
+
+    eyeHeight = ovrHmd_GetFloat(hmd, 
+      OVR_KEY_PLAYER_HEIGHT, 
+      OVR_DEFAULT_PLAYER_HEIGHT);
+
     resetCamera();
-  }
-
-  ~SimpleScene() {
-  }
-
-  virtual void update() {
-    // Auto-cycle the res
-//    texRes = (sin(ovr_GetTimeInSeconds()) + 1.0f) / 2.0f;
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
@@ -67,23 +65,18 @@ public:
       rvp.Size.w, rvp.Size.h);
 
     glEnable(GL_DEPTH_TEST);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    std::string maxfps = Platform::format("%0.2f", texRes);
-    float mp = rvp.Size.w * rvp.Size.h;
-    mp /= 1000000;
-    std::string message = Platform::format("Texture Scale %0.2f\nMegapixels per eye: %0.2f", texRes, mp);
+    glClear(GL_DEPTH_BUFFER_BIT);
     gl::MatrixStack & mv = gl::Stacks::modelview();
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
-      GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-      GlUtils::renderFloor();
-      gl::Stacks::with_push(mv, [&]{
-        mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
-        GlUtils::drawColorCube(true);
-      });
+      GlUtils::renderCubeScene(ipd, eyeHeight);
     });
+
+    std::string message = Platform::format(
+      "Texture Scale %0.2f\nMegapixels per eye: %0.2f", texRes, 
+      (rvp.Size.w * rvp.Size.h) / 1000000.0f);
     GlfwApp::renderStringAt(message, glm::vec2(-0.5f, 0.5f));
   }
 };
 
-RUN_OVR_APP(SimpleScene);
+RUN_OVR_APP(DynamicFramebufferScaleExample);
