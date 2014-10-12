@@ -84,7 +84,7 @@ protected:
   }
 };
 
-//#define USE_RIFT 1
+#define USE_RIFT 1
 #ifdef USE_RIFT
 #define PARENT_CLASS RiftApp
 #else

@@ -78,12 +78,12 @@ protected:
 
   static LRESULT CALLBACK systemWindowProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
   {
-    DxStubWindow * pParent = (DxStubWindow *)GetWindowLongPtr(hWnd, GWL_USERDATA);
+    DxStubWindow * pParent = (DxStubWindow *)GetWindowLongPtr(hWnd, GWLP_USERDATA);
     switch (msg)
     {
     case WM_CREATE:
       pParent = (DxStubWindow*)((LPCREATESTRUCT)lp)->lpCreateParams;
-      SetWindowLongPtr(hWnd, GWL_USERDATA, (LONG_PTR)pParent);
+      SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)pParent);
       break;
 
     case WM_SETFOCUS:
