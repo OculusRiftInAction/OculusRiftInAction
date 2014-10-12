@@ -270,6 +270,7 @@ void GlfwApp::destroyWindow() {
 }
 
 GlfwApp::~GlfwApp() {
+  glfwDestroyWindow(window);
   glfwTerminate();
 }
 
@@ -334,7 +335,6 @@ int GlfwApp::run() {
       framecount = 0;
     }
   }
-  glfwDestroyWindow(window);
   return 0;
 }
 
