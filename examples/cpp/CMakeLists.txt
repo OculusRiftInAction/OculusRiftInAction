@@ -26,6 +26,8 @@ function(make_example FILE PROJECT_FOLDER)
 
     if(WIN32)
         add_executable(${EXECUTABLE} WIN32 ${SOURCE_FILES})
+        list(APPEND EXAMPLE_LIBS d3d11)
+        list(APPEND EXAMPLE_LIBS dxgi)
     elseif(APPLE)
         list(APPEND SOURCE_FILES ${ALL_RESOURCES})
         foreach(resource_file ${ALL_RESOURCES}) 
@@ -56,4 +58,14 @@ function(make_examples GLOB PROJECT_FOLDER)
 endfunction() 
 
 make_examples(*.cpp "Examples")
+
+if (OpenCV_FOUND)
+    make_examples(opencv/*.cpp "Examples/OpenCV")
+endif()
+
+if (EXPERIMENTAL)
+    make_examples(experimental/*.cpp "Examples/Experimental")
+endif()
+
+
 

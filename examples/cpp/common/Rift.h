@@ -111,13 +111,16 @@ protected:
   glm::ivec2 hmdDesktopPosition;
 
 public:
-  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK1) {
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
     hmd = ovrHmd_Create(0);
     if (NULL == hmd) {
       hmd = ovrHmd_CreateDebug(defaultHmdType);
+      hmdDesktopPosition = glm::ivec2(100, 100);
+    }
+    else {
+      hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
     }
     hmdNativeResolution = glm::ivec2(hmd->Resolution.w, hmd->Resolution.h);
-    hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
   }
 
   virtual ~RiftManagerApp() {
@@ -151,7 +154,7 @@ public:
       GLFWmonitor ** monitors = glfwGetMonitors(&monitorCount);
       for (int i = 0; i < monitorCount; ++i) {
         GLFWmonitor * monitor = monitors[i];
-        if (monitors[i] != primaryMonitor) {
+        if (monitor != primaryMonitor) {
           hmdMonitor = monitors[i];
           break;
         }
@@ -174,7 +177,7 @@ public:
     } else {
       // If we've got a fake rift and we're NOT fullscreen,
       // use the DK1 resolution
-      windowSize = glm::uvec2(1280, 800);
+      windowSize = hmdNativeResolution;
     }
 
     // if we're using a fake rift
@@ -210,6 +213,11 @@ public:
   virtual ~RiftGlfwApp() {
   }
 
+  virtual void viewport(ovrEyeType eye) {
+    glm::uvec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
+    gl::viewport(viewportPosition, glm::uvec2(windowSize.x / 2, windowSize.y));
+  }
+    
   int getEnabledCaps() {
     return ovrHmd_GetEnabledCaps(hmd);
   }
@@ -247,7 +255,7 @@ private:
   ovrEyeType currentEye;
 
 protected:
-  void renderStringAt(const std::string & str, float x, float y);
+  void renderStringAt(const std::string & str, float x, float y, float size = 18.0f);
   virtual void initGl();
   virtual void finishFrame();
   virtual void onKey(int key, int scancode, int action, int mods);
@@ -257,6 +265,7 @@ protected:
   virtual void renderScene() = 0;
 
 
+  virtual void applyEyePoseAndOffset(const glm::mat4 & eyePose, const glm::vec3 & eyeOffset);
 
   inline ovrEyeType getCurrentEye() const {
     return currentEye;

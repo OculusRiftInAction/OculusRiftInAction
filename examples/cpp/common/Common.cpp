@@ -98,7 +98,7 @@ std::string Platform::getResourceData(Resource resource) {
 }
 
 std::string Platform::format(const char * fmt_str, ...) {
-    int final_n, n = strlen(fmt_str) * 2; /* reserve 2 times as much as the length of the fmt_str */
+    int final_n, n = (int)strlen(fmt_str) * 2; /* reserve 2 times as much as the length of the fmt_str */
     std::string str;
     std::unique_ptr<char[]> formatted;
     va_list ap;

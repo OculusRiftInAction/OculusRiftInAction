@@ -120,23 +120,36 @@ public:
       eyeArg.frameBuffer.deactivate();
     }
 
-    glClearColor(0, 0, 1, 1);
+    glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
 
     distortionProgram->use();
-
+    bool showMesh = false;
     glViewport(0, 0, windowSize.x, windowSize.y);
+    float mix = (sin(ovr_GetTimeInSeconds() * TWO_PI / 10.0f) + 1.0f) / 2.0f;
     for_each_eye([&](ovrEyeType eye) {
       const EyeArg & eyeArg = eyeArgs[eye];
-      distortionProgram->setUniform(0, eyeArg.scale);
-      distortionProgram->setUniform(1, eyeArg.offset);
+      distortionProgram->setUniform("EyeToSourceUVScale", eyeArg.scale);
+      distortionProgram->setUniform("EyeToSourceUVOffset", eyeArg.offset);
+      distortionProgram->setUniform("RightEye", ovrEye_Left == eye ? 0 : 1);
+      distortionProgram->setUniform("DistortionWeight", mix);
       eyeArg.frameBuffer.color->bind();
       eyeArg.meshVao->bind();
+      if (showMesh) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glLineWidth(3.0f);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+      }
       glDrawElements(GL_TRIANGLES, eyeArg.mesh.IndexCount,
         GL_UNSIGNED_SHORT, nullptr);
+      if (showMesh) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+      }
     });
     gl::Texture2d::unbind();
     gl::Program::clear();
