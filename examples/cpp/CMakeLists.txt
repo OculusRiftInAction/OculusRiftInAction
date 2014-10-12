@@ -59,3 +59,13 @@ endfunction()
 
 make_examples(*.cpp "Examples")
 
+if (OpenCV_FOUND)
+    make_examples(opencv/*.cpp "Examples/OpenCV")
+endif()
+
+if (EXPERIMENTAL)
+    make_examples(experimental/*.cpp "Examples/Experimental")
+endif()
+
+
+
