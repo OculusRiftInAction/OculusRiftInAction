@@ -255,7 +255,7 @@ private:
   ovrEyeType currentEye;
 
 protected:
-  void renderStringAt(const std::string & str, float x, float y);
+  void renderStringAt(const std::string & str, float x, float y, float size = 18.0f);
   virtual void initGl();
   virtual void finishFrame();
   virtual void onKey(int key, int scancode, int action, int mods);
@@ -265,6 +265,7 @@ protected:
   virtual void renderScene() = 0;
 
 
+  virtual void applyEyePoseAndOffset(const glm::mat4 & eyePose, const glm::vec3 & eyeOffset);
 
   inline ovrEyeType getCurrentEye() const {
     return currentEye;

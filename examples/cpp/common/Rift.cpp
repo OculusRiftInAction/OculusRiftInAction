@@ -110,6 +110,13 @@ void RiftApp::update() {
 //  gl::Stacks::modelview().top() = glm::lookAt(glm::vec3(0, 0, 0.4f), glm::vec3(0), glm::vec3(0, 1, 0));
 }
 
+void RiftApp::applyEyePoseAndOffset(const glm::mat4 & eyePose, const glm::vec3 & eyeOffset) {
+  gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.preMultiply(glm::inverse(eyePose));
+  // Apply the per-eye offset
+  mv.preMultiply(glm::translate(glm::mat4(), eyeOffset));
+}
+
 void RiftApp::draw() {
   static int frameIndex = 0;
   ovrHmd_BeginFrame(hmd, frameIndex++);
@@ -131,11 +138,9 @@ void RiftApp::draw() {
       // Set up the per-eye modelview matrix
       {
         // Apply the head pose
-        glm::mat4 m = Rift::fromOvr(eyePoses[eye]);
-        mv.preMultiply(glm::inverse(m));
-        // Apply the per-eye offset
+        glm::mat4 eyePose = Rift::fromOvr(eyePoses[eye]);
         glm::vec3 eyeOffset = Rift::fromOvr(erd.ViewAdjust);
-        mv.preMultiply(glm::translate(glm::mat4(), eyeOffset));
+        applyEyePoseAndOffset(eyePose, eyeOffset);
       }
 
       // Render the scene to an offscreen buffer
@@ -177,7 +182,7 @@ void RiftApp::draw() {
   GL_CHECK_ERROR;
 }
 
-void RiftApp::renderStringAt(const std::string & str, float x, float y) {
+void RiftApp::renderStringAt(const std::string & str, float x, float y, float size) {
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pr = gl::Stacks::projection();
   gl::Stacks::with_push(mv, pr, [&]{
@@ -187,6 +192,6 @@ void RiftApp::renderStringAt(const std::string & str, float x, float y) {
       -windowAspectInverse * 2.0f, windowAspectInverse * 2.0f,
       -100.0f, 100.0f);
     glm::vec2 cursor(x, windowAspectInverse * y);
-    GlUtils::renderString(str, cursor, 18.0f);
+    GlUtils::renderString(str, cursor, size);
   });
 }
