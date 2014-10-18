@@ -25,3 +25,6 @@
 [submodule "examples/python"]
 	path = examples/python
 	url = https://github.com/OculusRiftInAction/pyovr-examples.git
+[submodule "cmake"]
+	path = cmake
+	url = https://github.com/jherico/cmake.git
