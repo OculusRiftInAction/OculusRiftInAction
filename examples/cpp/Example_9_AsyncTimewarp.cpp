@@ -2,13 +2,6 @@
 #include <thread>
 #include <mutex>
 
-template <typename Function>
-void withLock(std::mutex & m, Function f) {
-  m.lock();
-  f();
-  m.unlock();
-}
-
 struct PerEyeArgs {
   glm::mat4 projection;
   glm::mat4 translation;
@@ -214,9 +207,10 @@ public:
       // We can only acquire an eye pose between beginframe and endframe.
       // So we've arranged for the lock to be only open at those points.  
       // The main thread will spend most of it's time in the wait.
-      ::withLock(ovrLock, [&]{
-          renderPoses[eye] = ovrHmd_GetEyePose(hmd, eye);
-      });
+      {
+        std::unique_lock<std::mutex> locker(ovrLock);
+        renderPoses[eye] = ovrHmd_GetEyePose(hmd, eye);
+      }
 
       const PerEyeArgs & eyeArgs = perEyeArgs[eye];
       gl::MatrixStack & mv = gl::Stacks::modelview();
@@ -241,8 +235,8 @@ public:
     // Ensure all scene rendering commands have been completed
     glFinish();
 
-
-    withLock(ovrLock, [&]{
+    {
+      std::unique_lock<std::mutex> locker(ovrLock);
       for_each_eye([&](ovrEyeType eye) {
         int renderBufferIndex = renderBuffers[eye];
         renderBuffers[eye] = renderBufferIndex ? 0 : 1;
@@ -250,7 +244,7 @@ public:
           frameBuffers[eye][renderBufferIndex].color->texture;
         eyePoses[eye] = renderPoses[eye];
       });
-    });
+    }
   }
 
   void renderScene() {

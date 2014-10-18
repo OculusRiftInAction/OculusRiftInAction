@@ -22,7 +22,7 @@ protected:
   }
 
   void startCapture() {
-    captureThread = std::thread(&CaptureHandler::threadLoop, this);
+    captureThread = std::thread(&CaptureHandler::operator(), this);
   }
 
   const T & getCaptureResult() const {
@@ -30,34 +30,44 @@ protected:
   }
 
 public:
-  virtual void threadLoop() = 0;
+  virtual void operator()() = 0;
 };
 
 
 class WebcamHandler : public CaptureHandler<cv::Mat> {
 private:
   cv::VideoCapture videoCapture{ 1 };
-  glm::uvec2 imageSize;
+  cv::Size imageSize{ 1280, 720 };
+  cv::Mat cameraMatrix;
+  cv::Mat distCoeffs;
+  bool hasCalibration{ false };
 
 protected:
   double lastFrameTimes[2];
 
   WebcamHandler() {
+    cv::Mat view, rview, map1, map2;
+
+    
+    cv::FileStorage fs(CAMERA_PARAMS_FILE, cv::FileStorage::READ); // Read the settings
+    if (fs.isOpened()) {
+      fs["Camera_Matrix"] >> cameraMatrix;
+      fs["Distortion_Coefficients"] >> distCoeffs;
+      hasCalibration = true;
+    }
+
+
     if (!videoCapture.grab()) {
       FAIL("Failed grab");
     }
-    videoCapture.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
-    videoCapture.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
+    videoCapture.set(CV_CAP_PROP_FRAME_WIDTH, imageSize.width);
+    videoCapture.set(CV_CAP_PROP_FRAME_HEIGHT, imageSize.height);
     int fps = (int)videoCapture.get(CV_CAP_PROP_FPS);
     videoCapture.set(CV_CAP_PROP_FPS, 60);
-    // Force minimum focus, and disable autofocus
-    //    videoCapture.set(CV_CAP_PROP_FOCUS, 0);
-    imageSize = glm::uvec2(videoCapture.get(CV_CAP_PROP_FRAME_WIDTH),
-      videoCapture.get(CV_CAP_PROP_FRAME_HEIGHT));
-    captureResult = cv::Mat::zeros(imageSize.y, imageSize.x, CV_8UC3);
+    captureResult = cv::Mat::zeros(imageSize, CV_8UC3);
   }
 
-  virtual void threadLoop() {
+  virtual void operator()() {
     int framecount = 0;
     long start = Platform::elapsedMillis();
     while (!stop) {
@@ -73,14 +83,18 @@ protected:
       }
       static cv::Mat frame;
       videoCapture.retrieve(frame);
+      if (hasCalibration) {
+        cv::Mat temp = frame.clone();
+        undistort(temp, frame, cameraMatrix, distCoeffs);
+      }
       std::lock_guard < std::mutex > lock(frameMutex);
       cv::flip(frame, captureResult, 0);
       frameChanged = true;
     }
   }
 
-  const glm::uvec2 & getCaptureSize() const {
-    return imageSize;
+  glm::uvec2 getCaptureSize() const {
+    return glm::uvec2(imageSize.width, imageSize.height);
   }
 };
 
