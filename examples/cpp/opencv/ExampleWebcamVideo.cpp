@@ -181,13 +181,15 @@ public:
     mv.with_push([&]{
       mv.identity();
 
-      glm::mat4 eyePose = Rift::fromOvr(getEyePose());
-      glm::mat4 webcamPose = Rift::fromOvr(captureData.pose);
+      glm::mat4 eyePose = glm::mat4_cast(Rift::fromOvr(getEyePose().Orientation));
+      glm::mat4 webcamPose = glm::mat4_cast(Rift::fromOvr(captureData.pose.Orientation));
       glm::mat4 webcamDelta = webcamPose * glm::inverse(eyePose);
-      glm::vec3 rotated = glm::mat3(webcamDelta) * glm::vec3(0, 0, -1);
-      glm::mat4 lookat = glm::lookAt(glm::vec3(0), rotated, glm::vec3(0, 1, 0));
+//      glm::vec3 rotated = glm::mat3(webcamDelta) * glm::vec3(0, 0, -1);
+//      glm::mat4 lookat = glm::lookAt(glm::vec3(0), rotated, glm::vec3(0, 1, 0));
 
-      mv.preMultiply(glm::inverse(lookat));
+      
+      mv.preMultiply(webcamDelta);
+      //mv.preMultiply(glm::inverse(lookat));
       mv.translate(glm::vec3(0, 0, -IMAGE_DISTANCE));
 
       texture->bind();
