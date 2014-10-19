@@ -122,7 +122,9 @@ void RiftApp::draw() {
   ovrHmd_BeginFrame(hmd, frameIndex++);
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pr = gl::Stacks::projection();
-  static ovrPosef eyePoses[2];
+  for_each_eye([&](ovrEyeType eye){
+    eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
+  });
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
     gl::Stacks::with_push(pr, mv, [&]{
@@ -134,7 +136,6 @@ void RiftApp::draw() {
         pr.top() = ovrProj;
       }
 
-      eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
       // Set up the per-eye modelview matrix
       {
         // Apply the head pose
