@@ -11,6 +11,7 @@
 #define IMAGE_DISTANCE 10.0f
 #define CAMERA_DEVICE 1
 #define CAMERA_LATENCY 0.040
+#define CAMERA_ASPECT ((float)CAMERA_WIDTH / (float)CAMERA_HEIGHT)
 
 template <class T>
 class CaptureHandler {
@@ -25,6 +26,7 @@ private:
 
   float firstCapture{ -1 };
   int captures{ -1 };
+  float cps{ -1 };
 
   T result;
 
@@ -49,7 +51,15 @@ public:
     if (-1 == captures) {
       return 0;
     }
+
     float elapsed = Platform::elapsedSeconds() - firstCapture;
+    if (elapsed > 2.0f) {
+      cps = (float)captures / elapsed;
+      captures = -1;
+    }
+    if (cps > 0) {
+      return cps;
+    }
     return (float)captures / elapsed;
   }
 
@@ -103,13 +113,14 @@ public:
   virtual void captureLoop() {
     while (!isStopped()) {
       CaptureData captured;
-      captured.pose = ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds() - CAMERA_LATENCY).HeadPose.ThePose;
+      float captureTime = 
+        ovr_GetTimeInSeconds() - CAMERA_LATENCY;
+      ovrTrackingState tracking = 
+        ovrHmd_GetTrackingState(hmd, captureTime);
+      captured.pose = tracking.HeadPose.ThePose;
 
-      if (!videoCapture.grab()) {
-        FAIL("Failed video capture");
-      }
-
-      if (!videoCapture.retrieve(captured.image)) {
+      if (!videoCapture.grab() ||
+          !videoCapture.retrieve(captured.image)) {
         FAIL("Failed video capture");
       }
 
@@ -139,66 +150,66 @@ public:
     captureHandler.stopCapture();
   }
 
-  void initGl() {
-    RiftApp::initGl();
-    glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(UINT_MAX);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+void initGl() {
+  RiftApp::initGl();
+  glEnable(GL_PRIMITIVE_RESTART);
+  glPrimitiveRestartIndex(UINT_MAX);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    videoRenderProgram = GlUtils::getProgram(
-      Resource::SHADERS_TEXTURED_VS,
-      Resource::SHADERS_TEXTURED_FS);
+  videoRenderProgram = GlUtils::getProgram(
+    Resource::SHADERS_TEXTURED_VS,
+    Resource::SHADERS_TEXTURED_FS);
 
-    texture = gl::TexturePtr(new gl::Texture2d());
+  texture = gl::TexturePtr(new gl::Texture2d());
+  texture->bind();
+  texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl::Texture2d::unbind();
+
+  float halfFov = (CAMERA_HFOV_DEGREES / 2.0f) * 
+    DEGREES_TO_RADIANS;
+  float scale = tan(halfFov) * IMAGE_DISTANCE;
+  videoGeometry = GlUtils::getQuadGeometry(CAMERA_ASPECT, scale * 2.0f);
+}
+
+virtual void update() {
+  if (captureHandler.getResult(captureData)) {
     texture->bind();
-    texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
+      captureData.image.cols, captureData.image.rows, 
+      0, GL_BGR, GL_UNSIGNED_BYTE,
+      captureData.image.data);
     gl::Texture2d::unbind();
-
-    float halfFov = DEGREES_TO_RADIANS * CAMERA_HFOV_DEGREES / 2.0f;
-    float scale = tan(halfFov) * IMAGE_DISTANCE;
-
-    videoGeometry = GlUtils::getQuadGeometry((float)CAMERA_WIDTH / (float)CAMERA_HEIGHT, scale * 2.0f);
-
   }
+}
 
-  virtual void update() {
-    if (captureHandler.getResult(captureData)) {
-      texture->bind();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-        captureData.image.cols, captureData.image.rows, 0, GL_BGR, GL_UNSIGNED_BYTE,
-        captureData.image.data);
-      gl::Texture2d::unbind();
-    }
-  }
+virtual void renderScene() {
+  glClear(GL_DEPTH_BUFFER_BIT);
+  GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+  gl::MatrixStack & mv = gl::Stacks::modelview();
 
-  virtual void renderScene() {
-    glClear(GL_DEPTH_BUFFER_BIT);
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+  mv.with_push([&]{
+    mv.identity();
 
-    mv.with_push([&]{
-      mv.identity();
+    glm::quat eyePose = Rift::fromOvr(getEyePose().Orientation);
+    glm::quat webcamPose = Rift::fromOvr(captureData.pose.Orientation);
+    glm::mat4 webcamDelta = glm::mat4_cast(glm::inverse(eyePose) * webcamPose);
 
-      glm::quat eyePose = Rift::fromOvr(getEyePose().Orientation);
-      glm::quat webcamPose = Rift::fromOvr(captureData.pose.Orientation);
-      glm::mat4 webcamDelta = glm::mat4_cast(glm::inverse(eyePose) * webcamPose);
+    mv.preMultiply(webcamDelta);
+    mv.translate(glm::vec3(0, 0, -IMAGE_DISTANCE));
 
-      mv.preMultiply(webcamDelta);
-      mv.translate(glm::vec3(0, 0, -IMAGE_DISTANCE));
+    texture->bind();
+    GlUtils::renderGeometry(videoGeometry, videoRenderProgram);
+    gl::Texture2d::unbind();
+  });
 
-      texture->bind();
-      GlUtils::renderGeometry(videoGeometry, videoRenderProgram);
-      gl::Texture2d::unbind();
-    });
-
-    std::string message = Platform::format(
-      "OpenGL FPS: %0.2f\n"
-      "Vidcap FPS: %0.2f\n",
-      fps, captureHandler.getCapturesPerSecond());
-    GlfwApp::renderStringAt(message, glm::vec2(-0.5f, 0.5f));
-  }
+  std::string message = Platform::format(
+    "OpenGL FPS: %0.2f\n"
+    "Vidcap FPS: %0.2f\n",
+    fps, captureHandler.getCapturesPerSecond());
+  GlfwApp::renderStringAt(message, glm::vec2(-0.5f, 0.5f));
+}
 };
 
 RUN_OVR_APP(WebcamApp);
