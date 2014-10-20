@@ -1,5 +1,91 @@
 #include "Common.h"
-#include <OVR_CAPI_GL.h>
+
+class RiftFramework {
+  protected:
+
+  private:
+    ovrTexture eyeTextures[2];
+    ovrEyeRenderDesc eyeRenderDescs[2];
+    glm::mat4 projections[2];
+    ovrEyeType currentEye{ ovrEye_Count };
+    int frameIndex{ 0 };
+
+  public:
+    RiftFramework() {
+      ovr_Initialize();
+    }
+
+    virtual ~RiftFramework() {
+      ovr_Shutdown();
+    }
+
+  protected:
+
+    virtual void initRift() {
+      ovrHmd_Create(0);
+    }
+
+    virtual void initWindow() {
+    }
+
+    virtual void initRendering() {
+    }
+
+    virtual bool shouldQuit() {
+      return true;
+    }
+
+    // Called once per frame
+    virtual void update() {
+    }
+
+    virtual void run() {
+      initRift();
+      initWindow();
+      initRendering();
+      while (!shouldQuit()) {
+        ++frameIndex;
+        update();
+        draw();
+      }
+    }
+
+    virtual void draw() final;
+    virtual void postDraw() {};
+    virtual void update();
+    virtual void renderScene() = 0;
+
+
+    virtual void applyEyePoseAndOffset(const glm::mat4 & eyePose, const glm::vec3 & eyeOffset);
+
+    inline ovrEyeType getCurrentEye() const {
+      return currentEye;
+    }
+
+    const ovrEyeRenderDesc & getEyeRenderDesc(ovrEyeType eye) const {
+      return eyeRenderDescs[eye];
+    }
+
+    const ovrFovPort & getFov(ovrEyeType eye) const {
+      return eyeRenderDescs[eye].Fov;
+    }
+
+    const glm::mat4 & getPerspectiveProjection(ovrEyeType eye) const {
+      return projections[eye];
+    }
+
+    const ovrFovPort & getFov() const {
+      return getFov(getCurrentEye());
+    }
+
+    const ovrEyeRenderDesc & getEyeRenderDesc() const {
+      return getEyeRenderDesc(getCurrentEye());
+    }
+
+    const glm::mat4 & getPerspectiveProjection() const {
+      return getPerspectiveProjection(getCurrentEye());
+    }
+};
 
 #if defined(OVR_OS_WIN32)
 #define GLFW_EXPOSE_NATIVE_WIN32

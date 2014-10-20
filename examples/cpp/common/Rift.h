@@ -252,6 +252,7 @@ private:
   gl::FrameBufferWrapper frameBuffers[2];
   glm::mat4 projections[2];
   glm::mat4 orthoProjections[2];
+  ovrPosef eyePoses[2];
   ovrEyeType currentEye;
 
 protected:
@@ -285,6 +286,14 @@ protected:
 
   const glm::mat4 & getOrthographicProjection(ovrEyeType eye) const {
     return orthoProjections[eye];
+  }
+
+  const ovrPosef & getEyePose(ovrEyeType eye) const {
+    return eyePoses[eye];
+  }
+
+  const ovrPosef & getEyePose() const {
+    return getEyePose(getCurrentEye());
   }
 
   const ovrFovPort & getFov() const {

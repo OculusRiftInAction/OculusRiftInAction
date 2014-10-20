@@ -6,31 +6,13 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
 
 project(OculusRiftExamples)
 cmake_minimum_required(VERSION 2.8)
-include (GenerateExportHeader)
+include(GenerateExportHeader)
+include(cmake/defaults.cmake)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-# First for the generic no-config case (e.g. with mingw)
-set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
-set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
-set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
-
-# Second, for multi-config builds (e.g. msvc)
-foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
-    string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
-    set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
-    set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
-    set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
-endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
-
-# Comment out to disable the debug build
 set(CMAKE_BUILD_TYPE DEBUG)
-set(CMAKE_DEBUG_POSTFIX "d")
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
 
 option(RIFT_BUILD_SCRATCH_EXAMPLES OFF)
-
 string( TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER )
 if(BUILD_TYPE_LOWER STREQUAL "debug")
    set(RIFT_DEBUG 1)
@@ -43,31 +25,10 @@ else()
    message("Release build, resources will be loaded from executable/bundle")
 endif()
 
-# Verbosity is good, especially if a command fails
-set(CMAKE_VERBOSE_MAKEFILE ON)
-set(TARGET_ARCHITECTURE "x64")
-
-if(CMAKE_COMPILER_IS_GNUCXX)
-    # Ensure we use C++ 11 
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-    # Ensure we generate position independent code 
-    if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-    endif()
-endif()
 
 if(WIN32)
-    add_definitions(-DUNICODE -D_UNICODE)
-    set(TARGET_ARCHITECTURE "x86")
 elseif(APPLE)
-    # Ensure we use C++ 11 
-    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++0x")
-    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
-    set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0")
 else()
-    add_subdirectory(libraries/OculusSDK/3rdParty/EDID)
-    set_target_properties(edid PROPERTIES FOLDER "3rdParty")
 endif()
 
 
@@ -131,11 +92,10 @@ if (OpenCV_FOUND)
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
 else()
-
-# Without OpenCV, we have to fall back on libpng
-# which requires zlib.  For windows and apple we
-# build the library.  For Unix systems we locate 
-# the native package
+    # Without OpenCV, we have to fall back on libpng
+    # which requires zlib.  For windows and apple we
+    # build the library.  For Unix systems we locate 
+    # the native package
     if((WIN32 OR APPLE))
         # zlib
         add_subdirectory(libraries/zlib)
@@ -164,6 +124,7 @@ endif()
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
+
 ###############################################################################
 #
 # Common GL code, using only headers.  
@@ -178,6 +139,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
 # GLM - Vector / matrix header only math library based on the syntax of GLSL
 #
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
+
 
 ###############################################################################
 #
