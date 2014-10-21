@@ -62,12 +62,12 @@ public:
       // EXIF data parsed succesfully
       uchar *embedded = (uchar*)malloc(fullPanoSize.x * fullPanoSize.y * 3);
       insetImage(fullPanoSize, croppedImageSize, croppedImagePos, mat, embedded);
-      texture = GlUtils::getImageAsTexture(embedded, fullPanoSize);
+      texture = GlUtils::getImageAsTexture(fullPanoSize, embedded);
       free(embedded);
     } else {
 
       // Failed to load EXIF data
-      texture = GlUtils::getImageAsTexture(mat.datastart, glm::uvec2(mat.cols, mat.rows));
+      texture = GlUtils::getImageAsTexture(glm::uvec2(mat.cols, mat.rows), mat.datastart);
     }
     return texture;
   }

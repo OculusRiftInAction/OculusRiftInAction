@@ -130,7 +130,7 @@ public:
   /**
   * A convenience method for loading unsigned char (RGB) pixels into textures.
   */
-  static gl::TexturePtr getImageAsTexture(unsigned char *pixels, glm::uvec2 dimensions) {
+  static gl::TexturePtr getImageAsTexture(const glm::uvec2 &dimensions, unsigned char *pixels = NULL) {
     gl::TexturePtr texture = gl::TexturePtr(new gl::Texture2d());
     texture->bind();
     texture->image2d(dimensions, pixels);
