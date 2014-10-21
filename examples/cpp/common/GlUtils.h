@@ -50,6 +50,8 @@ public:
       const glm::vec2 & texMax = glm::vec2(1)
   );
 
+  static gl::GeometryPtr getSphereGeometry(float radius = 1, int du = 20, int dv = 10);
+
   static gl::TextureCubeMapPtr getCubemapTextures(Resource resource);
 
   static void getImageData(
@@ -109,7 +111,6 @@ public:
     return texture;
   }
 
-
   /**
    * A convenience method for loading images into textures
    * when you don't care about the dimensions of the image
@@ -124,6 +125,19 @@ public:
     GLenum target = TextureType) {
     glm::uvec2 imageSize;
     getImageAsTexture(texture, resource, imageSize, target);
+  }
+
+  /**
+  * A convenience method for loading unsigned char (RGB) pixels into textures.
+  */
+  static gl::TexturePtr getImageAsTexture(unsigned char *pixels, glm::uvec2 dimensions) {
+    gl::TexturePtr texture = gl::TexturePtr(new gl::Texture2d());
+    texture->bind();
+    texture->image2d(dimensions, pixels);
+    texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    texture->unbind();
+    return texture;
   }
 
   template<GLenum TextureType = GL_TEXTURE_2D>

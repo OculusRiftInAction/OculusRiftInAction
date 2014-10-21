@@ -1,0 +1,674 @@
+Content-type: text/html
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of EXIV2</TITLE>
+</HEAD><BODY>
+<H1>EXIV2</H1>
+Section: User Commands  (1)<BR>Updated: Nov 11, 2012<BR><A HREF="#index">Index</A>
+<A HREF="http://linux.die.net/man">Return to Main Contents</A><HR>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+exiv2 - Image metadata manipulation tool
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>exiv2</B>
+
+[<I>options</I>] [<I>action</I>] <I>file</I> ...
+<BR>
+
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+<P>
+
+
+
+
+<B>exiv2</B>
+
+is a program to read and write Exif, IPTC and XMP image metadata and
+image comments. The following image formats are supported:
+<TABLE>
+<TR VALIGN=top><TD><B>Type</B></TD><TD><B>Exif</B></TD><TD><B>IPTC</B></TD><TD><B>XMP</B></TD><TD><B>Image comments</B><BR></TD></TR>
+<TR VALIGN=top><TD><HR></TD><TD><HR></TD><TD><HR></TD><TD><HR></TD><TD><HR></TD></TR>
+<TR VALIGN=top><TD>JPEG</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write<BR></TD></TR>
+<TR VALIGN=top><TD>EXV</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write<BR></TD></TR>
+<TR VALIGN=top><TD>CR2</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>CRW</TD><TD>Read/Write</TD><TD>-</TD><TD>-</TD><TD>Read/Write<BR></TD></TR>
+<TR VALIGN=top><TD>MRW</TD><TD>Read</TD><TD>Read</TD><TD>Read</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>TIFF</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>DNG</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>NEF</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>PEF</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>ARW</TD><TD>Read</TD><TD>Read</TD><TD>Read</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>RW2</TD><TD>Read</TD><TD>Read</TD><TD>Read</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>SR2</TD><TD>Read</TD><TD>Read</TD><TD>Read</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>SRW</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>ORF</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>PNG</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write<BR></TD></TR>
+<TR VALIGN=top><TD>PGF</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write<BR></TD></TR>
+<TR VALIGN=top><TD>RAF</TD><TD>Read</TD><TD>Read</TD><TD>Read</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>EPS</TD><TD>-</TD><TD>-</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>XMP</TD><TD>-</TD><TD>-</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>GIF</TD><TD>-</TD><TD>-</TD><TD>-</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>PSD</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>TGA</TD><TD>-</TD><TD>-</TD><TD>-</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>BMP</TD><TD>-</TD><TD>-</TD><TD>-</TD><TD>-<BR></TD></TR>
+<TR VALIGN=top><TD>JP2</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>Read/Write</TD><TD>-<BR></TD></TR>
+</TABLE>
+
+<DL COMPACT>
+<DT>&bull;<DD>
+Support for GIF, TGA and BMP images is minimal: the image format is
+recognized, a MIME type assigned to it and the height and width of the
+image are determined.
+<DT>&bull;<DD>
+Reading other TIFF-like RAW image formats, which are not listed in the
+table, may also work.
+</DL>
+<A NAME="lbAE">&nbsp;</A>
+<H2>ACTIONS</H2>
+
+The <I>action</I> argument is only required if it is not clear from the
+<I>options</I> which action is implied.
+<DL COMPACT>
+<DT><B>pr | print</B>
+
+<DD>
+Print image metadata. This is the default action, i.e., the command
+<I>exiv2 image.jpg</I> will print a summary of the image Exif metadata.
+<DT><B>ex | extract</B>
+
+<DD>
+Extract metadata to *.exv, XMP sidecar (*.xmp) and thumbnail image files. 
+Modification commands can be applied on-the-fly.
+<DT><B>in | insert</B>
+
+<DD>
+Insert metadata from corresponding *.exv, XMP sidecar (*.xmp) and
+thumbnail files.  Use option <B>-S</B> <I>.suf</I> to change the suffix
+of the input files. Since files of any supported format can be used as
+input files, this command can be used to copy the metadata between
+files of different formats. Modification commands can be applied
+on-the-fly.
+<DT><B>rm | delete</B>
+
+<DD>
+Delete image metadata from the files.
+<DT><B>ad | adjust</B>
+
+<DD>
+Adjust Exif timestamps by the given time. Requires at least one of the
+options <B>-a</B> <I>time</I>, <B>-Y</B> <I>yrs</I>, <B>-O</B>
+<I>mon</I> or <B>-D</B> <I>day</I>.
+<DT><B>mo | modify</B>
+
+<DD>
+Apply commands to modify (add, set, delete) the Exif, IPTC and XMP
+metadata of image files. Requires option <B>-c</B>, <B>-m</B> or
+<B>-M</B>.
+<DT><B>mv | rename</B>
+
+<DD>
+Rename files and/or set file timestamps according to the Exif create
+timestamp. Uses the value of tag Exif.Photo.DateTimeOriginal or, if
+not present, Exif.Image.DateTime to determine the timestamp. The
+filename format can be set with <B>-r</B> <I>fmt</I>, timestamp options
+are <B>-t</B> and <B>-T</B>.
+<DT><B>fi | fixiso</B>
+
+<DD>
+Copy the ISO setting from one of the proprietary Nikon or Canon
+makernote ISO tags to the regular Exif ISO tag,
+Exif.Photo.ISOSpeedRatings. Does not overwrite an existing standard
+Exif ISO tag.
+<DT><B>fc | fixcom</B>
+
+<DD>
+Fix the character encoding of Exif Unicode user comments.  Decodes the
+comment using the auto-detected or specified character encoding and
+writes it back in UCS-2. Use option <B>-n</B> to specify the current
+encoding of the comment if necessary.
+</DL>
+<A NAME="lbAF">&nbsp;</A>
+<H2>OPTIONS</H2>
+
+<DL COMPACT>
+<DT><B>-h</B>
+
+<DD>
+Display help and exit.
+<DT><B>-V</B>
+
+<DD>
+Show the program version and exit.
+<BR>
+
+When <B>-V</B> is combined with <B>-v</B> (Verbose version), build information
+is printed to standard output along with a list of shared libraries which
+have been loaded into memory. Verbose version is supported on Windows
+(both MSVC and Cygwin builds), MacOSX and Linux and is provided
+for test and debugging.
+<DT><B>-v</B>
+
+<DD>
+Be verbose during the program run.
+<DT><B>-q</B>
+
+<DD>
+Silence warnings and error messages from the Exiv2 library during the
+program run (quiet). Note that options <B>-v</B> and <B>-q</B> can be
+used at the same time.
+<DT><B>-Q </B><I>lvl</I>
+
+<DD>
+Set the log-level to 'd'(ebug), 'i'(nfo), 'w'(arning), 'e'(rror)
+or 'm'(ute). The default log-level is 'w'. <B>-Qm</B> is equivalent
+to <B>-q</B>. All log messages are written to standard error.
+<DT><B>-b</B>
+
+<DD>
+Show large binary values (default is to suppress them).
+<DT><B>-u</B>
+
+<DD>
+Show unknown tags (default is to suppress tags which don't have a name).
+<DT><B>-g </B><I>key</I>
+
+<DD>
+Only output info for this Exiv2 key (grep). Multiple <B>-g</B> options
+can be used to grep info for several keys.
+<DT><B>-n </B><I>enc</I>
+
+<DD>
+Charset to use to decode Exif Unicode user comments. <I>enc</I> is
+a name understood by <B><A HREF="http://linux.die.net/man/3/iconv_open">iconv_open</A></B>(3), e.g., 'UTF-8'.
+<DT><B>-k</B>
+
+<DD>
+Preserve file timestamps when updating files (keep). Can be used with
+all options which update files. The flag is ignored by read-only
+options.
+<DT><B>-t</B>
+
+<DD>
+Set the file timestamp according to the Exif create timestamp in
+addition to renaming the file (overrides <B>-k</B>). This option is
+only used with the 'rename' action.
+<DT><B>-T</B>
+
+<DD>
+Only set the file timestamp according to the Exif create timestamp, do
+not rename the file (overrides <B>-k</B>). This option is only used
+with the 'rename' action. Note: On Windows you may have to set the TZ
+environment variable for this option to work correctly.
+<DT><B>-f</B>
+
+<DD>
+Do not prompt before overwriting existing files (force overwrite).
+<DT><B>-F</B>
+
+<DD>
+Do not prompt before renaming files (Force rename). Appends '_1' 
+('_2', ...) to the name of the new file.
+<DT><B>-a </B><I>time</I>
+
+<DD>
+Time adjustment in the format [-]HH[:MM[:SS]]. This option is only
+used with the 'adjust' action. Examples: 1 adds one hour, 1:01 
+adds one hour and one minute, -0:00:30 subtracts 30 seconds.
+<DT><B>-Y </B><I>yrs</I>
+
+<DD>
+Time adjustment by a positive or negative number of years, for
+the 'adjust' action.
+<DT><B>-O </B><I>mon</I>
+
+<DD>
+Time adjustment by a positive or negative number of months, for
+the 'adjust' action.
+<DT><B>-D </B><I>day</I>
+
+<DD>
+Time adjustment by a positive or negative number of days, for
+the 'adjust' action.
+<DT><B>-p </B><I>mode</I>
+
+<DD>
+Print mode for the 'print' action. Possible modes are:
+<BR>
+
+s : print a summary of the Exif metadata (the default)
+<BR>
+
+a : print Exif, IPTC and XMP metadata (shortcut for -Pkyct)
+<BR>
+
+t : interpreted (translated) Exif tags (-PEkyct) 
+<BR>
+
+v : plain Exif tag values (-PExgnycv)
+<BR>
+
+h : hexdump of the Exif data (-PExgnycsh)
+<BR>
+
+i : IPTC datasets (-PIkyct)
+<BR>
+
+x : XMP properties (-PXkyct)
+<BR>
+
+c : JPEG comment
+<BR>
+
+p : list available image previews, sorted by preview image size in pixels
+<DT><B>-P </B><I>flgs</I>
+
+<DD>
+Print flags for fine control of the tag list ('print' action). Allows
+control of the type of metadata as well as data columns included in
+the print output.  Valid flags are:
+<BR>
+
+E : include Exif tags in the list
+<BR>
+
+I : IPTC datasets
+<BR>
+
+X : XMP properties
+<BR>
+
+x : print a column with the tag number
+<BR>
+
+g : group name
+<BR>
+
+k : key
+<BR>
+
+l : tag label
+<BR>
+
+n : tag name
+<BR>
+
+y : type
+<BR>
+
+c : number of components (count)
+<BR>
+
+s : size in bytes
+<BR>
+
+v : plain data value
+<BR>
+
+t : interpreted (translated) data
+<BR>
+
+h : hexdump of the data
+<DT><B>-d </B><I>tgt</I>
+
+<DD>
+Delete target(s) for the 'delete' action. Possible targets are:
+<BR>
+
+a : all supported metadata (the default)
+<BR>
+
+e : Exif section
+<BR>
+
+t : Exif thumbnail only
+<BR>
+
+i : IPTC data
+<BR>
+
+x : XMP packet
+<BR>
+
+c : JPEG comment
+<DT><B>-i </B><I>tgt</I>
+
+<DD>
+Insert target(s) for the 'insert' action. Possible targets are the
+same as those for the <B>-d</B> option, plus a modifier:
+<BR>
+
+X : Insert metadata from an XMP sidecar file &lt;file&gt;.xmp. The remaining
+insert targets determine what metadata to insert from the sidecar
+file. Possible are Exif, IPTC and XMP and the default is all of
+these. Note that the inserted XMP properties include those converted
+to Exif and IPTC.
+<BR>
+
+Only JPEG thumbnails can be inserted (not TIFF thumbnails), they need to 
+be named <I>file</I>-thumb.jpg.
+<DT><B>-e </B><I>tgt</I>
+
+<DD>
+Extract target(s) for the 'extract' action. Possible targets are the same 
+as those for the <B>-d</B> option, plus a target to extract preview
+images and a modifier to generate an XMP sidecar file:
+<BR>
+
+p[&lt;n&gt;[,&lt;m&gt; ...]] : Extract preview images. The optional comma separated
+list of preview image numbers is used to determine which preview images
+to extract. The available preview images and their numbers are displayed
+with the 'print' option <B>-pp</B>.
+<BR>
+
+X : Extract metadata to an XMP sidecar file &lt;file&gt;.xmp. The remaining
+extract targets determine what metadata to extract to the sidecar
+file. Possible are Exif, IPTC and XMP and the default is all of these.
+<P>
+<DT><B>-g </B><I>match</I>
+
+<DD>
+Report only keys which match.  This is sub-string match and not grep, although
+the <B>-g</B> option is intended to help you remember this as grep. The match is case-sensitive.
+<BR>
+
+<P>
+<PRE>
+exiv2 -g Date -pt R.jpg  
+Exif.Image.DateTime           Ascii      20  2012:08:07 16:01:05
+Exif.Photo.DateTimeOriginal   Ascii      20  2011:09:18 16:25:48
+Exif.Photo.DateTimeDigitized  Ascii      20  2011:09:18 16:25:48 
+</PRE>
+
+<P>
+<DT><B>-r </B><I>fmt</I>
+
+<DD>
+Filename format for the 'rename' action. The format string follows
+<B><A HREF="http://linux.die.net/man/3/strftime">strftime</A></B>(3) and supports the following keywords:
+<BR>
+
+:basename:   - original filename without extension
+<BR>
+
+:dirname:    - name of the directory holding the original file
+<BR>
+
+:parentname: - name of parent directory
+<BR>
+
+Default filename format is %Y%m%d_%H%M%S.
+<DT><B>-c </B><I>txt</I>
+
+<DD>
+<P>
+JPEG comment string to set in the image ('modify' action). This option
+can also be used with the 'extract' and 'insert' actions to modify
+metadata on-the-fly.
+<DT><B>-m </B><I>file</I>
+
+<DD>
+Command file for the 'modify' action. This option can also be used
+with the 'extract' and 'insert' actions to modify metadata on-the-fly.
+<DT><B>-M </B><I>cmd</I>
+
+<DD>
+Command line for the 'modify' action. This option can also be used
+with the 'extract' and 'insert' actions to modify metadata on-the-fly.
+The format for the commands is the same as that of the lines of a
+command file.
+<DT><B>-l </B><I>dir</I>
+
+<DD>
+Location (directory) for files to be inserted or extracted.
+<DT><B>-S </B><I>.suf</I>
+
+<DD>
+Use suffix <I>.suf</I> for source files in 'insert' action.
+</DL>
+<A NAME="lbAG">&nbsp;</A>
+<H2>COMMANDS</H2>
+
+Commands for the 'modify' action can be read from a command file, e.g., 
+<P>
+<PRE>
+   exiv2 -m cmd.txt image.jpg
+</PRE>
+
+<P>
+or given on the command line, as in
+<P>
+<PRE>
+   exiv2 -M&quot;add Iptc.Application2.Credit String Mr. Smith&quot; image.jpg
+</PRE>
+
+<P>
+Note the quotes. Multiple <B>-m</B> and <B>-M</B> options can be combined.
+<P>
+When writing Exif, IPTC and XMP metadata, 
+<B>exiv2 </B>
+
+enforces only a correct
+metadata structure. It is possible to write tags with types and values
+different from those specified in the standards, duplicate Exif tags,
+undefined tags, or incomplete metadata. While 
+<B>exiv2 </B>
+
+is able to read
+all metadata that it can write, other programs may have difficulties
+with images that contain non standard-conforming metadata.
+<A NAME="lbAH">&nbsp;</A>
+<H3>Command format</H3>
+
+The format of a command is
+<P>
+<PRE>
+<B>set | add | del</B> <I>key</I> [[<I>type</I>] <I>value</I>]
+</PRE>
+
+<DL COMPACT>
+<DT><B>set</B>
+
+<DD>
+Set the <I>value</I> of an existing tag with a matching <I>key</I> or
+add the tag.
+<DT><B>add</B>
+
+<DD>
+Add a tag (unless <I>key</I> is a non-repeatable IPTC key; nothing
+prevents you from adding duplicate Exif tags).
+<DT><B>del</B>
+
+<DD>
+Delete all occurrences of a tag (requires only a <I>key</I>).
+<DT><I>key</I>
+
+<DD>
+Exiv2 Exif, IPTC or XMP key.
+<DT><I>type</I>
+
+<DD>
+<B>Byte | Ascii | Short | Long | Rational | Undefined | SShort | SLong | SRational | Comment</B>
+
+for Exif keys,
+<BR>
+
+<B>String | Date | Time | Short | Undefined</B>
+
+for IPTC keys, and
+<BR>
+
+<B>XmpText | XmpAlt | XmpBag | XmpSeq | LangAlt</B>
+
+for XMP keys.
+<P>
+A default <I>type</I> is used if none is explicitly given. The default
+is determined based on <I>key</I>.
+<DT><I>value</I>
+
+<DD>
+The remaining text on the line is the value. It can optionally be
+enclosed in single quotes ('<I>value</I>') or double quotes (&quot;<I>value</I>&quot;).
+<P>
+The value is optional. Not providing any value is equivalent to an
+empty value (&quot;&quot;) and is mainly useful to create an XMP array property,
+e.g., a bag.
+<P>
+The format of Exif <B>Comment</B> values includes an optional charset
+specification at the beginning:
+<P>
+<B>[charset=Ascii|Jis|Unicode|Undefined ]</B><I>comment</I>
+
+<P>
+<B>Undefined </B>
+
+is used by default if the value doesn't start with a charset
+definition.
+<P>
+The format for IPTC <B>Date</B> values is YYYY-MM-DD (year, month, day),
+that for IPTC <B>Time</B> values is HH:MM:SS+|-HH:MM, where HH:MM:SS
+refers to local hour, minute and seconds and +|-HH:MM refers to hours
+and minutes ahead or behind Universal Coordinated Time (+|- means
+either a + or a - sign is required).
+<P>
+The format of XMP <B>LangAlt</B> values includes an optional language
+qualifier:
+<P>
+<B>[lang=</B><I>language-code</I> ]<I>text</I>
+
+<P>
+<B>x-default</B>
+
+is used by default if the value doesn't start with a language qualifier.
+<DT>An additional command is available to register XMP namespaces:<DD>
+<DT><PRE>
+<DD><B>reg</B> <I>prefix</I> <I>namespace</I>
+</PRE>
+
+</DL>
+<A NAME="lbAI">&nbsp;</A>
+<H3>Command file format</H3>
+
+Empty lines and lines starting with <B>#</B> in a command file are
+ignored (comments). Remaining lines are commands as described above.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>EXAMPLES</H2>
+
+<DL COMPACT>
+<DT>exiv2 *.jpg<DD>
+Prints a summary of the Exif information for all JPEG files in the directory.
+<DT>exiv2 -pi image.jpg<DD>
+Prints the IPTC metadata of the image.
+<DT>exiv2 rename img_1234.jpg<DD>
+Renames img_1234.jpg (taken on 13-Nov-05 at 22:58:31) to 20051113_225831.jpg
+<DT>exiv2 -r':basename:_%Y%m' rename img_1234.jpg<DD>
+Renames img_1234.jpg to img_1234_200511.jpg
+<DT>exiv2 -et img1.jpg img2.jpg<DD>
+Extracts the Exif thumbnails from the two files into img1-thumb.jpg
+and img2-thumb.jpg.
+<DT>exiv2 -it img1.jpg img2.jpg<DD>
+Inserts (copies) metadata from img1.exv to img1.jpg and from img2.exv
+to img2.jpg.
+<DT>exiv2 -ep1,2 image.jpg<DD>
+Extracts previews 1 and 2 from the image to the files image-preview1.jpg
+and image-preview2.jpg.
+<DT>exiv2 -eiX image.jpg <DD>
+Extracts IPTC datasets into an XMP sidecar file image.xmp and in the
+process converts them to &quot;IPTC Core&quot; XMP schema.
+<DT>exiv2 -iixX image.jpg<DD>
+Inserts IPTC and XMP metadata from an XMP sidecar file image.xmp into
+image.jpg.  The resulting IPTC datasets are converted from the &quot;IPTC
+Core&quot; XMP schema properties in the sidecar file to the older IPTC IIM4
+format. The inserted XMP properties include those in the &quot;IPTC Core&quot;
+XMP schema.
+<DT><PRE>
+<DD>exiv2 -M&quot;set Exif.Photo.UserComment charset=Ascii New Exif comment&quot; image.jpg
+</PRE>
+
+Sets the Exif comment to an ASCII string.
+<DT><PRE>
+<DD>exiv2 -M&quot;set Exif.GPSInfo.GPSLatitude 4/1 15/1 33/1&quot; \
+-M&quot;set Exif.GPSInfo.GPSLatitudeRef N&quot; image.jpg
+</PRE>
+
+Sets the latitude to 4 degrees, 15 minutes and 33 seconds north. The
+Exif standard stipulates that the GPSLatitude tag consists of three
+Rational numbers for the degrees, minutes and seconds of the latitude
+and GPSLatitudeRef contains either 'N' or 'S' for north or south
+latitude respectively.
+<DT><PRE>
+<DD>exiv2 insert -l/tmp -S.CRW /data/*.JPG
+</PRE>
+
+Copy all metadata from CRW files in the /tmp directory to JPG files
+with corresponding basenames in the /data directory. Note that this
+copies metadata as is, without any modifications to adapt it to the
+requirements of the target format. Some tags copied like this may not
+make sense in the target image.
+</DL>
+<A NAME="lbAK">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<DL COMPACT>
+<DT><I><A HREF="http://www.exiv2.org/sample.html#modify">http://www.exiv2.org/sample.html#modify</A></I>
+
+<DD>
+Sample command files.
+<DT><I><A HREF="http://www.exiv2.org/metadata.html">http://www.exiv2.org/metadata.html</A></I>
+
+<DD>
+Taglists with <I>key</I> and default <I>type</I> values.
+</DL>
+<A NAME="lbAL">&nbsp;</A>
+<H2>AUTHORS</H2>
+
+<B>exiv2 </B>
+
+was written by Andreas Huggel &lt;<A HREF="mailto:ahuggel@gmx.net">ahuggel@gmx.net</A>&gt;.
+<P>
+
+This manual page was originally written by KELEMEN Peter &lt;<A HREF="mailto:fuji@debian.org">fuji@debian.org</A>&gt;,
+for the Debian project.
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">ACTIONS</A><DD>
+<DT><A HREF="#lbAF">OPTIONS</A><DD>
+<DT><A HREF="#lbAG">COMMANDS</A><DD>
+<DL>
+<DT><A HREF="#lbAH">Command format</A><DD>
+<DT><A HREF="#lbAI">Command file format</A><DD>
+</DL>
+<DT><A HREF="#lbAJ">EXAMPLES</A><DD>
+<DT><A HREF="#lbAK">SEE ALSO</A><DD>
+<DT><A HREF="#lbAL">AUTHORS</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="http://linux.die.net/man">man2html</A>,
+using the manual pages.<BR>
+Time: 14:07:21 GMT, December 01, 2013
+</BODY>
+</HTML>
