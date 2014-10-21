@@ -345,11 +345,43 @@ gl::GeometryPtr GlUtils::getQuadGeometry(const glm::vec2 & min,
   i.push_back(1);
   i.push_back(3);
   return gl::GeometryPtr(new gl::Geometry(
-      v, i, 2,
-      // Buffer has texture coordinates
+    v, i, 2,
+    // Buffer has texture coordinates
+    gl::Geometry::Flag::HAS_TEXTURE,
+    // Indices are for a triangle strip
+    GL_TRIANGLES));
+}
+
+gl::GeometryPtr GlUtils::getSphereGeometry(float radius, int du, int dv) {
+  int numTriangles = du * dv * 2;
+  std::vector<glm::vec4> vertices;
+  std::vector<GLuint> indices;
+
+  for (int u = 0; u <= du; u++) {
+    for (int v = 0; v <= dv; v++) {
+      double s = (double) u / (double) du;
+      double t = (double) v / (double) dv;
+      vertices.push_back(glm::vec4(-radius * sin(s * PI * 2) * sin(t * PI), radius * cos(t * PI), radius * cos(s * PI * 2) * sin(t * PI), 1));
+      vertices.push_back(glm::vec4(s, t, 0, 0));
+    }
+  }
+
+  for (int u = 0; u < du; u++) {
+    for (int v = 0; v < dv; v++) {
+      int n = u * (dv + 1) + v;
+      indices.push_back(n + 0);
+      indices.push_back(n + 1);
+      indices.push_back(n + (dv + 1) + 1);
+      indices.push_back(n + 0);
+      indices.push_back(n + (dv + 1) + 1);
+      indices.push_back(n + (dv + 1));
+    }
+  }
+
+  return gl::GeometryPtr(new gl::Geometry(
+      vertices, indices, numTriangles,
       gl::Geometry::Flag::HAS_TEXTURE,
-      // Indices are for a triangle strip
-      GL_TRIANGLES));
+      GL_TRIANGLES, 3));
 }
 
 #ifdef HAVE_OPENCV
@@ -485,7 +517,7 @@ void getPngImageData(
   outSize.x = width;
   outSize.y = height;
 
-  uint32_t bytesPerRow = png_get_rowbytes(png_ptr, info_ptr);
+  uint32_t bytesPerRow = (uint32_t) png_get_rowbytes(png_ptr, info_ptr);
   if (bytesPerRow % 4) {
     bytesPerRow += (4 - (bytesPerRow % 4));
   }
@@ -605,7 +637,7 @@ void GlUtils::renderArtificialHorizon(float alpha) {
       for (size_t i = 0; i < mesh.positions.size(); ++i) {
         const glm::vec4 & v = mesh.positions[i];
         if (abs(v.x) < EPSILON && abs(v.z) < EPSILON) {
-          poleIndices.insert(i);
+          poleIndices.insert((int) i);
         }
       }
       for (size_t i = 0; i < mesh.indices.size(); i += 3) {

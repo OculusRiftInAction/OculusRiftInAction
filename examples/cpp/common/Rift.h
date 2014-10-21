@@ -244,7 +244,7 @@ public:
 
 protected:
   glm::mat4 player;
-  ovrPosef  headPose;
+  glm::mat4 headPose;
   ovrTexture eyeTextures[2];
 
 private:
