@@ -30,13 +30,15 @@ protected:
   glm::mat4               player;
 
 public:
+  GLenum glErr;
   HelloRift() {
+    glErr = glGetError();
     ovr_Initialize();
+    glErr = glGetError();
     hmd = ovrHmd_Create(0);
     if (nullptr == hmd) {
       hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
     }
-    ovrHmd_SetBool(hmd, "HSW", false);
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_Position, 0);
@@ -68,14 +70,18 @@ public:
   }
 
   virtual void createRenderingTarget() {
-    glfwWindowHint(GLFW_DECORATED, 0);
+    glErr = glGetError();
     if (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) {
+      glfwWindowHint(GLFW_DECORATED, 0);
       createWindow(windowSize, windowPosition);
     } else {
-      glm::uvec2 mirrorSize = windowSize;
-      mirrorSize /= 4;
+      // FIXME Doesn't work as expected
+      //glm::uvec2 mirrorSize = windowSize;
+      //mirrorSize /= 4;
+      //createSecondaryScreenWindow(mirrorSize);
       createSecondaryScreenWindow(windowSize);
     }
+    glErr = glGetError();
 
     void * windowIdentifier = nullptr;
     ON_WINDOWS([&]{
@@ -90,7 +96,8 @@ public:
 
     ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
     ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
-    if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
+    if ((ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) && 
+      glfwGetWindowAttrib(window, GLFW_DECORATED)) {
       FAIL("Unable to create undecorated window");
     }
   }
@@ -116,6 +123,12 @@ public:
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.RTSize = hmd->Resolution;
+    // FIXME Doesn't work as expected
+    //if (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop)) {
+    //  cfg.OGL.Header.RTSize.w /= 4;
+    //  cfg.OGL.Header.RTSize.h /= 4;
+    //}
+
     cfg.OGL.Header.Multisample = 1;
 
     ON_WINDOWS([&]{
