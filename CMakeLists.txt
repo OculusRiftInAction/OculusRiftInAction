@@ -48,17 +48,12 @@ endif()
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(libraries/OculusSDK/LibOVR)
 set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
+list(APPEND EXAMPLE_LIBS OculusVR)
 
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
 set_target_properties(glew PROPERTIES FOLDER "3rdparty")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND EXAMPLE_LIBS glew)
-
-add_subdirectory(libraries/OculusSDK/Bindings/C)
-set_target_properties(OVR_C PROPERTIES FOLDER "3rdparty")
-include_directories(libraries/OculusSDK/Bindings/C/Include)
-list(APPEND EXAMPLE_LIBS OVR_C)
 
 ###############################################################################
 #
@@ -74,13 +69,11 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
 set(GLFW_INSTALL OFF CACHE BOOL "Generate installation target")
 add_subdirectory(libraries/glfw)
 set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
 list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 
 # OpenCTM - a 3D mesh compression
 add_subdirectory(libraries/OpenCTM)
 set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
 # Computer vision library with advanced image loading and manipulation 
@@ -109,20 +102,34 @@ else()
         set(PNG_TESTS OFF CACHE BOOL "Build PNG tests")
         set(PNG_SHARED OFF CACHE BOOL "Build PNG shared library")
         add_subdirectory(libraries/libpng)
-        include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
-        include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
         list(APPEND EXAMPLE_LIBS png)
         set_target_properties(zlib PROPERTIES FOLDER "3rdparty")
         set_target_properties(png PROPERTIES FOLDER "3rdparty")
     else()
         find_package(PNG REQUIRED)
-        include_directories(${PNG_INCLUDE_DIR})
         list(APPEND EXAMPLE_LIBS ${PNG_LIBRARIES})
     endif()
 endif()
 
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
+
+
+
+if (OpenCV_FOUND) 
+    include_directories(${OpenCV_INCLUDE_DIRS})
+else()
+    if((WIN32 OR APPLE))
+        include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
+        include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
+    else()
+        include_directories(${PNG_INCLUDE_DIR})
+    endif()
+endif()
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 
 
 ###############################################################################
