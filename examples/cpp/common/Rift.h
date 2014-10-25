@@ -113,7 +113,7 @@ protected:
 public:
   RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
     hmd = ovrHmd_Create(0);
-    if (NULL == hmd) {
+    if (nullptr == hmd) {
       hmd = ovrHmd_CreateDebug(defaultHmdType);
       hmdDesktopPosition = glm::ivec2(100, 100);
     }
@@ -244,7 +244,7 @@ public:
 
 protected:
   glm::mat4 player;
-  ovrPosef  headPose;
+  glm::mat4 headPose;
   ovrTexture eyeTextures[2];
   ovrVector3f eyeOffsets[2];
 

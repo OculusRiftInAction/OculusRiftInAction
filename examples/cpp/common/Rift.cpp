@@ -141,6 +141,8 @@ void RiftApp::draw() {
         // Apply the head pose
         glm::mat4 eyePose = Rift::fromOvr(eyePoses[eye]);
         applyEyePoseAndOffset(eyePose, glm::vec3(0));
+        // Cache the headPose so subsequent scene code can read it
+        headPose = eyePose;
       }
 
       // Render the scene to an offscreen buffer
