@@ -246,6 +246,7 @@ protected:
   glm::mat4 player;
   glm::mat4 headPose;
   ovrTexture eyeTextures[2];
+  ovrVector3f eyeOffsets[2];
 
 private:
   ovrEyeRenderDesc eyeRenderDescs[2];

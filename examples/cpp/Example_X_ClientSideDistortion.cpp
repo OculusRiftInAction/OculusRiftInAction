@@ -11,11 +11,11 @@ struct EyeArg {
   gl::VertexArrayPtr            meshVao;
 
   glm::mat4                     projection;
-  glm::mat4                     viewOffset;
 };
 
 class ClientSideDistortionExample : public RiftGlfwApp {
   EyeArg      eyeArgs[2];
+  ovrVector3f hmdToEyeOffsets[2];
   glm::mat4   player;
   float       ipd = OVR_DEFAULT_IPD;
   float       eyeHeight = OVR_DEFAULT_EYE_HEIGHT;
@@ -43,7 +43,7 @@ public:
       // Set up the per-eye projection matrix
       eyeArg.projection = Rift::fromOvr(
         ovrMatrix4f_Projection(fov, 0.01, 100000, true));
-      eyeArg.viewOffset = glm::translate(glm::mat4(), Rift::fromOvr(renderDesc.ViewAdjust));
+      hmdToEyeOffsets[eye] = renderDesc.HmdToEyeViewOffset;
       ovrRecti texRect;
       texRect.Size = ovrHmd_GetFovTextureSize(hmd, eye,
         hmd->DefaultEyeFov[eye], 1.0f);
@@ -99,22 +99,23 @@ public:
 
   void draw() {
     static int frameIndex = 0;
-    ovrFrameTiming timing = ovrHmd_BeginFrameTiming(hmd, frameIndex++);
+    ++frameIndex;
+    ovrPosef eyePoses[2];
+    ovrFrameTiming timing = ovrHmd_BeginFrameTiming(hmd, frameIndex);
+    ovrHmd_GetEyePoses(hmd, frameIndex, hmdToEyeOffsets, eyePoses, nullptr);
+
     for (int i = 0; i < 2; ++i) {
       const ovrEyeType eye = hmd->EyeRenderOrder[i];
       const EyeArg & eyeArg = eyeArgs[eye];
       // Set up the per-eye projection matrix
       gl::Stacks::projection().top() = eyeArg.projection;
       
-      ovrPosef pose = ovrHmd_GetEyePose(hmd, eye);
       eyeArg.frameBuffer.activate();
       gl::MatrixStack & mv = gl::Stacks::modelview();
       gl::Stacks::with_push([&]{
         // Set up the per-eye modelview matrix
         // Apply the head pose
-        mv.preMultiply(glm::inverse(Rift::fromOvr(pose)));
-        // Apply the per-eye offset
-        mv.preMultiply(eyeArg.viewOffset);
+        mv.preMultiply(glm::inverse(Rift::fromOvr(eyePoses[eye])));
         renderScene();
       });
       eyeArg.frameBuffer.deactivate();

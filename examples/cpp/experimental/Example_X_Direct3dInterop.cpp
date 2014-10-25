@@ -3,8 +3,8 @@
 #ifdef OVR_OS_WIN32
 
 #define OVR_D3D_VERSION 11
-#include <../../../LibOVR/Src/Kernel/OVR_Types.h>
-#include <../../../LibOVR/Src/Kernel/OVR_RefCount.h>
+#include <Kernel/OVR_Types.h>
+#include <Kernel/OVR_RefCount.h>
 #include <OVR_CAPI_D3D.h>
 #include <GL/wglew.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -247,7 +247,6 @@ public:
 
 struct EyeArgs {
   glm::mat4               projection;
-  glm::mat4               viewOffset;
   gl::FrameBufferWrapper  framebuffer;
 };
 
@@ -255,6 +254,7 @@ class HelloRift : public GlStubWindow, RiftStubApp, DxStubWindow {
 protected:
   EyeArgs           perEyeArgs[2];
   ovrTexture        textures[2];
+  ovrVector3f       hmdToEyeOffsets[2];
   float             eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
   float             ipd{ OVR_DEFAULT_IPD };
   glm::mat4         player;
@@ -332,8 +332,7 @@ public:
       EyeArgs & eyeArgs = perEyeArgs[eye];
       eyeArgs.projection = Rift::fromOvr(
         ovrMatrix4f_Projection(hmd->DefaultEyeFov[eye], 0.01, 100, true));
-      eyeArgs.viewOffset = glm::translate(glm::mat4(),
-        Rift::fromOvr(eyeRenderDescs[eye].ViewAdjust));
+      hmdToEyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
     });
 
     ovrHmd_ConfigureTracking(hmd,
@@ -423,8 +422,10 @@ public:
   void draw() {
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
+    ++frameIndex;
     gl::MatrixStack & mv = gl::Stacks::modelview();
-    ovrHmd_BeginFrame(hmd, frameIndex++);
+    ovrHmd_GetEyePoses(hmd, frameIndex, hmdToEyeOffsets, eyePoses, nullptr);
+    ovrHmd_BeginFrame(hmd, frameIndex);
     glEnable(GL_DEPTH_TEST);
     if (!wglDXLockObjectsNV(gl_handleD3D, 2, gl_handles)) {
       FAIL("Could not lock objects");
@@ -435,11 +436,10 @@ public:
       gl::Stacks::projection().top() = eyeArgs.projection;
       gl::Stacks::projection().scale(glm::vec3(1, -1, 1));
 
-      eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
       eyeArgs.framebuffer.activate();
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose
-        mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(eyePoses[eye])) * mv.top();
+        mv.preMultiply(glm::inverse(Rift::fromOvr(eyePoses[eye])));
         renderScene();
       });
       eyeArgs.framebuffer.deactivate();

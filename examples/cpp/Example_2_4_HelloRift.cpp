@@ -23,6 +23,7 @@ struct EyeArgs {
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
+  bool                    directMode{ false };
   EyeArgs                 perEyeArgs[2];
   ovrTexture              textures[2];
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
@@ -36,6 +37,8 @@ public:
     if (nullptr == hmd) {
       hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
     }
+
+    directMode = (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop));
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_Position, 0);
@@ -67,8 +70,16 @@ public:
   }
 
   virtual void createRenderingTarget() {
-    glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(windowSize, windowPosition);
+    if (directMode) {
+      // FIXME Doesn't work as expected
+      //glm::uvec2 mirrorSize = windowSize;
+      //mirrorSize /= 4;
+      //createSecondaryScreenWindow(mirrorSize);
+      createSecondaryScreenWindow(windowSize);
+    } else {
+      glfwWindowHint(GLFW_DECORATED, 0);
+      createWindow(windowSize, windowPosition);
+    }
 
     void * windowIdentifier = nullptr;
     ON_WINDOWS([&]{
@@ -78,13 +89,16 @@ public:
       windowIdentifier = glfwGetCocoaWindow(window);
     });
     ON_LINUX([&]{
-      windowIdentifier = glfwGetX11Window(window);
+      windowIdentifier = (void*)glfwGetX11Window(window);
     });
 
-    ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
     ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
-    if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-      FAIL("Unable to create undecorated window");
+    if (directMode) {
+        ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
+    } else {
+      if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
+        FAIL("Unable to create undecorated window");
+      }
     }
   }
 
@@ -105,10 +119,16 @@ public:
       ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArgs.framebuffer.color->texture;
     });
 
-    ovrGLConfig cfg; 
+    ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.RTSize = hmd->Resolution;
+    // FIXME Doesn't work as expected
+    //if (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop)) {
+    //  cfg.OGL.Header.RTSize.w /= 4;
+    //  cfg.OGL.Header.RTSize.h /= 4;
+    //}
+
     cfg.OGL.Header.Multisample = 1;
 
     ON_WINDOWS([&]{
@@ -116,13 +136,13 @@ public:
     });
 
     ON_LINUX([&]{
-      cfg.OGL.Disp = 0;
-      cfg.OGL.Win = 0;
+      cfg.OGL.Disp = glfwGetX11Display();
+      cfg.OGL.Win = glfwGetX11Window(window);
     });
 
-    int distortionCaps = 
-      ovrDistortionCap_TimeWarp | 
-      ovrDistortionCap_Chromatic | 
+    int distortionCaps =
+      ovrDistortionCap_TimeWarp |
+      ovrDistortionCap_Chromatic |
       ovrDistortionCap_Vignette;
 
     ovrEyeRenderDesc              eyeRenderDescs[2];
@@ -133,8 +153,8 @@ public:
       EyeArgs & eyeArgs = perEyeArgs[eye];
       eyeArgs.projection = Rift::fromOvr(
         ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01, 100, true));
-      eyeArgs.viewOffset = glm::translate(glm::mat4(), 
-        Rift::fromOvr(eyeRenderDescs[eye].ViewAdjust));
+      eyeArgs.viewOffset = glm::translate(glm::mat4(),
+        Rift::fromOvr(eyeRenderDescs[eye].HmdToEyeViewOffset));
     });
   }
 
@@ -187,14 +207,19 @@ public:
   }
 
   virtual void update() {
-    CameraControl::instance().applyInteraction(player);
+    //CameraControl::instance().applyInteraction(player);
     gl::Stacks::modelview().top() = glm::inverse(player);
   }
 
   void draw() {
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
-    ovrHmd_BeginFrame(hmd, frameIndex++);
+    static ovrVector3f eyeOffsets[2];
+    memset(eyeOffsets, 0, sizeof(ovrVector3f) * 2);
+    ++frameIndex;
+    ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
+
+    ovrHmd_BeginFrame(hmd, frameIndex);
     glEnable(GL_DEPTH_TEST);
     for( int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
@@ -203,7 +228,6 @@ public:
       gl::MatrixStack & mv = gl::Stacks::modelview();
 
       eyeArgs.framebuffer.activate();
-      eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose
         mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(eyePoses[eye])) * mv.top();

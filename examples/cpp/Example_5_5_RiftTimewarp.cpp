@@ -2,7 +2,6 @@
 #include "CubeScene.h"
 
 struct PerEyeArg {
-  glm::mat4                     modelviewOffset;
   glm::mat4                     projection;
   gl::FrameBufferWrapper        frameBuffer;
 };
@@ -10,6 +9,7 @@ struct PerEyeArg {
 class CubeScene_RiftTimewarp: public CubeScene {
   PerEyeArg   eyes[2];
   ovrTexture  textures[2];
+  ovrVector3f hmdToEyeOffsets[2];
   int         frameIndex{ 0 };
 
 public:
@@ -52,11 +52,10 @@ public:
       eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
       ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArg.frameBuffer.color->texture;
 
-      ovrVector3f offset = eyeRenderDescs[eye].ViewAdjust;
+      hmdToEyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
       ovrMatrix4f projection = ovrMatrix4f_Projection(fov, 0.01f, 100, true);
 
       eyeArg.projection = Rift::fromOvr(projection);
-      eyeArg.modelviewOffset = glm::translate(glm::mat4(), Rift::fromOvr(offset));
     });
   }
 
@@ -66,8 +65,10 @@ public:
   ovrPosef eyePoses[2];
 
   virtual void draw() {
-    ovrHmd_BeginFrame(hmd, frameIndex++);
+    ++frameIndex;
     ovrPosef eyePoses[2];
+    ovrHmd_BeginFrame(hmd, frameIndex);
+    ovrHmd_GetEyePoses(hmd, frameIndex, hmdToEyeOffsets, eyePoses, nullptr);
 
     gl::MatrixStack & mv = gl::Stacks::modelview();
     for (int i = 0; i < ovrEye_Count; ++i) {
@@ -75,13 +76,10 @@ public:
       PerEyeArg & eyeArgs = eyes[eye];
       gl::Stacks::projection().top() = eyeArgs.projection;
 
-      eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
-
       eyeArgs.frameBuffer.withFramebufferActive([&]{
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         gl::Stacks::with_push(mv, [&]{
           mv.preMultiply(glm::inverse(Rift::fromOvr(eyePoses[eye])));
-          mv.preMultiply(eyeArgs.modelviewOffset);
           drawCubeScene();
         });
       });

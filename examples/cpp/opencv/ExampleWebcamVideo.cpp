@@ -96,6 +96,8 @@ class WebcamCaptureHandler : public CaptureHandler<CaptureData> {
 private:
   cv::VideoCapture videoCapture;
   ovrHmd hmd;
+  cv::Mat distortionMap;
+  bool hasCalibration{ false };
 
 public:
 
@@ -103,6 +105,25 @@ public:
     videoCapture.open(CAMERA_DEVICE);
     if (!videoCapture.isOpened()) {
       FAIL("Could not open video source");
+    }
+
+    cv::Mat cameraMatrix;
+    cv::Mat distCoeffs;
+    cv::Mat map1, map2;
+
+    cv::FileStorage fs(CAMERA_PARAMS_FILE, cv::FileStorage::READ); // Read the settings
+    if (fs.isOpened()) {
+      fs["Camera_Matrix"] >> cameraMatrix;
+      fs["Distortion_Coefficients"] >> distCoeffs;
+      hasCalibration = true;
+      cv::Size imageSize(CAMERA_WIDTH, CAMERA_HEIGHT);
+      cv::Mat optimalMatrix = getOptimalNewCameraMatrix(
+        cameraMatrix, distCoeffs, imageSize, 1, imageSize, 0);
+      initUndistortRectifyMap(cameraMatrix, distCoeffs, cv::Mat(), 
+        optimalMatrix, imageSize, CV_16SC2, map1, map2);
+      distortionMap = cv::Mat(imageSize, CV_32FC2);
+      cv::Mat map3(imageSize, CV_32FC1);
+      cv::convertMaps(map1, map2, distortionMap, map3, CV_32FC2);
     }
 
     videoCapture.set(CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
@@ -122,6 +143,10 @@ public:
       if (!videoCapture.grab() ||
           !videoCapture.retrieve(captured.image)) {
         FAIL("Failed video capture");
+      }
+
+      if (hasCalibration) {
+        remap(captured.image.clone(), captured.image, distortionMap, cv::Mat(), cv::INTER_LINEAR);
       }
 
       cv::flip(captured.image.clone(), captured.image, 0);

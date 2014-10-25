@@ -51,25 +51,32 @@
 #include <GL/glew.h>
 
 #include <OVR_CAPI.h>
+#include <Kernel/OVR_Types.h>
 #include <OVR_CAPI_GL.h>
 
 
 #if defined(OVR_OS_WIN32)
 #define ON_WINDOWS(runnable) runnable()
+#define NOT_ON_WINDOWS(runnable)
 #else
-#define ON_WINDOWS(runnable) 
+#define ON_WINDOWS(runnable)
+#define NOT_ON_WINDOWS(runnable) runnable()
 #endif
 
 #if defined(OVR_OS_MAC)
 #define ON_MAC(runnable) runnable()
+#define NOT_ON_MAC(runnable)
 #else
-#define ON_MAC(runnable) 
+#define ON_MAC(runnable)
+#define NOT_ON_MAC(runnable) runnable()
 #endif
 
 #if defined(OVR_OS_LINUX)
 #define ON_LINUX(runnable) runnable()
+#define NOT_ON_LINUX(runnable)
 #else
-#define ON_LINUX(runnable) 
+#define ON_LINUX(runnable)
+#define NOT_ON_LINUX(runnable) runnable()
 #endif
 
 #include <GlDebug.h>

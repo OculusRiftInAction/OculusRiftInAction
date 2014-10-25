@@ -50,7 +50,7 @@ public:
     const ovrEyeRenderDesc & erd = getEyeRenderDesc();
     ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
     ovrVector2f scale; scale.x = scaleFactor; scale.y = scaleFactor;
-    return Rift::fromOvr(ovrMatrix4f_OrthoSubProjection(ovrPerspectiveProjection, scale, 100.8f, erd.ViewAdjust.x));
+    return Rift::fromOvr(ovrMatrix4f_OrthoSubProjection(ovrPerspectiveProjection, scale, 100.8f, erd.HmdToEyeViewOffset.x));
   }
 
 #define QUAD_SIZE (1)

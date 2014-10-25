@@ -57,7 +57,7 @@ void RiftApp::initGl() {
     distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
 
 #ifdef _DEBUG
-  ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
+//  ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
 #endif
   float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
   for_each_eye([&](ovrEyeType eye){
@@ -65,9 +65,10 @@ void RiftApp::initGl() {
     ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
     projections[eye] = Rift::fromOvr(ovrPerspectiveProjection);
     glm::vec2 orthoScale = glm::vec2(1.0f) / Rift::fromOvr(erd.PixelsPerTanAngleAtCenter);
+    eyeOffsets[eye] = erd.HmdToEyeViewOffset;
     orthoProjections[eye] = Rift::fromOvr(
         ovrMatrix4f_OrthoSubProjection(
-            ovrPerspectiveProjection, Rift::toOvr(orthoScale), orthoDistance, erd.ViewAdjust.x));
+          ovrPerspectiveProjection, Rift::toOvr(orthoScale), orthoDistance, erd.HmdToEyeViewOffset.x));
   });
 
   ///////////////////////////////////////////////////////////////////////////
@@ -122,9 +123,8 @@ void RiftApp::draw() {
   ovrHmd_BeginFrame(hmd, frameIndex++);
   gl::MatrixStack & mv = gl::Stacks::modelview();
   gl::MatrixStack & pr = gl::Stacks::projection();
-  for_each_eye([&](ovrEyeType eye){
-    eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
-  });
+  
+  ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
     gl::Stacks::with_push(pr, mv, [&]{
@@ -140,9 +140,7 @@ void RiftApp::draw() {
       {
         // Apply the head pose
         glm::mat4 eyePose = Rift::fromOvr(eyePoses[eye]);
-        glm::vec3 eyeOffset = Rift::fromOvr(erd.ViewAdjust);
-        applyEyePoseAndOffset(eyePose, eyeOffset);
-
+        applyEyePoseAndOffset(eyePose, glm::vec3(0));
         // Cache the headPose so subsequent scene code can read it
         headPose = eyePose;
       }
