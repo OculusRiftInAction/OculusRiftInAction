@@ -10,7 +10,6 @@ include(GenerateExportHeader)
 include(cmake/defaults.cmake)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-#set(CMAKE_BUILD_TYPE DEBUG)
 
 option(RIFT_BUILD_SCRATCH_EXAMPLES OFF)
 string( TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER )
