@@ -71,17 +71,23 @@ public:
 
   virtual void createRenderingTarget() {
     glErr = glGetError();
-    if (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) {
+    ON_LINUX([&]{
       glfwWindowHint(GLFW_DECORATED, 0);
       createWindow(windowSize, windowPosition);
-    } else {
-      // FIXME Doesn't work as expected
-      //glm::uvec2 mirrorSize = windowSize;
-      //mirrorSize /= 4;
-      //createSecondaryScreenWindow(mirrorSize);
-      createSecondaryScreenWindow(windowSize);
-    }
-    glErr = glGetError();
+    });
+
+    NOT_ON_LINUX([&]{
+      if (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) {
+        glfwWindowHint(GLFW_DECORATED, 0);
+        createWindow(windowSize, windowPosition);
+      } else {
+        // FIXME Doesn't work as expected
+        //glm::uvec2 mirrorSize = windowSize;
+        //mirrorSize /= 4;
+        //createSecondaryScreenWindow(mirrorSize);
+        createSecondaryScreenWindow(windowSize);
+      }
+    });
 
     void * windowIdentifier = nullptr;
     ON_WINDOWS([&]{
@@ -91,15 +97,19 @@ public:
       windowIdentifier = glfwGetCocoaWindow(window);
     });
     ON_LINUX([&]{
-      windowIdentifier = glfwGetX11Window(window);
+      windowIdentifier = (void*)glfwGetX11Window(window);
     });
 
-    ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
     ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
-    if ((ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) && 
-      glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-      FAIL("Unable to create undecorated window");
-    }
+    NOT_ON_LINUX([&]{
+      if (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) {
+          ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
+      } else {
+        if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
+          FAIL("Unable to create undecorated window");
+        }
+      }
+    });
   }
 
   void initGl() {
@@ -119,7 +129,7 @@ public:
       ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArgs.framebuffer.color->texture;
     });
 
-    ovrGLConfig cfg; 
+    ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.RTSize = hmd->Resolution;
@@ -136,13 +146,13 @@ public:
     });
 
     ON_LINUX([&]{
-      cfg.OGL.Disp = 0;
-      cfg.OGL.Win = 0;
+      cfg.OGL.Disp = glfwGetX11Display();
+      cfg.OGL.Win = glfwGetX11Window(window);
     });
 
-    int distortionCaps = 
-      ovrDistortionCap_TimeWarp | 
-      ovrDistortionCap_Chromatic | 
+    int distortionCaps =
+      ovrDistortionCap_TimeWarp |
+      ovrDistortionCap_Chromatic |
       ovrDistortionCap_Vignette;
 
     ovrEyeRenderDesc              eyeRenderDescs[2];
@@ -153,7 +163,7 @@ public:
       EyeArgs & eyeArgs = perEyeArgs[eye];
       eyeArgs.projection = Rift::fromOvr(
         ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01, 100, true));
-      eyeArgs.viewOffset = glm::translate(glm::mat4(), 
+      eyeArgs.viewOffset = glm::translate(glm::mat4(),
         Rift::fromOvr(eyeRenderDescs[eye].HmdToEyeViewOffset));
     });
   }
@@ -207,14 +217,14 @@ public:
   }
 
   virtual void update() {
-    CameraControl::instance().applyInteraction(player);
+    //CameraControl::instance().applyInteraction(player);
     gl::Stacks::modelview().top() = glm::inverse(player);
   }
 
   void draw() {
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
-    static ovrVector3f eyeOffsets[2]; 
+    static ovrVector3f eyeOffsets[2];
     memset(eyeOffsets, 0, sizeof(ovrVector3f) * 2);
     ++frameIndex;
     ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);

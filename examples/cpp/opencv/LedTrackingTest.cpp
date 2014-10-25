@@ -2,7 +2,7 @@
 #include <opencv2/opencv.hpp>
 using namespace cv;
 
-static char * AVC1 = "AVC1";
+static const char * AVC1 = "AVC1";
 static const char * WINDOW_NAME = "window";
 static const char * INPUT_FILE = "f:\\leds.mp4";
 static int MAX_VALUE = 255;
@@ -179,7 +179,7 @@ public:
     corners.clear();
     for (int i = 0; i < boardSize.height; ++i) {
       for (int j = 0; j < boardSize.width; ++j) {
-        Point3f pt = (float(j*squareSize), float(i*squareSize), 0);
+        Point3f pt = Point3f(float(j*squareSize), float(i*squareSize), 0);
         corners.push_back(pt);
       }
     }
@@ -251,7 +251,7 @@ public:
       if (!cap.grab()) {
         break;
       }
-      
+
       if (!cap.read(frame)) {
         break;
       }
