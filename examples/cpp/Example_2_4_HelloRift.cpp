@@ -23,6 +23,7 @@ struct EyeArgs {
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
+  bool                    directMode{ false };
   EyeArgs                 perEyeArgs[2];
   ovrTexture              textures[2];
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
@@ -30,15 +31,14 @@ protected:
   glm::mat4               player;
 
 public:
-  GLenum glErr;
   HelloRift() {
-    glErr = glGetError();
     ovr_Initialize();
-    glErr = glGetError();
     hmd = ovrHmd_Create(0);
     if (nullptr == hmd) {
       hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
     }
+
+    directMode = (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop));
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_Position, 0);
@@ -70,24 +70,16 @@ public:
   }
 
   virtual void createRenderingTarget() {
-    glErr = glGetError();
-    ON_LINUX([&]{
+    if (directMode) {
+      // FIXME Doesn't work as expected
+      //glm::uvec2 mirrorSize = windowSize;
+      //mirrorSize /= 4;
+      //createSecondaryScreenWindow(mirrorSize);
+      createSecondaryScreenWindow(windowSize);
+    } else {
       glfwWindowHint(GLFW_DECORATED, 0);
       createWindow(windowSize, windowPosition);
-    });
-
-    NOT_ON_LINUX([&]{
-      if (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) {
-        glfwWindowHint(GLFW_DECORATED, 0);
-        createWindow(windowSize, windowPosition);
-      } else {
-        // FIXME Doesn't work as expected
-        //glm::uvec2 mirrorSize = windowSize;
-        //mirrorSize /= 4;
-        //createSecondaryScreenWindow(mirrorSize);
-        createSecondaryScreenWindow(windowSize);
-      }
-    });
+    }
 
     void * windowIdentifier = nullptr;
     ON_WINDOWS([&]{
@@ -101,15 +93,13 @@ public:
     });
 
     ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
-    NOT_ON_LINUX([&]{
-      if (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) {
-          ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
-      } else {
-        if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-          FAIL("Unable to create undecorated window");
-        }
+    if (directMode) {
+        ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
+    } else {
+      if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
+        FAIL("Unable to create undecorated window");
       }
-    });
+    }
   }
 
   void initGl() {
