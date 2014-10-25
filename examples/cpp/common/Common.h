@@ -51,6 +51,7 @@
 #include <GL/glew.h>
 
 #include <OVR_CAPI.h>
+#include <Kernel/OVR_Types.h>
 #include <OVR_CAPI_GL.h>
 
 

@@ -4,19 +4,18 @@
 
 struct PerEyeArgs {
   glm::mat4 projection;
-  glm::mat4 translation;
 };
 
 class AsyncTimewarpExample : public RiftGlfwApp {
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
   glm::mat4 player;
-
   int perEyeDelay = 0;
 
   PerEyeArgs perEyeArgs[2];
   ovrTexture eyeTextures[2];
   ovrPosef eyePoses[2];
+  ovrVector3f hmdToEyeOffsets[2];
 
   int frameIndex{ 0 };
 
@@ -98,10 +97,7 @@ public:
         ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
       perEyeArgs[eye].projection =
         Rift::fromOvr(ovrPerspectiveProjection);
-      glm::vec3 eyeOffset =
-        Rift::fromOvr(erd.ViewAdjust);
-      perEyeArgs[eye].translation =
-        glm::translate(glm::mat4(), eyeOffset);
+      hmdToEyeOffsets[eye] = erd.HmdToEyeViewOffset;
     });
 
     //////////////////////////////////////////////////////
@@ -182,7 +178,8 @@ public:
     // Each thread requires it's own glewInit call.
     glewInit();
     while (running) {
-      ovrFrameTiming frameTime = ovrHmd_BeginFrame(hmd, frameIndex++);
+      ++frameIndex;
+      ovrFrameTiming frameTime = ovrHmd_BeginFrame(hmd, frameIndex);
       ovrLock.unlock();
 
       if (0 != frameTime.TimewarpPointSeconds) {
@@ -201,17 +198,10 @@ public:
     static int renderBuffers[2]{0, 0};
     // The pose for each rendered framebuffer
     static ovrPosef renderPoses[2];
+    ovrHmd_GetEyePoses(hmd, frameIndex, hmdToEyeOffsets, renderPoses, nullptr);
 
     for (int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
-      // We can only acquire an eye pose between beginframe and endframe.
-      // So we've arranged for the lock to be only open at those points.  
-      // The main thread will spend most of it's time in the wait.
-      {
-        std::unique_lock<std::mutex> locker(ovrLock);
-        renderPoses[eye] = ovrHmd_GetEyePose(hmd, eye);
-      }
-
       const PerEyeArgs & eyeArgs = perEyeArgs[eye];
       gl::MatrixStack & mv = gl::Stacks::modelview();
       gl::Stacks::projection().top() = eyeArgs.projection;
@@ -219,9 +209,6 @@ public:
         // Apply the head pose
         glm::mat4 m = Rift::fromOvr(renderPoses[eye]);
         mv.preMultiply(glm::inverse(m));
-        // Apply the per-eye offset
-        mv.preMultiply(eyeArgs.translation);
-
         int renderBufferIndex = renderBuffers[eye];
         gl::FrameBufferWrapper & frameBuffer = 
           frameBuffers[eye][renderBufferIndex];

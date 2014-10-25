@@ -46,7 +46,7 @@ public:
       textureHeader.RenderViewport.Pos.y = 0;
       ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArg.frameBuffer.color->texture;
 
-      ovrVector3f offset = eyeRenderDescs[eye].ViewAdjust;
+      ovrVector3f offset = eyeRenderDescs[eye].HmdToEyeViewOffset;
       ovrMatrix4f projection = ovrMatrix4f_Projection(fov, 0.01f, 100, true);
 
       eyeArg.projection = Rift::fromOvr(projection);

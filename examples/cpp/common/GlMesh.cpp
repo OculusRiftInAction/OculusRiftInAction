@@ -66,7 +66,7 @@ void add_all(T & dest, const T & src) {
 
 template<typename T>
 void add_all_transformed(const glm::mat4 & xfm, T & dest, const T & src) {
-  int destSize = dest.size();
+  size_t destSize = dest.size();
   dest.reserve(dest.size() + src.size());
   for (size_t i = 0; i < src.size(); ++i) {
     dest.push_back(xfm * src[i]);
@@ -77,7 +77,7 @@ template<typename T>
 void add_all_incremented(const size_t increment, T & dest, const T & src) {
   dest.reserve(dest.size() + src.size());
   for (size_t i = 0; i < src.size(); ++i) {
-    dest.push_back(src[i] + increment);
+    dest.push_back((int)(src[i] + increment));
   }
 }
 
@@ -113,7 +113,7 @@ void Mesh::addTexCoord(const glm::vec2 & texCoord) {
 
 
 void Mesh::addMesh(const Mesh & mesh, bool forceColor) {
-  int indexOffset = positions.size();
+  size_t indexOffset = positions.size();
 
   // Positions are transformed
   add_all_transformed(model.top(), positions, mesh.positions);
@@ -137,7 +137,7 @@ void Mesh::addMesh(const Mesh & mesh, bool forceColor) {
 }
 
 void Mesh::addQuad(float width, float height) {
-  int indexOffset = positions.size();
+  size_t indexOffset = positions.size();
   float x = width / 2.0f;
   float y = height / 2.0f;
 

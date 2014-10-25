@@ -52,7 +52,6 @@ class RiftFramework {
 
     virtual void draw() final;
     virtual void postDraw() {};
-    virtual void update();
     virtual void renderScene() = 0;
 
 

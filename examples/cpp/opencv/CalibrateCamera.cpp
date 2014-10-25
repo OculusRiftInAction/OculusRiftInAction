@@ -183,9 +183,9 @@ public:
   bool calibZeroTangentDist{ true }; // Assume zero tangential distortion
   bool calibFixPrincipalPoint{ true };// Fix the principal point at the center
   bool flipVertical{ false };          // Flip the captured images around the horizontal axis
-  string outputFileName{ "camera.xml" };      // The name of the file where to write
+  string outputFileName = string{ "camera.xml" };      // The name of the file where to write
   bool showUndistorsed{ true };       // Show undistorted images after calibration
-  string input{ "1" };               // The input ->
+  string input = string{ "1" };               // The input ->
 
 
 
@@ -198,7 +198,7 @@ public:
   int flag;
 
 private:
-  string patternToUse{ "CHESSBOARD" };
+  string patternToUse = std::string{ "CHESSBOARD" };
 
 
 };

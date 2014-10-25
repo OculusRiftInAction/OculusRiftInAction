@@ -36,6 +36,7 @@ public:
     if (nullptr == hmd) {
       hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
     }
+    ovrHmd_SetBool(hmd, "HSW", false);
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_Position, 0);
@@ -68,7 +69,13 @@ public:
 
   virtual void createRenderingTarget() {
     glfwWindowHint(GLFW_DECORATED, 0);
-    createWindow(windowSize, windowPosition);
+    if (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop) {
+      createWindow(windowSize, windowPosition);
+    } else {
+      glm::uvec2 mirrorSize = windowSize;
+      mirrorSize /= 4;
+      createSecondaryScreenWindow(windowSize);
+    }
 
     void * windowIdentifier = nullptr;
     ON_WINDOWS([&]{
@@ -134,7 +141,7 @@ public:
       eyeArgs.projection = Rift::fromOvr(
         ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01, 100, true));
       eyeArgs.viewOffset = glm::translate(glm::mat4(), 
-        Rift::fromOvr(eyeRenderDescs[eye].ViewAdjust));
+        Rift::fromOvr(eyeRenderDescs[eye].HmdToEyeViewOffset));
     });
   }
 
@@ -194,7 +201,12 @@ public:
   void draw() {
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
-    ovrHmd_BeginFrame(hmd, frameIndex++);
+    static ovrVector3f eyeOffsets[2]; 
+    memset(eyeOffsets, 0, sizeof(ovrVector3f) * 2);
+    ++frameIndex;
+    ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
+
+    ovrHmd_BeginFrame(hmd, frameIndex);
     glEnable(GL_DEPTH_TEST);
     for( int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
@@ -203,7 +215,6 @@ public:
       gl::MatrixStack & mv = gl::Stacks::modelview();
 
       eyeArgs.framebuffer.activate();
-      eyePoses[eye] = ovrHmd_GetEyePose(hmd, eye);
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose
         mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(eyePoses[eye])) * mv.top();
