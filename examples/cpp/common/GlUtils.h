@@ -128,14 +128,24 @@ public:
   }
 
   /**
+  * A convenience method for setting up a texture with LINEAR filtering.
+  */
+  static gl::TexturePtr initTexture() {
+    gl::TexturePtr texture = gl::TexturePtr(new gl::Texture2d());
+    texture->bind();
+    texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    texture->unbind();
+    return texture;
+  }
+
+  /**
   * A convenience method for loading unsigned char (RGB) pixels into textures.
   */
   static gl::TexturePtr getImageAsTexture(const glm::uvec2 &dimensions, unsigned char *pixels = nullptr) {
-    gl::TexturePtr texture = gl::TexturePtr(new gl::Texture2d());
+    gl::TexturePtr texture = initTexture();
     texture->bind();
     texture->image2d(dimensions, pixels);
-    texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     texture->unbind();
     return texture;
   }
@@ -163,9 +173,8 @@ public:
   static Text::FontPtr getFont(Resource resource);
   static Text::FontPtr getDefaultFont();
 
-  static void renderGeometry(
-      const gl::GeometryPtr & geometry,
-      gl::ProgramPtr program);
+  static void renderGeometry(const gl::GeometryPtr & geometry, 
+      gl::ProgramPtr program = GlUtils::getProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS));
 
   static void renderSkybox(Resource firstResource);
   static void renderBunny();

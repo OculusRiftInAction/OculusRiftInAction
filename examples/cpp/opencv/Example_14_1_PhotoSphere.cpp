@@ -16,11 +16,10 @@ public:
 
   void drawSphere() {
     static gl::GeometryPtr geometry = GlUtils::getSphereGeometry();
-    static gl::ProgramPtr program = GlUtils::getProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
     static gl::TexturePtr t = loadAndPositionPhotoSphereImage(filepath);
 
     t->bind();
-    GlUtils::renderGeometry(geometry, program);
+    GlUtils::renderGeometry(geometry);
     t->unbind();
   }
 
