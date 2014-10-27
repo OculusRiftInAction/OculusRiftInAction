@@ -45,7 +45,9 @@ endif()
 # Add debug output from the Oculus SDK
 
 # The primary SDK artifact, a static library for Oculus access 
+set(BUILD_SHARED_LIBS ON)
 add_subdirectory(libraries/OculusSDK/LibOVR)
+set(BUILD_SHARED_LIBS OFF)
 set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS OculusVR)
 
