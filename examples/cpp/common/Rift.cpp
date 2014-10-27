@@ -1,4 +1,3 @@
-#include "Common.h"
 #include <OVR_CAPI_GL.h>
 
 RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
