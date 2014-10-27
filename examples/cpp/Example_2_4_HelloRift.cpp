@@ -24,6 +24,7 @@ class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
   bool                    directMode{ false };
+  bool                    debugDevice{ false };
   EyeArgs                 perEyeArgs[2];
   ovrTexture              textures[2];
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
@@ -35,10 +36,13 @@ public:
     ovr_Initialize();
     hmd = ovrHmd_Create(0);
     if (nullptr == hmd) {
+      debugDevice = true;
       hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
     }
 
-    directMode = (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop));
+    ON_WINDOWS([&]{
+      directMode = (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop));
+    });
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_Position, 0);
@@ -77,8 +81,13 @@ public:
       //createSecondaryScreenWindow(mirrorSize);
       createSecondaryScreenWindow(windowSize);
     } else {
-      glfwWindowHint(GLFW_DECORATED, 0);
-      createWindow(windowSize, windowPosition);
+      if (debugDevice) {
+        windowSize /= 4;
+        createSecondaryScreenWindow(windowSize);
+      } else {
+        glfwWindowHint(GLFW_DECORATED, 0);
+        createWindow(windowSize, windowPosition);
+      }
     }
 
     void * windowIdentifier = nullptr;
@@ -96,7 +105,7 @@ public:
     if (directMode) {
         ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
     } else {
-      if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
+      if (!debugDevice && glfwGetWindowAttrib(window, GLFW_DECORATED)) {
         FAIL("Unable to create undecorated window");
       }
     }
@@ -122,7 +131,7 @@ public:
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize = hmd->Resolution;
+    cfg.OGL.Header.RTSize = Rift::toOvr(windowSize);
     // FIXME Doesn't work as expected
     //if (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop)) {
     //  cfg.OGL.Header.RTSize.w /= 4;
