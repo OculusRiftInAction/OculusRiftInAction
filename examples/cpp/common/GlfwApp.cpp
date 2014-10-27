@@ -168,7 +168,7 @@ void GlfwApp::onCreate() {
 // init GLEW if we use a core context.
   glewExperimental = GL_TRUE;
   if (0 != glewInit()) {
-    FAIL("Failed to initialize GL3W");
+    FAIL("Failed to initialize GLEW");
   }
   glGetError();
 #ifdef RIFT_DEBUG
