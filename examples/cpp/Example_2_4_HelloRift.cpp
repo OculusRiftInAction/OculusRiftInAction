@@ -48,6 +48,9 @@ public:
       ovrTrackingCap_Position, 0);
     windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
     windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
+    ON_LINUX([&]{
+      std::swap(windowSize.x, windowSize.y);
+    });
     resetPosition();
   }
 
@@ -153,6 +156,10 @@ public:
       ovrDistortionCap_TimeWarp |
       ovrDistortionCap_Chromatic |
       ovrDistortionCap_Vignette;
+
+    ON_LINUX([&]{
+      distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
+    });
 
     ovrEyeRenderDesc              eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
