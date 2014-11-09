@@ -1,28 +1,27 @@
 #include "Common.h"
-#include "CubeScene.h"
 
-struct PerEyeArg {
-  glm::mat4                     modelviewOffset;
-  glm::mat4                     projection;
-  gl::FrameBufferWrapper        frameBuffer;
-};
 
-class CubeScene_Rift: public CubeScene {
-  PerEyeArg eyes[2];
-  int frameIndex{ 0 };
-  ovrTexture textures[2];
+class CubeScene_Rift: public RiftGlfwApp {
+  FramebufferWrapper  eyeFramebuffers[2];
+  ovrTexture eyeTextures[2];
+  ovrVector3f eyeOffsets[2];
+  glm::mat4 eyeProjections[2];
 
 public:
   CubeScene_Rift() {
+    Stacks::modelview().top() = glm::lookAt(
+      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 5 * OVR_DEFAULT_IPD),
+      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 0),
+      Vectors::UP);
   }
 
   virtual void initGl() {
-    CubeScene::initGl();
+    GlfwApp::initGl();
 
     ovrRenderAPIConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.Header.API = ovrRenderAPI_OpenGL;
-    cfg.Header.RTSize = hmd->Resolution;
+    cfg.Header.RTSize = ovr::fromGlm(getSize());
     cfg.Header.Multisample = 1;
 
     int distortionCaps = 
@@ -33,24 +32,22 @@ public:
         distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
 
     for_each_eye([&](ovrEyeType eye){
-      PerEyeArg & eyeArg = eyes[eye];
       ovrFovPort fov = hmd->DefaultEyeFov[eye];
-      ovrTextureHeader & textureHeader = textures[eye].Header;
       ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
-      eyeArg.frameBuffer.init(Rift::fromOvr(texSize));
+      eyeFramebuffers[eye].init(ovr::toGlm(texSize));
 
+      ovrTextureHeader & textureHeader = eyeTextures[eye].Header;
       textureHeader.API = ovrRenderAPI_OpenGL;
       textureHeader.TextureSize = texSize;
       textureHeader.RenderViewport.Size = texSize;
       textureHeader.RenderViewport.Pos.x = 0;
       textureHeader.RenderViewport.Pos.y = 0;
-      ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArg.frameBuffer.color->texture;
+      ((ovrGLTexture&)eyeTextures[eye]).OGL.TexId = oglplus::GetName(*eyeFramebuffers[eye].color);
 
-      ovrVector3f offset = eyeRenderDescs[eye].HmdToEyeViewOffset;
+      eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
+
       ovrMatrix4f projection = ovrMatrix4f_Projection(fov, 0.01f, 100, true);
-
-      eyeArg.projection = Rift::fromOvr(projection);
-      eyeArg.modelviewOffset = glm::translate(glm::mat4(), Rift::fromOvr(offset));
+      eyeProjections[eye] = ovr::toGlm(projection);
     });
   }
 
@@ -58,25 +55,25 @@ public:
   }
 
   virtual void draw() {
-    ovrHmd_BeginFrame(hmd, frameIndex++);
-    static ovrPosef eyePoses[2];
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    ovrPosef eyePoses[2];
+    // Bug in SDK prevents direct mode from activating unless I call this
+    ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
+
+    ovrHmd_BeginFrame(hmd, getFrame());
+    MatrixStack & mv = Stacks::modelview();
     for (int i = 0; i < ovrEye_Count; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
-      PerEyeArg & eyeArgs = eyes[eye];
-      gl::Stacks::projection().top() = eyeArgs.projection;
+      Stacks::projection().top() = eyeProjections[eye];
 
-      eyeArgs.frameBuffer.withFramebufferActive([&]{
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        gl::Stacks::with_push(mv, [&]{
-          mv.preMultiply(eyeArgs.modelviewOffset);
-          drawCubeScene();
-        });
+      eyeFramebuffers[eye].Bind();
+      oglplus::Context::Clear().DepthBuffer();
+      Stacks::withPush(mv, [&]{
+        mv.preMultiply(glm::translate(glm::mat4(), ovr::toGlm(eyeOffsets[eye])));
+        oria::renderCubeScene(OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
       });
-
     }
-
-    ovrHmd_EndFrame(hmd, eyePoses, textures);
+    oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+    ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
   }
 };
 

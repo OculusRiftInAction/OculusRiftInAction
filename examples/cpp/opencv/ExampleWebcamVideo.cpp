@@ -212,13 +212,13 @@ virtual void update() {
 virtual void renderScene() {
   glClear(GL_DEPTH_BUFFER_BIT);
   GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+  MatrixStack & mv = Stacks::modelview();
 
   mv.with_push([&]{
     mv.identity();
 
-    glm::quat eyePose = Rift::fromOvr(getEyePose().Orientation);
-    glm::quat webcamPose = Rift::fromOvr(captureData.pose.Orientation);
+    glm::quat eyePose = ovr::toGlm(getEyePose().Orientation);
+    glm::quat webcamPose = ovr::toGlm(captureData.pose.Orientation);
     glm::mat4 webcamDelta = glm::mat4_cast(glm::inverse(eyePose) * webcamPose);
 
     mv.preMultiply(webcamDelta);

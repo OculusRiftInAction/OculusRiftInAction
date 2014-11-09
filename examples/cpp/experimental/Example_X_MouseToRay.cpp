@@ -47,7 +47,7 @@ public:
 
   virtual void update() {
     CameraControl::instance().applyInteraction(player);
-    gl::Stacks::modelview().top() = glm::inverse(player);
+    Stacks::modelview().top() = glm::inverse(player);
   }
 
 
@@ -67,8 +67,8 @@ public:
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     GlUtils::renderFloor();
 
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    gl::MatrixStack & pr = gl::Stacks::projection();
+    MatrixStack & mv = Stacks::modelview();
+    MatrixStack & pr = Stacks::projection();
     mv.withPush([&]{
       mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
       GlUtils::drawColorCube(true);

@@ -7,20 +7,26 @@ public:
 
   void initGl() {
     RiftGlfwApp::initGl();
-    glEnable(GL_SCISSOR_TEST);
   }
 
   void draw() {
-    glm::ivec2 position(0, 0);
     glm::uvec2 eyeSize(hmd->Resolution.w / 2, hmd->Resolution.h);
-    gl::scissor(position, eyeSize);
-    gl::clearColor(Colors::red);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glm::ivec2 position = glm::ivec2(0, 0);
+    glm::vec4 color = glm::vec4(1, 0, 0, 1);
+
+    using namespace oglplus;
+    Context::Enable(Capability::ScissorTest);
+    Context::Scissor(position.x, position.y, eyeSize.x, eyeSize.y);
+    Context::ClearColor(color.r, color.g, color.b, color.a);
+    Context::Clear().ColorBuffer();
 
     position = glm::ivec2(eyeSize.x, 0);
-    gl::scissor(position, eyeSize);
-    gl::clearColor(Colors::blue);
-    glClear(GL_COLOR_BUFFER_BIT);
+    color = glm::vec4(0, 0, 1, 1);
+
+    Context::Scissor(position.x, position.y, eyeSize.x, eyeSize.y);
+    Context::ClearColor(color.r, color.g, color.b, color.a);
+    Context::Clear().ColorBuffer();
+    Context::Disable(Capability::ScissorTest);
   }
 };
 

@@ -41,7 +41,7 @@ public:
       ovrEyeRenderDesc renderDesc = ovrHmd_GetRenderDesc(hmd, eye, fov);
 
       // Set up the per-eye projection matrix
-      eyeArg.projection = Rift::fromOvr(
+      eyeArg.projection = ovr::toGlm(
         ovrMatrix4f_Projection(fov, 0.01, 100000, true));
       hmdToEyeOffsets[eye] = renderDesc.HmdToEyeViewOffset;
       ovrRecti texRect;
@@ -49,13 +49,13 @@ public:
         hmd->DefaultEyeFov[eye], 1.0f);
       texRect.Pos.x = texRect.Pos.y = 0;
 
-      eyeArg.frameBuffer.init(Rift::fromOvr(texRect.Size));
+      eyeArg.frameBuffer.init(ovr::toGlm(texRect.Size));
 
       ovrVector2f scaleAndOffset[2];
       ovrHmd_GetRenderScaleAndOffset(fov, texRect.Size,
         texRect, scaleAndOffset);
-      eyeArg.scale = Rift::fromOvr(scaleAndOffset[0]);
-      eyeArg.offset = Rift::fromOvr(scaleAndOffset[1]);
+      eyeArg.scale = ovr::toGlm(scaleAndOffset[0]);
+      eyeArg.offset = ovr::toGlm(scaleAndOffset[1]);
 
       ovrHmd_CreateDistortionMesh(hmd, eye, fov, 0, &eyeArg.mesh);
 
@@ -94,7 +94,7 @@ public:
   }
 
   void update() {
-    gl::Stacks::modelview().top() = glm::inverse(player);
+    Stacks::modelview().top() = glm::inverse(player);
   }
 
   void draw() {
@@ -108,14 +108,14 @@ public:
       const ovrEyeType eye = hmd->EyeRenderOrder[i];
       const EyeArg & eyeArg = eyeArgs[eye];
       // Set up the per-eye projection matrix
-      gl::Stacks::projection().top() = eyeArg.projection;
+      Stacks::projection().top() = eyeArg.projection;
       
       eyeArg.frameBuffer.activate();
-      gl::MatrixStack & mv = gl::Stacks::modelview();
-      gl::Stacks::with_push([&]{
+      MatrixStack & mv = Stacks::modelview();
+      Stacks::with_push([&]{
         // Set up the per-eye modelview matrix
         // Apply the head pose
-        mv.preMultiply(glm::inverse(Rift::fromOvr(eyePoses[eye])));
+        mv.preMultiply(glm::inverse(ovr::toGlm(eyePoses[eye])));
         renderScene();
       });
       eyeArg.frameBuffer.deactivate();
@@ -166,8 +166,8 @@ public:
 
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     GlUtils::renderFloor();
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    gl::Stacks::with_push(mv, [&]{
+    MatrixStack & mv = Stacks::modelview();
+    Stacks::with_push(mv, [&]{
       mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
       GlUtils::drawColorCube(true);
     });

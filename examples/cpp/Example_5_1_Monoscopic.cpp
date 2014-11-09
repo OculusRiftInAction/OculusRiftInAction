@@ -1,24 +1,30 @@
 #include "Common.h"
-#include "CubeScene.h"
 
 static const glm::uvec2 WINDOW_SIZE(1280, 800);
 static const glm::ivec2 WINDOW_POS(100, 100);
 
-class CubeScene_Mono : public CubeScene {
+class CubeScene_Mono : public GlfwApp {
 public:
   CubeScene_Mono() {
-    gl::Stacks::projection().top() = glm::perspective(
-        PI / 2.0f, glm::aspect(WINDOW_SIZE), 0.01f, 100.0f);
+    Stacks::projection().top() = glm::perspective(
+        PI / 2.0f, aspect(WINDOW_SIZE), 0.01f, 100.0f);
+
+    Stacks::modelview().top() = glm::lookAt(
+      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 1), 
+      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 0), 
+      Vectors::UP);
   }
 
-  virtual void createRenderingTarget() {
-    createWindow(WINDOW_SIZE, WINDOW_POS);
+  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    outSize = WINDOW_SIZE;
+    outPosition = WINDOW_POS;
+    return glfw::createWindow(outSize, outPosition);
   }
 
   virtual void draw() {
-    glClear(GL_DEPTH_BUFFER_BIT);
-    drawCubeScene();
+    oglplus::Context::Clear().ColorBuffer().DepthBuffer();
+    oria::renderCubeScene(OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
   }
 };
 
-RUN_OVR_APP(CubeScene_Mono);
+RUN_APP(CubeScene_Mono);

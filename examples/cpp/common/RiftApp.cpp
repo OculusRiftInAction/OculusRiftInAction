@@ -1,4 +1,24 @@
+/************************************************************************************
+ 
+ Authors     :   Bradley Austin Davis <bdavis@saintandreas.org>
+ Copyright   :   Copyright Brad Davis. All Rights reserved.
+ 
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ 
+ http://www.apache.org/licenses/LICENSE-2.0
+ 
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ 
+ ************************************************************************************/
+
 #include "Common.h"
+#include "RiftApp.h"
 #include <OVR_CAPI_GL.h>
 
 RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
@@ -26,17 +46,13 @@ RiftApp::RiftApp(bool fullscreen) :  RiftGlfwApp(fullscreen) {
 }
 
 RiftApp::~RiftApp() {
-  //ovrHmd_StopSensor(hmd);
 }
 
 void RiftApp::finishFrame() {
-
 }
 
 void RiftApp::initGl() {
   RiftGlfwApp::initGl();
-  query = gl::TimeQueryPtr(new gl::TimeQuery());
-  GL_CHECK_ERROR;
 
   int samples;
   glGetIntegerv(GL_SAMPLES, &samples);
@@ -44,50 +60,37 @@ void RiftApp::initGl() {
   ovrGLConfig cfg;
   memset(&cfg, 0, sizeof(cfg));
   cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-  cfg.OGL.Header.RTSize = Rift::toOvr(windowSize);
+  cfg.OGL.Header.RTSize = ovr::fromGlm(getSize());
   cfg.OGL.Header.Multisample = 1;
 
-  int distortionCaps = 0 
+  int distortionCaps =
+    ovrDistortionCap_Chromatic
     | ovrDistortionCap_Vignette
-    | ovrDistortionCap_Chromatic
-    | ovrDistortionCap_TimeWarp
-    ;
+    | ovrDistortionCap_TimeWarp;
 
+  ON_LINUX([&]{
+    distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
+  });
+  
   int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
     distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
+  assert(configResult);
 
-#ifdef _DEBUG
-//  ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
-#endif
-  float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
   for_each_eye([&](ovrEyeType eye){
     const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
     ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
-    projections[eye] = Rift::fromOvr(ovrPerspectiveProjection);
-    glm::vec2 orthoScale = glm::vec2(1.0f) / Rift::fromOvr(erd.PixelsPerTanAngleAtCenter);
+    projections[eye] = ovr::toGlm(ovrPerspectiveProjection);
     eyeOffsets[eye] = erd.HmdToEyeViewOffset;
-    orthoProjections[eye] = Rift::fromOvr(
-        ovrMatrix4f_OrthoSubProjection(
-          ovrPerspectiveProjection, Rift::toOvr(orthoScale), orthoDistance, erd.HmdToEyeViewOffset.x));
   });
-
-  ///////////////////////////////////////////////////////////////////////////
-  // Initialize OpenGL settings and variables
-  // Anti-alias lines (hopefully)
-  glEnable(GL_BLEND);
-  glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-  glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
-  GL_CHECK_ERROR;
 
   // Allocate the frameBuffer that will hold the scene, and then be
   // re-rendered to the screen with distortion
-  glm::uvec2 frameBufferSize = Rift::fromOvr(eyeTextures[0].Header.TextureSize);
+  glm::uvec2 frameBufferSize = ovr::toGlm(eyeTextures[0].Header.TextureSize);
   for_each_eye([&](ovrEyeType eye) {
-    frameBuffers[eye].init(frameBufferSize);
+    eyeFramebuffers[eye].init(frameBufferSize);
     ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId = 
-      frameBuffers[eye].color->texture;
+        oglplus::GetName(*eyeFramebuffers[eye].color);
   });
-  GL_CHECK_ERROR;
 }
 
 void RiftApp::onKey(int key, int scancode, int action, int mods) {
@@ -97,66 +100,59 @@ void RiftApp::onKey(int key, int scancode, int action, int mods) {
     return;
   }
 
-  // Allow the camera controller to intercept the input
-  if (CameraControl::instance().onKey(key, scancode, action, mods)) {
-    return;
-  }
+  //// Allow the camera controller to intercept the input
+  //if (CameraControl::instance().onKey(key, scancode, action, mods)) {
+  //  return;
+  //}
   RiftGlfwApp::onKey(key, scancode, action, mods);
 }
 
 
 void RiftApp::update() {
   RiftGlfwApp::update();
-  CameraControl::instance().applyInteraction(player);
-//  gl::Stacks::modelview().top() = glm::lookAt(glm::vec3(0, 0, 0.4f), glm::vec3(0), glm::vec3(0, 1, 0));
+//  CameraControl::instance().applyInteraction(player);
+//  Stacks::modelview().top() = glm::lookAt(glm::vec3(0, 0, 0.4f), glm::vec3(0), glm::vec3(0, 1, 0));
 }
 
 void RiftApp::applyEyePoseAndOffset(const glm::mat4 & eyePose, const glm::vec3 & eyeOffset) {
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+  MatrixStack & mv = Stacks::modelview();
   mv.preMultiply(glm::inverse(eyePose));
   // Apply the per-eye offset
   mv.preMultiply(glm::translate(glm::mat4(), eyeOffset));
 }
 
 void RiftApp::draw() {
-  static int frameIndex = 0;
-  ovrHmd_BeginFrame(hmd, frameIndex++);
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  gl::MatrixStack & pr = gl::Stacks::projection();
+  ovrHmd_BeginFrame(hmd, getFrame());
+  MatrixStack & mv = Stacks::modelview();
+  MatrixStack & pr = Stacks::projection();
   
-  ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
+  ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
-    gl::Stacks::with_push(pr, mv, [&]{
+    Stacks::withPush(pr, mv, [&]{
       const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
       // Set up the per-eye projection matrix
       {
         ovrMatrix4f eyeProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
-        glm::mat4 ovrProj = Rift::fromOvr(eyeProjection);
+        glm::mat4 ovrProj = ovr::toGlm(eyeProjection);
         pr.top() = ovrProj;
       }
 
       // Set up the per-eye modelview matrix
       {
         // Apply the head pose
-        glm::mat4 eyePose = Rift::fromOvr(eyePoses[eye]);
+        glm::mat4 eyePose = ovr::toGlm(eyePoses[eye]);
         applyEyePoseAndOffset(eyePose, glm::vec3(0));
-        // Cache the headPose so subsequent scene code can read it
-        headPose = eyePose;
       }
 
       // Render the scene to an offscreen buffer
-      frameBuffers[eye].activate();
-      //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      //glEnable(GL_DEPTH_TEST);
+      eyeFramebuffers[eye].Bind();
       renderScene();
-      frameBuffers[eye].deactivate();
-
-      //ovrHmd_EndEyeRender(hmd, eye, renderPose, &(eyeTextures[eye].Texture));
     });
-    GL_CHECK_ERROR;
   }
-  query->begin();
+  // Restore the default framebuffer
+  oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+
   postDraw();
 #if 1
   ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
@@ -166,34 +162,31 @@ void RiftApp::draw() {
   static gl::ProgramPtr program = GlUtils::getProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
   program->use();
   geometry->bindVertexArray();
-  gl::Stacks::with_push(pr, mv, [&]{
+  Stacks::with_push(pr, mv, [&]{
     pr.identity(); mv.identity();
     frameBuffers[0].color->bind();
-    glViewport(0, 0, 640, 800);
+    viewport(ovrEye_Left);
     geometry->draw();
     frameBuffers[1].color->bind();
-    glViewport(640, 0, 640, 800);
+    viewport(ovrEye_Right);
     geometry->draw();
   });
   gl::Program::clear();
   gl::VertexArray::unbind();
   glfwSwapBuffers(window);
 #endif
-  query->end();
-  int result = query->getResult();
-  GL_CHECK_ERROR;
 }
 
 void RiftApp::renderStringAt(const std::string & str, float x, float y, float size) {
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  gl::MatrixStack & pr = gl::Stacks::projection();
-  gl::Stacks::with_push(mv, pr, [&]{
+  MatrixStack & mv = Stacks::modelview();
+  MatrixStack & pr = Stacks::projection();
+  Stacks::withPush(mv, pr, [&]{
     mv.identity();
     pr.top() = 1.0f * glm::ortho(
       -1.0f, 1.0f,
       -windowAspectInverse * 2.0f, windowAspectInverse * 2.0f,
       -100.0f, 100.0f);
     glm::vec2 cursor(x, windowAspectInverse * y);
-    GlUtils::renderString(str, cursor, size);
+    oria::renderString(str, cursor, size);
   });
 }

@@ -1,5 +1,4 @@
 #include "Common.h"
-#include "GlTexture.h"
 #include <fstream>
 #include <cstdio>
 #include <opencv2/core/core.hpp>
@@ -27,7 +26,7 @@ public:
   void renderScene() {
     glClear(GL_DEPTH_BUFFER_BIT);
 
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.translate(glm::vec3(0, 0, -1)).scale(0.2f);
       drawSphere();

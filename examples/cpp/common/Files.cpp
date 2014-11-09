@@ -18,21 +18,14 @@
  ************************************************************************************/
 
 #include "Common.h"
+#include "Files.h"
 #include <fstream>
 #include <sstream>
 #include <cassert>
 #include <stdexcept>
-
-#undef HAVE_BOOST
-#ifdef HAVE_BOOST
-#include <boost/filesystem.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-using namespace boost::posix_time;
-using namespace boost::filesystem;
-#endif
+#include <chrono>
 
 using namespace std;
-
 
 string Files::read(const string & filename) {
   ifstream ins(filename.c_str(), ios::binary);
@@ -46,19 +39,11 @@ string Files::read(const string & filename) {
 }
 
 time_t Files::modified(const string & filename) {
-#ifdef HAVE_BOOST
-  return last_write_time(filename);
-#else
   return 0;
-#endif
+//  return tr2::sys::last_write_time(tr2::sys::path(filename));
 }
 
-
 bool Files::exists(const string & filename) {
-#ifdef HAVE_BOOST
-  return boost::filesystem::exists(filename);
-#else
-  // FIXME
   return false;
-#endif
+//  return tr2::sys::exists(tr2::sys::path(filename));
 }

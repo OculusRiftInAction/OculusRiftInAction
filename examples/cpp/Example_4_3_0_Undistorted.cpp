@@ -1,4 +1,5 @@
 #include "Common.h"
+#include <oglplus/shapes/plane.hpp>
 
 Resource SCENE_IMAGES_DK1[2] = {
   Resource::IMAGES_TUSCANY_UNDISTORTED_LEFT_DK1_PNG,
@@ -13,27 +14,28 @@ Resource SCENE_IMAGES_DK2[2] = {
 class UndistortedExample : public RiftGlfwApp {
 
 protected:
-  gl::Texture2dPtr textures[2];
-  gl::GeometryPtr quadGeometry;
-  gl::ProgramPtr program;
+  TexturePtr textures[2];
+  ProgramPtr program;
+  ShapeWrapperPtr shape;
 
 public:
   virtual ~UndistortedExample() {
   }
 
   void initGl() {
+    using namespace oglplus;
     RiftGlfwApp::initGl();
-    glDisable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    Context::Disable(Capability::Blend);
+    Context::Disable(Capability::DepthTest);
+    Context::Disable(Capability::CullFace);
 
-    program = GlUtils::getProgram(
+    program = oria::loadProgram(
         Resource::SHADERS_TEXTURED_VS,
         Resource::SHADERS_TEXTURED_FS);
-    program->use();
-
-    quadGeometry = GlUtils::getQuadGeometry();
-    quadGeometry->bindVertexArray();
+    shape = ShapeWrapperPtr(new shapes::ShapeWrapper({ "Position", "TexCoord" }, shapes::Plane(
+        Vec3f(1, 0, 0),
+        Vec3f(0, 1, 0)
+      ), *program));
 
     Resource * sceneImages = SCENE_IMAGES_DK2;
     if (hmd->Type == ovrHmd_DK1) {
@@ -41,12 +43,29 @@ public:
     }
 
     for_each_eye([&](ovrEyeType eye) {
-      GlUtils::getImageAsTexture(textures[eye], sceneImages[eye]);
+      textures[eye] = oria::load2dTexture(sceneImages[eye]);
     });
   }
 
+  virtual void shutdownGl() {
+    program.reset();
+    shape.reset();
+    for_each_eye([&](ovrEyeType eye) {
+      textures[eye].reset();
+    });
+    RiftGlfwApp::shutdownGl();
+  }
+
+
   void draw() {
-    glClear(GL_COLOR_BUFFER_BIT);
+    using namespace oglplus;
+    static ovrPosef eyePoses[2];
+    {
+      static ovrVector3f eyeOffsets[2];
+      ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
+    }
+    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+    Context::Clear().ColorBuffer();
     for_each_eye([&](ovrEyeType eye) {
       renderEye(eye);
     });
@@ -54,8 +73,9 @@ public:
 
   void renderEye(ovrEyeType eye) {
     viewport(eye);
-    textures[eye]->bind();
-    quadGeometry->draw();
+//    Stacks::modelview().identity().rotate(HALF_PI, Vectors::X_AXIS);
+    textures[eye]->Bind(oglplus::Texture::Target::_2D);
+    oria::renderGeometry(shape, program);
   }
 };
 

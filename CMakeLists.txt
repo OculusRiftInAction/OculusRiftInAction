@@ -45,9 +45,7 @@ endif()
 # Add debug output from the Oculus SDK
 
 # The primary SDK artifact, a static library for Oculus access 
-set(BUILD_SHARED_LIBS ON)
 add_subdirectory(libraries/OculusSDK/LibOVR)
-set(BUILD_SHARED_LIBS OFF)
 set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS OculusVR)
 
@@ -115,7 +113,31 @@ endif()
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
+######################################################
+#
+# OGLplus provides object oriented OpenGL wrappers
+#
 
+# oglplus uses CMake to detect compiler features, but 
+# we can't use the full oglplus CMake include, so we 
+# need to jump through some hoops to make it's 
+# compiler detection logic work here.
+set(SAVE_PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
+set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/libraries/oglplus)
+    include(libraries/oglplus/config/Compiler.cmake)
+    include(libraries/oglplus/config/CPPFeature.cmake)
+    set(OGLPLUS_CONFIG_SET_LOW_PROFILE 1)
+    set(OGLPLUS_LOW_PROFILE 0)
+    set(OGLPLUS_USE_GLCOREARB_H 0) 
+    set(OGLPLUS_USE_GL3_H 0)
+    set(OGLPLUS_USE_GLEW 1)
+    set(OGLPLUS_USE_GL3W 0)
+    set(OGLPLUS_USE_BOOST_CONFIG 0)
+    configure_file(
+        ${PROJECT_SOURCE_DIR}/config/oglplus/config/site.hpp.in
+        ${PROJECT_BINARY_DIR}/libraries/oglplus/include/oglplus/config/site.hpp
+    )
+set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
 
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
@@ -127,27 +149,20 @@ else()
         include_directories(${PNG_INCLUDE_DIR})
     endif()
 endif()
-include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
+
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
+include_directories(${CMAKE_BINARY_DIR}/libraries/oglplus/include)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
-
-
-###############################################################################
-#
-# Common GL code, using only headers.  
-#
-add_subdirectory(libraries/gl)
-set_target_properties(gl PROPERTIES FOLDER "Examples/Shared")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
-
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
 
 ###############################################################################
 #
 # GLM - Vector / matrix header only math library based on the syntax of GLSL
 #
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
-
 
 ###############################################################################
 #
