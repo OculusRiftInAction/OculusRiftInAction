@@ -20,7 +20,14 @@
 #pragma once
 
 class Platform {
+
 public:
+
+  enum ThreadPriority {
+    LOW,
+    MEDIUM,
+    HIGH
+  };
   static void sleepMillis(int millis);
   static long elapsedMillis();
   static float elapsedSeconds();
@@ -35,6 +42,7 @@ public:
   static std::string readFile(const std::string & filename);
   static time_t lastModifiedTime(const std::string & filename);
   static bool fileExists(const std::string & filename);
+  static void setThreadPriority(ThreadPriority priority = MEDIUM);
 
   static void addShutdownHook(std::function<void()> f);
   static void runShutdownHooks();

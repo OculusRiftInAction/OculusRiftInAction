@@ -26,6 +26,7 @@
 #else
 #include <sys/time.h>
 #include <unistd.h>
+#include <pthread.h>
 #endif
 
 void Platform::sleepMillis(int millis) {
@@ -159,4 +160,36 @@ void Platform::runShutdownHooks() {
   std::for_each(hooks.begin(), hooks.end(), [&](std::function<void()> f){
     f();
   });
+}
+
+void Platform::setThreadPriority(ThreadPriority priority) {
+#ifdef OS_WIN
+  int win32priority;
+  switch (priority) {
+  case LOW:
+    win32priority = THREAD_PRIORITY_LOWEST;
+    break;
+  case MEDIUM:
+    win32priority = THREAD_PRIORITY_NORMAL;
+    break;
+  case HIGH:
+    win32priority = THREAD_PRIORITY_HIGHEST;
+    break;
+  }
+  SetThreadPriority(GetCurrentThread(), win32priority);
+#else 
+  sched_param params;
+  switch (priority) {
+  case LOW:
+    params.sched_priority = sched_get_priority_min(SCHED_FIFO);
+    break;
+  case MEDIUM:
+    params.sched_priority = 0;
+    break;
+  case HIGH:
+    params.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    break;
+  }
+  pthread_setschedparam(pthread_self(), SCHED_FIFO, &params);
+#endif
 }

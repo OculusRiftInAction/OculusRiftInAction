@@ -136,39 +136,116 @@ using glm::quat;
 #pragma warning( default : 4068 4244 4267 4065)
 #endif
 
-// A wrapper for constructing and using a 
-struct FboWrapper {
-  oglplus::Framebuffer   fbo;
-  oglplus::Texture       color;
-  oglplus::Renderbuffer  depth;
+struct FramebufferWraper {
+  glm::uvec2 size;
+  GLuint fbo{0};
+  GLuint color{0};
+  GLuint depth{ 0 };
 
-  void init(const glm::uvec2 & size) {
-    using namespace oglplus;
-    Context::Bound(Texture::Target::_2D, color)
-      .MinFilter(TextureMinFilter::Linear)
-      .MagFilter(TextureMagFilter::Linear)
-      .WrapS(TextureWrap::ClampToEdge)
-      .WrapT(TextureWrap::ClampToEdge)
-      .Image2D(
-      0, PixelDataInternalFormat::RGBA8,
-      size.x, size.y,
-      0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
-      );
+  virtual ~FramebufferWraper() {
+    release();
+  }
 
-    Context::Bound(Renderbuffer::Target::Renderbuffer, depth)
-      .Storage(
-      PixelDataInternalFormat::DepthComponent,
-      size.x, size.y
-      );
+  void allocate() {
+    release();
+    glGenRenderbuffers(1, &depth);
+    assert(depth);
+    glGenTextures(1, &color);
+    assert(color);
+    glGenFramebuffers(1, &fbo);
+    assert(fbo);
+  }
 
-    Context::Bound(Framebuffer::Target::Draw, fbo)
-      .AttachTexture(FramebufferAttachment::Color, color, 0)
-      .AttachRenderbuffer(FramebufferAttachment::Depth, depth)
-      .Complete();
+  void release() {
+    if (fbo) {
+      glDeleteFramebuffers(1, &fbo);
+      fbo = 0;
+    }
+    if (color) {
+      glDeleteTextures(1, &color);
+      color = 0;
+    }
+    if (depth) {
+      glDeleteRenderbuffers(1, &depth);
+      depth = 0;
+    }
+  }
+
+  static bool checkStatus(GLenum target = GL_FRAMEBUFFER) {
+    GLuint status = glCheckFramebufferStatus(target);
+    switch (status) {
+    case GL_FRAMEBUFFER_COMPLETE:
+      return true;
+      break;
+
+    case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+      std::cerr << "framebuffer incomplete attachment" << std::endl;
+      break;
+
+    case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+      std::cerr << "framebuffer missing attachment" << std::endl;
+      break;
+
+    case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
+      std::cerr << "framebuffer incomplete draw buffer" << std::endl;
+      break;
+
+    case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
+      std::cerr << "framebuffer incomplete read buffer" << std::endl;
+      break;
+
+    case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
+      std::cerr << "framebuffer incomplete multisample" << std::endl;
+      break;
+
+    case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
+      std::cerr << "framebuffer incomplete layer targets" << std::endl;
+      break;
+
+    case GL_FRAMEBUFFER_UNSUPPORTED:
+      std::cerr << "framebuffer unsupported internal format or image" << std::endl;
+      break;
+
+    default:
+      std::cerr << "other framebuffer error" << std::endl;
+      break;
+    }
+
+    return false;
+  }
+
+  void init(const glm::ivec2 & size) {
+    this->size = size;
+    allocate();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    glBindTexture(GL_TEXTURE_2D, color);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, size.x, size.y);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+
+    glBindRenderbuffer(GL_RENDERBUFFER, depth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, size.x, size.y);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth);
+
+    if (!checkStatus()) {
+      FAIL("Could not create a valid framebuffer");
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
+
+  void activate() {
+    assert(fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glViewport(0, 0, size.x, size.y);
   }
 };
-
-typedef std::shared_ptr<FboWrapper> fbo_wrapper_ptr;
 
 namespace Attribute {
   enum {
@@ -817,7 +894,7 @@ private:
   ovrEyeRenderDesc eyeRenderDescs[2];
   mat4 projections[2];
   ovrPosef eyePoses[2];
-  fbo_wrapper_ptr eyeFbos[2];
+  FramebufferWraper eyeFbos[2];
 
 public:
 
@@ -886,10 +963,9 @@ protected:
       // Allocate the frameBuffer that will hold the scene, and then be
       // re-rendered to the screen with distortion
       auto & eyeTextureHeader = eyeTextures[eye];
-      eyeFbos[eye] = fbo_wrapper_ptr(new FboWrapper());
-      eyeFbos[eye]->init(ovr::toGlm(eyeTextureHeader.Header.TextureSize));
+      eyeFbos[eye].init(ovr::toGlm(eyeTextureHeader.Header.TextureSize));
       // Get the actual OpenGL texture ID
-      ((ovrGLTexture&)eyeTextureHeader).OGL.TexId = oglplus::GetName(eyeFbos[eye]->color);
+      ((ovrGLTexture&)eyeTextureHeader).OGL.TexId = eyeFbos[eye].color;
     });
   }
 
@@ -929,8 +1005,7 @@ protected:
       const ovrRecti & vp = eyeTextures[eye].Header.RenderViewport;
 
       // Render the scene to an offscreen buffer
-      eyeFbos[eye]->fbo.Bind(oglplus::Framebuffer::Target::Draw);
-      oglplus::Context::Viewport(vp.Pos.x, vp.Pos.y, vp.Size.w, vp.Size.h);
+      eyeFbos[eye].activate();
       renderScene(projections[eye], ovr::toGlm(eyePoses[eye]));
     }
     oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);

@@ -6,17 +6,21 @@ class AsyncTimewarpExample : public RiftGlfwApp {
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
   glm::mat4 player;
-  int perEyeDelay = 0;
-
+  
   ovrTexture eyeTextures[2];
   ovrPosef eyePoses[2];
   ovrVector3f hmdToEyeOffsets[2];
-  unsigned int distortionFrameIndex = 0;
   glm::mat4 eyeProjections[2];
 
-  // Offscreen rendering targets.  two for each eye.
-  // One is used for rendering while the other is used for distortion
+
+  unsigned int distortionFrameIndex{ 0 };
+  int perEyeDelay = 0;
+  // Offscreen rendering targets: two for each eye.
+  // One is used for rendering (writing) while the other 
+  // is  used for distortion (reading)
   FramebufferWrapper  eyeFramebuffers[2][2];
+  // Keep track of the index of the buffer currently being written to for each eye
+  unsigned int writeFramebuffersIndex{ 0 };
 
   std::unique_ptr<std::thread> threadPtr;
   std::mutex ovrLock;
@@ -52,11 +56,6 @@ public:
     RiftGlfwApp::initGl();
 
     memset(eyeTextures, 0, 2 * sizeof(ovrGLTexture));
-    float eyeHeight = 1.5f;
-    player = glm::inverse(glm::lookAt(
-      glm::vec3(0, eyeHeight, 4),
-      glm::vec3(0, eyeHeight, 0),
-      glm::vec3(0, 1, 0)));
 
     for_each_eye([&](ovrEyeType eye){
       ovrSizei eyeTextureSize = 
@@ -96,11 +95,14 @@ public:
     glfwWindowHint(GLFW_VISIBLE, 0);
     renderWindow = glfwCreateWindow(100, 100, "Offscreen", nullptr, getWindow());
     glfwMakeContextCurrent(renderWindow);
+    // Some bug in the SDK causes the render window to trigger a 
+    // framebuffer error when it's made active, so clear that out
+    GLenum err = glGetError();
     oglplus::Context::Enable(oglplus::Capability::Blend);
-//    glEnable(GL_BLEND);
+
     for_each_eye([&](ovrEyeType eye){
       glm::uvec2 frameBufferSize =
-        ovr::toGlm(eyeTextures[0].Header.TextureSize);
+        ovr::toGlm(eyeTextures[eye].Header.TextureSize);
       for (int i = 0; i < 2; ++i) {
         eyeFramebuffers[eye][i].init(frameBufferSize);
       }
@@ -160,14 +162,12 @@ public:
 
 
   void distortionThread() {
-    static int distortionFrameIndex = 0;
-
+    Platform::setThreadPriority(Platform::HIGH);
     // Make the shared context current
     glfwMakeContextCurrent(getWindow());
 
     // Each thread requires it's own glewInit call.
     glewInit();
-
     while (running) {
       ++distortionFrameIndex;
       ovrFrameTiming frameTime = ovrHmd_BeginFrame(hmd, distortionFrameIndex);
@@ -176,7 +176,7 @@ public:
       // give the render thread as much time as possible to update the frame
       // before starting the EndFrame call
       if (0 != frameTime.TimewarpPointSeconds) {
-        ovr_WaitTillTime(frameTime.TimewarpPointSeconds - 0.002);
+        ovr_WaitTillTime(frameTime.TimewarpPointSeconds - 0.003);
       }
 
       ovrLock.lock();
@@ -186,12 +186,9 @@ public:
   }
 
   void draw() {
-    // Synchronization to determine when a given eye's render commands have completed
-    // The index of the current rendering target framebuffer.  
-    static int renderBuffers[2]{0, 0};
     // The pose for each rendered framebuffer
-    static ovrPosef renderPoses[2];
-    ovrHmd_GetEyePoses(hmd, getFrame(), hmdToEyeOffsets, renderPoses, nullptr);
+    ovrPosef renderPoses[2];
+    ovrHmd_GetEyePoses(hmd, distortionFrameIndex, hmdToEyeOffsets, renderPoses, nullptr);
 
     for (int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
@@ -201,9 +198,8 @@ public:
         // Apply the head pose
         glm::mat4 m = ovr::toGlm(renderPoses[eye]);
         mv.preMultiply(glm::inverse(m));
-        int renderBufferIndex = renderBuffers[eye];
         FramebufferWrapper & frameBuffer = 
-          eyeFramebuffers[eye][renderBufferIndex];
+          eyeFramebuffers[eye][writeFramebuffersIndex];
         // Render the scene to an offscreen buffer
         frameBuffer.Bind();
         renderScene();
@@ -214,14 +210,15 @@ public:
     glFinish();
 
     {
-      std::unique_lock<std::mutex> locker(ovrLock);
+      ovrLock.lock();
       for_each_eye([&](ovrEyeType eye) {
-        int renderBufferIndex = renderBuffers[eye];
-        renderBuffers[eye] = renderBufferIndex ? 0 : 1;
+        int renderBufferIndex = writeFramebuffersIndex;
         ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
           oglplus::GetName(*eyeFramebuffers[eye][renderBufferIndex].color);
         eyePoses[eye] = renderPoses[eye];
       });
+      writeFramebuffersIndex = writeFramebuffersIndex ? 0 : 1;
+      ovrLock.unlock();
     }
   }
 
