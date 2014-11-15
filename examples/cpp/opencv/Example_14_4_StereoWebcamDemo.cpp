@@ -4,13 +4,12 @@
 #include <thread>
 #include <mutex>
 
+int CAMERA_FOR_EYE[2] = { 2, 1 };
+
 struct CaptureData {
   ovrPosef pose;
   cv::Mat image;
 };
-
-int a = 20;
-int b = 50;
 
 class WebcamHandler {
 
@@ -26,18 +25,27 @@ private:
 
 public:
 
-  WebcamHandler(ovrHmd & hmd) : hmd(hmd) {
+  WebcamHandler() {
   }
 
   // Spawn capture thread and return webcam aspect ratio (width over height)
-  float startCapture() {
-    videoCapture.open(1);
-    if (!videoCapture.isOpened()
-      || !videoCapture.read(frame.image)) {
-      FAIL("Could not open video source to capture first frame");
+  float startCapture(ovrHmd & hmdRef, int which) {
+    hmd = hmdRef;
+    videoCapture.open(which);
+    if (!videoCapture.isOpened()) {
+      FAIL("Could not open video source from webcam %i", which);
+    }
+    for (int i = 0; i < 10 && !videoCapture.read(frame.image); i++) {
+      Sleep(10);
+    }
+    if (!videoCapture.read(frame.image)) {
+      FAIL("Could not open get first frame from webcam %i", which);
     }
     float aspectRatio = (float)frame.image.cols / (float)frame.image.rows;
     captureThread = std::thread(&WebcamHandler::captureLoop, this);
+
+    // Snooze for 200 ms to get past multithreading issues in OpenCV
+    Sleep(200);
     return aspectRatio;
   }
 
@@ -72,12 +80,6 @@ public:
 
       videoCapture.read(captured.image);
       cv::flip(captured.image.clone(), captured.image, 0);
-
-      cv::blur(captured.image, captured.image, cv::Size(3, 3));
-      cv::cvtColor(captured.image, captured.image, CV_BGR2GRAY);
-      cv::Canny(captured.image, captured.image, a, b*3);
-      cv::cvtColor(captured.image, captured.image, CV_GRAY2BGR);
-
       set(captured);
     }
   }
@@ -87,46 +89,41 @@ class WebcamApp : public RiftApp {
 
 protected:
 
-  gl::Texture2dPtr texture;
-  gl::GeometryPtr videoGeometry;
-  WebcamHandler captureHandler;
-  CaptureData captureData;
+  gl::Texture2dPtr texture[2];
+  gl::GeometryPtr videoGeometry[2];
+  WebcamHandler captureHandler[2];
+  CaptureData captureData[2];
 
 public:
 
-  WebcamApp() : captureHandler(hmd) {
-  }
-
-  virtual void onKey(int key, int scancode, int action, int mods) {
-    RiftApp::onKey(key, scancode, action, mods);
-    if (GLFW_PRESS == action) switch (key) { 
-    case GLFW_KEY_8: b--; break;
-    case GLFW_KEY_9: b++; break;
-    case GLFW_KEY_1: a--; break;
-    case GLFW_KEY_2: a++; break;
-    }
+  WebcamApp() {
   }
 
   virtual ~WebcamApp() {
-    captureHandler.stopCapture();
+    for (int i = 0; i < 2; i++) {
+      captureHandler[i].stopCapture();
+    }
   }
 
   void initGl() {
     RiftApp::initGl();
 
-    texture = GlUtils::initTexture();
-    float aspectRatio = captureHandler.startCapture();
-    videoGeometry = GlUtils::getQuadGeometry(aspectRatio);
+    for (int i = 0; i < 2; i++) {
+      texture[i] = GlUtils::initTexture();
+      videoGeometry[i] = GlUtils::getQuadGeometry(captureHandler[i].startCapture(hmd, CAMERA_FOR_EYE[i]));
+    }
   }
 
   virtual void update() {
-    if (captureHandler.get(captureData)) {
-      texture->bind();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-          captureData.image.cols, captureData.image.rows,
-          0, GL_BGR, GL_UNSIGNED_BYTE,
-          captureData.image.data);
-      texture->unbind();
+    for (int i = 0; i < 2; i++) {
+      if (captureHandler[i].get(captureData[i])) {
+        texture[i]->bind();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
+            captureData[i].image.cols, captureData[i].image.rows,
+            0, GL_BGR, GL_UNSIGNED_BYTE,
+            captureData[i].image.data);
+        texture[i]->unbind();
+      }
     }
   }
 
@@ -137,16 +134,16 @@ public:
     
     mv.with_push([&]{
       glm::quat eyePose = Rift::fromOvr(getEyePose().Orientation);
-      glm::quat webcamPose = Rift::fromOvr(captureData.pose.Orientation);
+      glm::quat webcamPose = Rift::fromOvr(captureData[getCurrentEye()].pose.Orientation);
       glm::mat4 webcamDelta = glm::mat4_cast(glm::inverse(eyePose) * webcamPose);
 
       mv.identity();
       mv.preMultiply(webcamDelta);
 
-      mv.translate(glm::vec3(0, 0, -2));
-      texture->bind();
-      GlUtils::renderGeometry(videoGeometry);
-      texture->unbind();
+      mv.translate(glm::vec3(0, 0, -2.75));
+      texture[getCurrentEye()]->bind();
+      GlUtils::renderGeometry(videoGeometry[getCurrentEye()]);
+      texture[getCurrentEye()]->unbind();
     });
   }
 };
