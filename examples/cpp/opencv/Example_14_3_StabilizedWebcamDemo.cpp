@@ -9,9 +9,6 @@ struct CaptureData {
   cv::Mat image;
 };
 
-int a = 20;
-int b = 50;
-
 class WebcamHandler {
 
 private:
@@ -72,12 +69,6 @@ public:
 
       videoCapture.read(captured.image);
       cv::flip(captured.image.clone(), captured.image, 0);
-
-      cv::blur(captured.image, captured.image, cv::Size(3, 3));
-      cv::cvtColor(captured.image, captured.image, CV_BGR2GRAY);
-      cv::Canny(captured.image, captured.image, a, b*3);
-      cv::cvtColor(captured.image, captured.image, CV_GRAY2BGR);
-
       set(captured);
     }
   }
@@ -95,16 +86,6 @@ protected:
 public:
 
   WebcamApp() : captureHandler(hmd) {
-  }
-
-  virtual void onKey(int key, int scancode, int action, int mods) {
-    RiftApp::onKey(key, scancode, action, mods);
-    if (GLFW_PRESS == action) switch (key) { 
-    case GLFW_KEY_8: b--; break;
-    case GLFW_KEY_9: b++; break;
-    case GLFW_KEY_1: a--; break;
-    case GLFW_KEY_2: a++; break;
-    }
   }
 
   virtual ~WebcamApp() {
@@ -143,7 +124,7 @@ public:
       mv.identity();
       mv.preMultiply(webcamDelta);
 
-      mv.translate(glm::vec3(0, 0, -2));
+      mv.translate(glm::vec3(0, 0, -2.75));
       texture->bind();
       GlUtils::renderGeometry(videoGeometry);
       texture->unbind();
