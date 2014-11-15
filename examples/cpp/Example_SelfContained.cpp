@@ -116,26 +116,6 @@ using glm::quat;
 
 #include <GL/glew.h>
 
-//////////////////////////////////////////////////////////////////////
-//
-// OGLplus is a set of wrapper classes for giving OpenGL a more object
-// oriented interface
-//
-#ifdef OVR_OS_WIN32
-#pragma warning( disable : 4068 4244 4267 4065)
-#endif
-#include <oglplus/config/gl.hpp>
-#include <oglplus/all.hpp>
-#include <oglplus/interop/glm.hpp>
-#include <oglplus/bound/texture.hpp>
-#include <oglplus/bound/framebuffer.hpp>
-#include <oglplus/bound/renderbuffer.hpp>
-#include <oglplus/bound/buffer.hpp>
-#include <oglplus/shapes/cube.hpp>
-#ifdef OVR_OS_WIN32
-#pragma warning( default : 4068 4244 4267 4065)
-#endif
-
 struct FramebufferWraper {
   glm::uvec2 size;
   GLuint fbo{0};
@@ -244,164 +224,6 @@ struct FramebufferWraper {
     assert(fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glViewport(0, 0, size.x, size.y);
-  }
-};
-
-namespace Attribute {
-  enum {
-    Position = 0,
-    TexCoord0 = 1,
-    Normal = 2,
-    Color = 3,
-    TexCoord1 = 4,
-    InstanceTransform = 5,
-  };
-}
-
-static const char * VERTEX_SHADER =
-"#version 410\n"
-
-"uniform mat4 ProjectionMatrix;"
-"uniform mat4 CameraMatrix;"
-
-"layout(location = 0) in vec4 Position;"
-"layout(location = 2) in vec3 Normal;"
-"layout(location = 5) in mat4 InstanceTransform;"
-
-"out vec3 vertNormal;"
-
-"void main(void)"
-"{"
-" mat4 ViewXfm = CameraMatrix * InstanceTransform;"
-" vertNormal = Normal;"
-" gl_Position = ProjectionMatrix *"
-" ViewXfm *"
-" Position;"
-"}";
-
-static const char * FRAGMENT_SHADER =
-"#version 410\n"
-"in vec3 vertNormal;"
-
-"out vec4 fragColor;"
-
-"void main(void)"
-"{"
-" vec3 color = vertNormal;"
-" if (!all(equal(color, abs(color)))) {"
-"   color = vec3(1.0) - abs(color);"
-" }"
-" fragColor = vec4(color, 1.0);"
-"}";
-
-// a class for encapsulating building and rendering an RGB cube
-struct ColorCubeScene {
-
-  // Program
-  oglplus::Program prog;
-
-  // A vertex array object for the rendered cube
-  oglplus::VertexArray cube;
-
-  // VBOs for the cube's vertices and normals
-  int primitiveCount;
-  int instanceCount;
-  oglplus::Buffer verts;
-  oglplus::Buffer instances;
-  oglplus::Buffer normals;
-
-  const unsigned int GRID_SIZE{ 5 };
-
-public:
-  ColorCubeScene() {
-    using namespace oglplus;
-    try {
-      // attach the shaders to the program
-      prog.AttachShader(
-        FragmentShader()
-        .Source(GLSLSource(String(FRAGMENT_SHADER)))
-        .Compile()
-        );
-      prog.AttachShader(
-        VertexShader()
-        .Source(GLSLSource(String(VERTEX_SHADER)))
-        .Compile()
-        );
-      prog.Link();
-    }
-    catch (ProgramBuildError & err) {
-      FAIL((const char*)err.what());
-    }
-
-    // link and use it
-    prog.Use();
-
-    // bind the VAO for the cube
-    cube.Bind();
-
-    shapes::Cube make_cube;
-
-    // Populate cube positions
-    {
-      std::vector<GLfloat> v;
-      GLuint position_count = make_cube.Positions(v);
-      primitiveCount = v.size() / position_count;
-      Context::Bound(Buffer::Target::Array, verts)
-        .Data(v);
-      VertexArrayAttrib(prog, Attribute::Position)
-        .Setup<Vec3f>()
-        .Enable();
-    }
-
-    // Populate cube normals
-    {
-      std::vector<GLfloat> v;
-      make_cube.Normals(v);
-      Context::Bound(Buffer::Target::Array, normals)
-        .Data(v);
-      VertexArrayAttrib(prog, Attribute::Normal)
-        .Setup<Vec3f>()
-        .Enable();
-    }
-
-    // Create a cube of cubes
-    {
-      std::vector<mat4> instance_positions;
-      for (unsigned int z = 0; z < GRID_SIZE; ++z) {
-        for (unsigned int y = 0; y < GRID_SIZE; ++y) {
-          for (unsigned int x = 0; x < GRID_SIZE; ++x) {
-            int xpos = (x - (GRID_SIZE / 2)) * 2;
-            int ypos = (y - (GRID_SIZE / 2)) * 2;
-            int zpos = -z * 2;
-            vec3 relativePosition = vec3(xpos, ypos, zpos);
-            instance_positions.push_back(glm::translate(glm::mat4(1.0f), relativePosition));
-          }
-        }
-      }
-
-      Context::Bound(Buffer::Target::Array, instances).Data(instance_positions);
-      instanceCount = instance_positions.size();
-      int stride = sizeof(mat4);
-      for (int i = 0; i < 4; ++i) {
-        VertexArrayAttrib instance_attr(prog, Attribute::InstanceTransform + i);
-        size_t offset = sizeof(vec4) * i;
-        instance_attr.Pointer(4, DataType::Float, false, stride, (void*)offset);
-        instance_attr.Divisor(1);
-        instance_attr.Enable();
-      }
-    }
-  }
-
-  void render(const mat4 & projection, const mat4 & modelview) {
-    using namespace oglplus;
-    prog.Use();
-
-    typedef oglplus::Uniform<mat4> Mat4Uniform;
-    Mat4Uniform(prog, "ProjectionMatrix").Set(projection);
-    Mat4Uniform(prog, "CameraMatrix").Set(modelview);
-
-    cube.Bind();
-    Context::DrawArraysInstanced(PrimitiveType::Triangles, 0, primitiveCount, instanceCount);
   }
 };
 
@@ -578,6 +400,8 @@ public:
       finishFrame();
     }
 
+    shutdownGl();
+
     return 0;
   }
 
@@ -621,6 +445,10 @@ protected:
   virtual void initGl() {
   }
 
+  virtual void shutdownGl() {
+
+  }
+
   virtual void finishFrame() {
     glfwSwapBuffers(window);
   }
@@ -649,7 +477,7 @@ protected:
 
 protected:
   virtual void viewport(const ivec2 & pos, const uvec2 & size) {
-    oglplus::Context::Viewport(pos.x, pos.y, size.x, size.y);
+    glViewport(pos.x, pos.y, size.x, size.y);
   }
 
 private:
@@ -769,59 +597,7 @@ namespace ovr {
     result.w = q.w;
     return result;
   }
-}
 
-class RiftManagerApp {
-protected:
-  ovrHmd hmd;
-
-  uvec2 hmdNativeResolution;
-  ivec2 hmdDesktopPosition;
-
-public:
-  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
-    hmd = ovrHmd_Create(0);
-    if (nullptr == hmd) {
-      hmd = ovrHmd_CreateDebug(defaultHmdType);
-      hmdDesktopPosition = ivec2(100, 100);
-      hmdNativeResolution = uvec2(1200, 800);
-    } else {
-      hmdDesktopPosition = ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
-      hmdNativeResolution = ivec2(hmd->Resolution.w, hmd->Resolution.h);
-    }
-  }
-
-  virtual ~RiftManagerApp() {
-    ovrHmd_Destroy(hmd);
-    hmd = nullptr;
-  }
-
-  int getEnabledCaps() {
-    return ovrHmd_GetEnabledCaps(hmd);
-  }
-
-  void enableCaps(int caps) {
-    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() | caps);
-  }
-
-  void toggleCap(ovrHmdCaps cap) {
-    if (cap & getEnabledCaps()) {
-      disableCaps(cap);
-    } else {
-      enableCaps(cap);
-    }
-  }
-
-  bool isEnabled(ovrHmdCaps cap) {
-    return (cap == (cap & getEnabledCaps()));
-  }
-
-  void disableCaps(int caps) {
-    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
-  }
-};
-
-namespace ovr {
 
   inline GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition) {
     GLFWwindow * window = nullptr;
@@ -881,6 +657,55 @@ namespace ovr {
   }
 }
 
+class RiftManagerApp {
+protected:
+  ovrHmd hmd;
+
+  uvec2 hmdNativeResolution;
+  ivec2 hmdDesktopPosition;
+
+public:
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
+    hmd = ovrHmd_Create(0);
+    if (nullptr == hmd) {
+      hmd = ovrHmd_CreateDebug(defaultHmdType);
+      hmdDesktopPosition = ivec2(100, 100);
+      hmdNativeResolution = uvec2(1200, 800);
+    } else {
+      hmdDesktopPosition = ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
+      hmdNativeResolution = ivec2(hmd->Resolution.w, hmd->Resolution.h);
+    }
+  }
+
+  virtual ~RiftManagerApp() {
+    ovrHmd_Destroy(hmd);
+    hmd = nullptr;
+  }
+
+  int getEnabledCaps() {
+    return ovrHmd_GetEnabledCaps(hmd);
+  }
+
+  void enableCaps(int caps) {
+    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() | caps);
+  }
+
+  void toggleCap(ovrHmdCaps cap) {
+    if (cap & getEnabledCaps()) {
+      disableCaps(cap);
+    } else {
+      enableCaps(cap);
+    }
+  }
+
+  bool isEnabled(ovrHmdCaps cap) {
+    return (cap == (cap & getEnabledCaps()));
+  }
+
+  void disableCaps(int caps) {
+    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
+  }
+};
 
 class RiftApp : public GlfwApp, public RiftManagerApp {
 public:
@@ -929,7 +754,7 @@ protected:
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize = ovr::fromGlm(windowSize);
+    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(windowSize);
     cfg.OGL.Header.Multisample = 0;
 
     int distortionCaps = 0
@@ -969,7 +794,6 @@ protected:
     });
   }
 
-
   // Override the base class to prevent the swap buffer call, because OVR does it in end frame
   virtual void finishFrame() {
   }
@@ -1008,18 +832,175 @@ protected:
       eyeFbos[eye].activate();
       renderScene(projections[eye], ovr::toGlm(eyePoses[eye]));
     }
-    oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
   }
 
   virtual void renderScene(const glm::mat4 & projection, const glm::mat4 & headPose) = 0;
 };
 
+//////////////////////////////////////////////////////////////////////
+//
+// The remainder of this code is specific to the scene we want to 
+// render.  I use oglplus to render an array of cubes, but your 
+// application would perform whatever rendering you want
+//
+
+
+//////////////////////////////////////////////////////////////////////
+//
+// OGLplus is a set of wrapper classes for giving OpenGL a more object
+// oriented interface
+//
+#ifdef OVR_OS_WIN32
+#pragma warning( disable : 4068 4244 4267 4065)
+#endif
+#include <oglplus/config/gl.hpp>
+#include <oglplus/all.hpp>
+#include <oglplus/interop/glm.hpp>
+#include <oglplus/bound/texture.hpp>
+#include <oglplus/bound/framebuffer.hpp>
+#include <oglplus/bound/renderbuffer.hpp>
+#include <oglplus/bound/buffer.hpp>
+#include <oglplus/shapes/cube.hpp>
+#include <oglplus/shapes/wrapper.hpp>
+#ifdef OVR_OS_WIN32
+#pragma warning( default : 4068 4244 4267 4065)
+#endif
+
+
+
+namespace Attribute {
+  enum {
+    Position = 0,
+    TexCoord0 = 1,
+    Normal = 2,
+    Color = 3,
+    TexCoord1 = 4,
+    InstanceTransform = 5,
+  };
+}
+
+static const char * VERTEX_SHADER =
+"#version 410\n"
+
+"uniform mat4 ProjectionMatrix;"
+"uniform mat4 CameraMatrix;"
+
+"layout(location = 0) in vec4 Position;"
+"layout(location = 2) in vec3 Normal;"
+"layout(location = 5) in mat4 InstanceTransform;"
+
+"out vec3 vertNormal;"
+
+"void main(void)"
+"{"
+" mat4 ViewXfm = CameraMatrix * InstanceTransform;"
+" vertNormal = Normal;"
+" gl_Position = ProjectionMatrix * ViewXfm * Position;"
+"}";
+
+static const char * FRAGMENT_SHADER =
+"#version 410\n"
+"in vec3 vertNormal;"
+
+"out vec4 fragColor;"
+
+"void main(void)"
+"{"
+" vec3 color = vertNormal;"
+" if (!all(equal(color, abs(color)))) {"
+"   color = vec3(1.0) - abs(color);"
+" }"
+" fragColor = vec4(color, 1.0);"
+"}";
+
+// a class for encapsulating building and rendering an RGB cube
+struct ColorCubeScene {
+
+  // Program
+  oglplus::Program prog;
+  oglplus::shapes::ShapeWrapper cube;
+  GLuint instanceCount;
+  oglplus::VertexArray vao;
+  oglplus::Buffer instances;
+
+  // VBOs for the cube's vertices and normals
+
+  const unsigned int GRID_SIZE{ 5 };
+
+public:
+  ColorCubeScene() : cube({ "Position", "Normal" }, oglplus::shapes::Cube()) {
+    using namespace oglplus;
+    try {
+      // attach the shaders to the program
+      prog.AttachShader(
+        FragmentShader()
+        .Source(GLSLSource(String(FRAGMENT_SHADER)))
+        .Compile()
+        );
+      prog.AttachShader(
+        VertexShader()
+        .Source(GLSLSource(String(VERTEX_SHADER)))
+        .Compile()
+        );
+      prog.Link();
+    }
+    catch (ProgramBuildError & err) {
+      FAIL((const char*)err.what());
+    }
+
+    // link and use it
+    prog.Use();
+
+    vao = cube.VAOForProgram(prog);
+    vao.Bind();
+
+    // Create a cube of cubes
+    {
+      std::vector<mat4> instance_positions;
+      for (unsigned int z = 0; z < GRID_SIZE; ++z) {
+        for (unsigned int y = 0; y < GRID_SIZE; ++y) {
+          for (unsigned int x = 0; x < GRID_SIZE; ++x) {
+            int xpos = (x - (GRID_SIZE / 2)) * 2;
+            int ypos = (y - (GRID_SIZE / 2)) * 2;
+            int zpos = z * -2;
+            vec3 relativePosition = vec3(xpos, ypos, zpos);
+            instance_positions.push_back(glm::translate(glm::mat4(1.0f), relativePosition));
+          }
+        }
+      }
+
+      Context::Bound(Buffer::Target::Array, instances).Data(instance_positions);
+      instanceCount = instance_positions.size();
+      int stride = sizeof(mat4);
+      for (int i = 0; i < 4; ++i) {
+        VertexArrayAttrib instance_attr(prog, Attribute::InstanceTransform + i);
+        size_t offset = sizeof(vec4) * i;
+        instance_attr.Pointer(4, DataType::Float, false, stride, (void*)offset);
+        instance_attr.Divisor(1);
+        instance_attr.Enable();
+      }
+    }
+  }
+
+  void render(const mat4 & projection, const mat4 & modelview) {
+    using namespace oglplus;
+    prog.Use();
+    typedef oglplus::Uniform<mat4> Mat4Uniform;
+    Mat4Uniform(prog, "ProjectionMatrix").Set(projection);
+    Mat4Uniform(prog, "CameraMatrix").Set(modelview);
+    vao.Bind();
+    cube.Draw(instanceCount);
+  }
+};
+
+
 // An example application that renders a simple cube
 class ExampleApp : public RiftApp {
-  mat4 modelview;
+  std::shared_ptr<ColorCubeScene> cubeScene;
   float ipd{ OVR_DEFAULT_IPD };
-  std::unique_ptr<ColorCubeScene> cubeScene;
+  mat4 modelview;
 
 public:
   ExampleApp() {
@@ -1029,29 +1010,25 @@ public:
 protected:
   virtual void initGl() {
     RiftApp::initGl();
-    using namespace oglplus;
-    Context::ClearColor(0.2f, 0.2f, 0.2f, 0.0f);
-    Context::ClearDepth(1.0f);
-    Context::Disable(Capability::Dither);
-    Context::Enable(Capability::DepthTest);
-
-    cubeScene = std::unique_ptr<ColorCubeScene>(new ColorCubeScene());
+    glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
+    glClearDepth(1.0f);
+    glDisable(GL_DITHER);
+    glEnable(GL_DEPTH_TEST);
     ovrHmd_RecenterPose(hmd);
+    cubeScene = std::shared_ptr<ColorCubeScene>(new ColorCubeScene());
   }
 
-  virtual void update() {
-    RiftApp::update();
-    // Update stuff
+  virtual void shutdownGl() {
+    cubeScene.reset();
   }
 
   void renderScene(const glm::mat4 & projection, const glm::mat4 & headPose) {
     // Clear the scene
-    oglplus::Context::Clear().ColorBuffer().DepthBuffer();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // apply the head pose to the current modelview matrix
     glm::mat4 modelview = glm::inverse(headPose) * this->modelview;
     // Scale the size of the cube to the distance between the eyes
     modelview = glm::scale(modelview, glm::vec3(ipd));
-    // Render the cube
     cubeScene->render(projection, modelview);
   }
 };

@@ -238,8 +238,10 @@ public:
     glfwDestroyWindow(window);
   }
 
-  virtual void createRenderingTarget() {
-    createWindow(glm::uvec2(320, 180), glm::ivec2(100, 100));
+  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    outSize = uvec2(320, 180);
+    outPosition = ivec2(100, 100);
+    return glfw::createWindow(outSize, outPosition);
   }
 };
 

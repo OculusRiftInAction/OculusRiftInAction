@@ -26,6 +26,7 @@ typedef std::shared_ptr<oglplus::VertexArray> VertexArrayPtr;
 namespace oria {
 
   ShapeWrapperPtr loadShape(const std::initializer_list<const GLchar*>& names, Resource resource, ProgramPtr program);
+  ShapeWrapperPtr loadSphere(const std::initializer_list<const GLchar*>& names, ProgramPtr program);
 
   void bindLights(ProgramPtr & program);
 

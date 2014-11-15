@@ -7,23 +7,30 @@
 
 class PhotoSphereExample : public RiftApp {
 
-  const std::string filepath = "c:\\users\\alex\\desktop\\PANO_20140620_160351.jpg";
+
 
 public:
   PhotoSphereExample() {
   }
 
   void drawSphere() {
-    static gl::GeometryPtr geometry = GlUtils::getSphereGeometry();
-    static gl::ProgramPtr program = GlUtils::getProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
-    static gl::TexturePtr t = loadAndPositionPhotoSphereImage(filepath);
+    static ProgramPtr program = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
+    static ShapeWrapperPtr geometry = oria::loadShape({ "Position", "TexCoord" }, Resource::MESHES_SPHERE_CTM, program);
+    static TexturePtr t = loadAndPositionPhotoSphereImage(Resource::IMAGES_PANO_2_14_62__16_351_JPG);
+    Platform::addShutdownHook([]{
+      program.reset();
+      geometry.reset();
+      t.reset();
+    }); 
 
-    t->bind();
-    GlUtils::renderGeometry(geometry, program);
-    t->unbind();
+    t->Bind(oglplus::Texture::Target::_2D);
+    oria::renderGeometry(geometry, program);
+    oglplus::DefaultTexture().Bind(oglplus::Texture::Target::_2D);
   }
 
   void renderScene() {
+    using namespace oglplus;
+    Context::Clear().DepthBuffer();
     glClear(GL_DEPTH_BUFFER_BIT);
 
     MatrixStack & mv = Stacks::modelview();
@@ -33,41 +40,57 @@ public:
     });
     mv.withPush([&]{
       mv.translate(glm::vec3(0, 0, -1)).scale(0.02f);
-      mv.postMultiply(headPose);
-      GlUtils::renderRift();
+      mv.postMultiply(ovr::toGlm(getEyePose()));
+      oria::renderRift();
     });
+
+    Context::Disable(Capability::CullFace);
     glDisable(GL_CULL_FACE);
     mv.withPush([&]{
       mv.scale(50.0f);
       drawSphere();
     });
-    glEnable(GL_CULL_FACE);
+    Context::Enable(Capability::CullFace);
   }
 
   /**
    * Call out to the exiv2 binary to retrieve the XMP fields encoded in the target image file.
    */
-  static gl::TexturePtr loadAndPositionPhotoSphereImage(const std::string & pathToImage) {
+  static TexturePtr loadAndPositionPhotoSphereImage(Resource res) {
     glm::uvec2 fullPanoSize;
     glm::uvec2 croppedImageSize;
     glm::uvec2 croppedImagePos;
-    gl::TexturePtr texture;
+    using namespace oglplus;
 
-    cv::Mat mat = cv::imread(pathToImage.c_str());
+    TexturePtr texture(new Texture());
+    Platform::addShutdownHook([&]{
+      texture.reset();
+    });
+    auto v = Platform::getResourceByteVector(res);
+    cv::Mat mat = cv::imdecode(v, CV_LOAD_IMAGE_COLOR);
     cv::cvtColor(mat, mat, CV_BGR2RGB);
+    cv::flip(mat, mat, 0);
+    Context::Bound(TextureTarget::_2D, *texture)
+      .MagFilter(TextureMagFilter::Linear)
+      .MinFilter(TextureMinFilter::Linear);
 
-    if (loadExifDataFromImage(pathToImage, fullPanoSize, croppedImageSize, croppedImagePos)) {
+    if (loadExifDataFromImage(Resources::getResourcePath(res), fullPanoSize, croppedImageSize, croppedImagePos)) {
 
       // EXIF data parsed succesfully
       uchar *embedded = (uchar*)malloc(fullPanoSize.x * fullPanoSize.y * 3);
       insetImage(fullPanoSize, croppedImageSize, croppedImagePos, mat, embedded);
-      texture = GlUtils::getImageAsTexture(fullPanoSize, embedded);
+      Context::Bound(TextureTarget::_2D, *texture)
+        .Image2D(images::Image(fullPanoSize.x, fullPanoSize.y, 1, 3, embedded));
       free(embedded);
-    } else {
-
-      // Failed to load EXIF data
-      texture = GlUtils::getImageAsTexture(glm::uvec2(mat.cols, mat.rows), mat.datastart);
     }
+    else {
+      // Failed to load EXIF data
+      texture->Bind(Texture::Target::_2D);
+      Context::PixelStore(PixelStorageMode::UnpackAlignment, 1);
+      Context::Bound(TextureTarget::_2D, *texture)
+        .Image2D(images::Image(mat.cols, mat.rows, 1, 3, mat.datastart));
+    }
+
     return texture;
   }
 
@@ -84,7 +107,7 @@ public:
   }
 
   static bool loadExifDataFromImage(const std::string &pathToImage, glm::uvec2 &fullPanoSize, glm::uvec2 &croppedImageSize, glm::uvec2 &croppedImagePos) {
-    static const std::string pathToExiv2 = "C:\\Users\\Alex\\GitHub\\OculusRiftInAction\\libraries\\exiv2-0.24\\exiv2.exe";
+    static const std::string pathToExiv2 = "C:\\bin\\exiv2\\exiv2.exe";
     static const std::string exiv2Params = "-pa print";
     static const std::string tempFile = "temp.txt";
 

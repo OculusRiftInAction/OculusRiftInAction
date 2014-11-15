@@ -48,7 +48,7 @@ public:
     ovrRenderAPIConfig config;
     memset(&config, 0, sizeof(config));
     config.Header.API = ovrRenderAPI_OpenGL;
-    config.Header.RTSize = ovr::fromGlm(getSize());
+    config.Header.BackBufferSize = ovr::fromGlm(getSize());
     config.Header.Multisample = 1;
 #if defined(OVR_OS_WIN32)
     ((ovrGLConfigData&)config).Window = 0;
@@ -67,7 +67,6 @@ public:
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
     }
-    ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
   }
 
   virtual void finishFrame() {

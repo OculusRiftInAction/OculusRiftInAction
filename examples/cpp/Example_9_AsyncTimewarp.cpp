@@ -12,8 +12,6 @@ class AsyncTimewarpExample : public RiftGlfwApp {
   ovrVector3f hmdToEyeOffsets[2];
   glm::mat4 eyeProjections[2];
 
-
-  unsigned int distortionFrameIndex{ 0 };
   int perEyeDelay = 0;
   // Offscreen rendering targets: two for each eye.
   // One is used for rendering (writing) while the other 
@@ -21,6 +19,7 @@ class AsyncTimewarpExample : public RiftGlfwApp {
   FramebufferWrapper  eyeFramebuffers[2][2];
   // Keep track of the index of the buffer currently being written to for each eye
   unsigned int writeFramebuffersIndex{ 0 };
+  unsigned int distortionFrameIndex{ 0 };
 
   std::unique_ptr<std::thread> threadPtr;
   std::mutex ovrLock;
@@ -69,7 +68,7 @@ public:
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize = ovr::fromGlm(getSize());
+    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
     cfg.OGL.Header.Multisample = 1;
 
     int distortionCaps = 0
@@ -209,17 +208,15 @@ public:
     // Ensure all scene rendering commands have been completed
     glFinish();
 
-    {
-      ovrLock.lock();
-      for_each_eye([&](ovrEyeType eye) {
-        int renderBufferIndex = writeFramebuffersIndex;
-        ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
-          oglplus::GetName(*eyeFramebuffers[eye][renderBufferIndex].color);
-        eyePoses[eye] = renderPoses[eye];
-      });
-      writeFramebuffersIndex = writeFramebuffersIndex ? 0 : 1;
-      ovrLock.unlock();
-    }
+    ovrLock.lock();
+    for_each_eye([&](ovrEyeType eye) {
+      int renderBufferIndex = writeFramebuffersIndex;
+      ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
+        oglplus::GetName(*eyeFramebuffers[eye][renderBufferIndex].color);
+      eyePoses[eye] = renderPoses[eye];
+    });
+    writeFramebuffersIndex = writeFramebuffersIndex ? 0 : 1;
+    ovrLock.unlock();
   }
 
   void renderScene() {

@@ -46,7 +46,7 @@ public:
 
   template <typename Function>
   static void withPush(Function f) {
-    with_push(projection(), modelview(), f);
+    withPush(projection(), modelview(), f);
   }
 
   static Lights & lights() {

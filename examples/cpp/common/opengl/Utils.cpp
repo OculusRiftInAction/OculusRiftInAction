@@ -644,5 +644,10 @@ namespace oria {
     SAY("--- OpenGL Callback Message ---");
   }
 
+  ShapeWrapperPtr loadSphere(const std::initializer_list<const GLchar*>& names, ProgramPtr program) {
+    return nullptr;
+  }
+
+
 }
 

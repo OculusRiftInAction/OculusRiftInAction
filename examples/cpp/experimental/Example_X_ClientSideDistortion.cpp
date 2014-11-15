@@ -1,25 +1,27 @@
 #include "Common.h"
 
 struct EyeArg {
-  gl::FrameBufferWrapper        frameBuffer;
+  FramebufferWrapper            frameBuffer;
   glm::vec2                     scale;
   glm::vec2                     offset;
 
   ovrDistortionMesh             mesh;
-  gl::VertexBufferPtr           meshVbo;
-  gl::IndexBufferPtr            meshIbo;
-  gl::VertexArrayPtr            meshVao;
-
+  oglplus::Buffer               meshBuffer;
+  oglplus::Buffer               meshIndexBuffer;
+  oglplus::VertexArray          meshVao;
   glm::mat4                     projection;
 };
 
+typedef std::shared_ptr<EyeArg> EyeArgPtr;
+
+
 class ClientSideDistortionExample : public RiftGlfwApp {
-  EyeArg      eyeArgs[2];
+  EyeArgPtr   eyeArgs[2];
   ovrVector3f hmdToEyeOffsets[2];
   glm::mat4   player;
   float       ipd = OVR_DEFAULT_IPD;
   float       eyeHeight = OVR_DEFAULT_EYE_HEIGHT;
-  gl::ProgramPtr distortionProgram;
+  ProgramPtr  distortionProgram;
 
 public:
   ClientSideDistortionExample() {
@@ -30,13 +32,20 @@ public:
     player = glm::inverse(glm::lookAt(
       glm::vec3(0, eyeHeight, ipd * 4),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
-      GlUtils::Y_AXIS));           // Camera up axis
+      Vectors::Y_AXIS));           // Camera up axis
   }
 
   void initGl() {
     RiftGlfwApp::initGl();
+    using namespace oglplus;
+    distortionProgram = oria::loadProgram(
+      Resource::SHADERS_DISTORTION_VS,
+      Resource::SHADERS_DISTORTION_FS
+    );
+
     for_each_eye([&](ovrEyeType eye){
-      EyeArg & eyeArg = eyeArgs[eye];
+      eyeArgs[eye] = EyeArgPtr(new EyeArg());
+      EyeArg & eyeArg = *eyeArgs[eye];
       ovrFovPort fov = hmd->DefaultEyeFov[eye];
       ovrEyeRenderDesc renderDesc = ovrHmd_GetRenderDesc(hmd, eye, fov);
 
@@ -59,38 +68,25 @@ public:
 
       ovrHmd_CreateDistortionMesh(hmd, eye, fov, 0, &eyeArg.mesh);
 
-      eyeArg.meshVao = gl::VertexArrayPtr(new gl::VertexArray());
-      eyeArg.meshVao->bind();
-
-      eyeArg.meshIbo = gl::IndexBufferPtr(new gl::IndexBuffer());
-      eyeArg.meshIbo->bind();
-      size_t bufferSize = eyeArg.mesh.IndexCount * sizeof(unsigned short);
-      eyeArg.meshIbo->load(bufferSize, eyeArg.mesh.pIndexData);
-
-      eyeArg.meshVbo = gl::VertexBufferPtr(new gl::VertexBuffer());
-      eyeArg.meshVbo->bind();
-      bufferSize = eyeArg.mesh.VertexCount * sizeof(ovrDistortionVertex);
-      eyeArg.meshVbo->load(bufferSize, eyeArg.mesh.pVertexData);
+      eyeArg.meshVao.Bind();
+      eyeArg.meshIndexBuffer.Bind(Buffer::Target::ElementArray);
+      eyeArg.meshIndexBuffer.Data(Buffer::Target::ElementArray, eyeArg.mesh.IndexCount, eyeArg.mesh.pIndexData);
+      eyeArg.meshBuffer.Bind(Buffer::Target::Array);
+      eyeArg.meshBuffer.Data(Buffer::Target::Array, eyeArg.mesh.VertexCount, eyeArg.mesh.pVertexData);
 
       size_t stride = sizeof(ovrDistortionVertex);
       size_t offset = offsetof(ovrDistortionVertex, ScreenPosNDC);
-      glEnableVertexAttribArray(gl::Attribute::Position);
-      glVertexAttribPointer(gl::Attribute::Position, 2, GL_FLOAT, GL_FALSE,
-        stride, (void*)offset);
+      VertexArrayAttrib(oria::Layout::Attribute::Position)
+        .Pointer(2, DataType::Float, false, stride, (void*)offset)
+        .Enable();
 
       offset = offsetof(ovrDistortionVertex, TanEyeAnglesG);
-      glEnableVertexAttribArray(gl::Attribute::TexCoord0);
-      glVertexAttribPointer(gl::Attribute::TexCoord0, 2, GL_FLOAT, GL_FALSE,
-        stride, (void*)offset);
-
-      gl::VertexArray::unbind();
-      gl::Program::clear();
+      VertexArrayAttrib(oria::Layout::Attribute::TexCoord0)
+        .Pointer(2, DataType::Float, false, stride, (void*)offset)
+        .Enable();
+      NoVertexArray().Bind();
     });
 
-    distortionProgram = GlUtils::getProgram(
-      Resource::SHADERS_DISTORTION_VS,
-      Resource::SHADERS_DISTORTION_FS
-    );
   }
 
   void update() {
@@ -98,47 +94,49 @@ public:
   }
 
   void draw() {
+    using namespace oglplus;
     static int frameIndex = 0;
     ++frameIndex;
+    Context::ClearColor(0, 0, 0, 1);
+    Context::Disable(Capability::Blend);
+    Context::Disable(Capability::CullFace);
+    Context::Disable(Capability::DepthTest);
+    Context::Clear().ColorBuffer();
+
     ovrPosef eyePoses[2];
-    ovrFrameTiming timing = ovrHmd_BeginFrameTiming(hmd, frameIndex);
     ovrHmd_GetEyePoses(hmd, frameIndex, hmdToEyeOffsets, eyePoses, nullptr);
+
+    ovrFrameTiming timing = ovrHmd_BeginFrameTiming(hmd, frameIndex);
 
     for (int i = 0; i < 2; ++i) {
       const ovrEyeType eye = hmd->EyeRenderOrder[i];
-      const EyeArg & eyeArg = eyeArgs[eye];
+      EyeArg & eyeArg = *eyeArgs[eye];
       // Set up the per-eye projection matrix
       Stacks::projection().top() = eyeArg.projection;
       
-      eyeArg.frameBuffer.activate();
+      eyeArg.frameBuffer.Bind();
       MatrixStack & mv = Stacks::modelview();
-      Stacks::with_push([&]{
+      Stacks::withPush([&]{
         // Set up the per-eye modelview matrix
         // Apply the head pose
         mv.preMultiply(glm::inverse(ovr::toGlm(eyePoses[eye])));
         renderScene();
       });
-      eyeArg.frameBuffer.deactivate();
     }
+    DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
 
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_BLEND);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-
-    distortionProgram->use();
+    distortionProgram->Bind();
     bool showMesh = false;
-    glViewport(0, 0, windowSize.x, windowSize.y);
-    float mix = (sin(ovr_GetTimeInSeconds() * TWO_PI / 10.0f) + 1.0f) / 2.0f;
+    glViewport(0, 0, getSize().x, getSize().y);
+//    float mix = (sin(ovr_GetTimeInSeconds() * TWO_PI / 10.0f) + 1.0f) / 2.0f;
     for_each_eye([&](ovrEyeType eye) {
-      const EyeArg & eyeArg = eyeArgs[eye];
-      distortionProgram->setUniform("EyeToSourceUVScale", eyeArg.scale);
-      distortionProgram->setUniform("EyeToSourceUVOffset", eyeArg.offset);
-      distortionProgram->setUniform("RightEye", ovrEye_Left == eye ? 0 : 1);
-      distortionProgram->setUniform("DistortionWeight", mix);
-      eyeArg.frameBuffer.color->bind();
-      eyeArg.meshVao->bind();
+      const EyeArg & eyeArg = *eyeArgs[eye];
+      Uniform<vec2>(*distortionProgram, "EyeToSourceUVScale").Set(eyeArg.scale);
+      Uniform<vec2>(*distortionProgram, "EyeToSourceUVOffset").Set(eyeArg.offset);
+      Uniform<GLuint>(*distortionProgram, "RightEye").Set(ovrEye_Left == eye ? 0 : 1);
+//      Uniform<GLfloat>(*distortionProgram, "DistortionWeight").Set(mix);
+      eyeArg.frameBuffer.color->Bind(Texture::Target::_2D);
+      eyeArg.meshVao.Bind();
       if (showMesh) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glLineWidth(3.0f);
@@ -152,25 +150,20 @@ public:
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
       }
     });
-    gl::Texture2d::unbind();
-    gl::Program::clear();
+    DefaultTexture().Bind(Texture::Target::_2D);;
+    NoProgram().Bind();
+    Context::Enable(Capability::Blend);
+    Context::Enable(Capability::CullFace);
+    Context::Enable(Capability::DepthTest);
     ovrHmd_EndFrameTiming(hmd);
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
   }
 
   virtual void renderScene() {
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    GlUtils::renderFloor();
-    MatrixStack & mv = Stacks::modelview();
-    Stacks::with_push(mv, [&]{
-      mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
-      GlUtils::drawColorCube(true);
-    });
+    using namespace oglplus;
+    Context::Enable(Capability::DepthTest);
+    Context::ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    Context::Clear().ColorBuffer().DepthBuffer();
+    oria::renderCubeScene(OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
   }
 };
 
