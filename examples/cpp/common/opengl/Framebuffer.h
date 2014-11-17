@@ -73,10 +73,21 @@ struct FramebufferWrapper {
 
   void Bind(oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {
     fbo->Bind(target);
-    oglplus::Context::Viewport(0, 0, size.x, size.y);
+    Viewport(); 
   }
 
   static void Unbind(oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {
     oglplus::DefaultFramebuffer().Bind(target);
+  }
+
+  void Viewport() {
+    oglplus::Context::Viewport(0, 0, size.x, size.y);
+  }
+
+  template <typename F> 
+  void Bound(F f, oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {
+    Bind(target);
+    f();
+    Unbind(target);
   }
 };

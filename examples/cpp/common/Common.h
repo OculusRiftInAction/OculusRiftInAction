@@ -121,6 +121,8 @@ public:
 
 #include "GlfwApp.h"
 #include "Interaction.h"
+//#include "Awesomium.h"
+#include "Cegui.h"
 
 
 #if defined(OS_WIN)

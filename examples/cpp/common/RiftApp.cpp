@@ -66,6 +66,7 @@ void RiftApp::initGl() {
   int distortionCaps =
     ovrDistortionCap_Chromatic
     | ovrDistortionCap_Vignette
+    | ovrDistortionCap_Overdrive
     | ovrDistortionCap_TimeWarp;
 
   ON_LINUX([&]{

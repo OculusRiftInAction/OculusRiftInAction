@@ -27,7 +27,7 @@ namespace oria {
 
   ShapeWrapperPtr loadShape(const std::initializer_list<const GLchar*>& names, Resource resource, ProgramPtr program);
   ShapeWrapperPtr loadSphere(const std::initializer_list<const GLchar*>& names, ProgramPtr program);
-
+  ShapeWrapperPtr loadSkybox(ProgramPtr program);
   void bindLights(ProgramPtr & program);
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list);

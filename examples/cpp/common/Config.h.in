@@ -31,6 +31,12 @@
 // 3D mouse support
 #cmakedefine HAVE_SPNAV @HAVE_SPNAV@
 
+//#cmakedefine HAVE_AWESOMIUM @HAVE_AWESOMIUM@
+
+#cmakedefine HAVE_CEGUI @HAVE_CEGUI@
+
+#define PROJECT_DIR "@PROJECT_SOURCE_DIR@"
+
 
 #if (defined(WIN64) || defined(WIN32))
 #define OS_WIN

@@ -67,5 +67,10 @@ if (EXPERIMENTAL)
     make_examples(experimental/*.cpp "Examples/Experimental")
 endif()
 
+if (HAVE_CEGUI)
+    make_examples(gui/*.cpp "Examples")
+endif()
+
+
 
 

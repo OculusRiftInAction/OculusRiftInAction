@@ -49,15 +49,15 @@ add_subdirectory(libraries/OculusSDK/LibOVR)
 set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS OculusVR)
 
-add_definitions(-DGLEW_STATIC)
-add_subdirectory(libraries/glew)
-set_target_properties(glew PROPERTIES FOLDER "3rdparty")
-list(APPEND EXAMPLE_LIBS glew)
-
 ###############################################################################
 #
 # Non-Oculus third party dependencies 
 #
+
+add_definitions(-DGLEW_STATIC)
+add_subdirectory(libraries/glew)
+set_target_properties(glew PROPERTIES FOLDER "3rdparty")
+list(APPEND EXAMPLE_LIBS glew)
 
 # Cross platform access to shader functionality
 
@@ -149,6 +149,26 @@ else()
         include_directories(${PNG_INCLUDE_DIR})
     endif()
 endif()
+
+
+set(CEGUI_DIR /dev/cegui-0.8.4)
+find_library(CEGUI_BASE_LIBRARY CEGUIBase-0_d ${CEGUI_DIR}/lib)
+if (CEGUI_BASE_LIBRARY)
+    message("Found CEGUI") 
+    list(APPEND CEGUI_LIBS CEGUIBase-0_d)
+    list(APPEND CEGUI_LIBS CEGUISILLYImageCodec_d)
+    list(APPEND CEGUI_LIBS CEGUIExpatParser_d) 
+    list(APPEND CEGUI_LIBS CEGUICoreWindowRendererSet_d)
+    list(APPEND CEGUI_LIBS CEGUIOpenGLRenderer-0_d)
+    list(APPEND CEGUI_LIBS CEGUICommonDialogs-0_d)
+    include_directories(${CEGUI_DIR}/cegui/include)
+    link_directories(${CEGUI_DIR}/lib)
+    list(APPEND EXAMPLE_LIBS ${CEGUI_LIBS})
+    set(HAVE_CEGUI 1)
+endif()
+
+
+
 
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)

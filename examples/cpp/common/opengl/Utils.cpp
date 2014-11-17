@@ -432,6 +432,15 @@ namespace oria {
     renderGeometry(shape, program);
   }
 
+  ShapeWrapperPtr loadSkybox(ProgramPtr program) {
+    using namespace oglplus;
+    ShapeWrapperPtr shape = ShapeWrapperPtr(new shapes::ShapeWrapper(List("Position").Get(), shapes::SkyBox(), *program));
+    Platform::addShutdownHook([&]{
+      shape.reset();
+    });
+    return shape;
+  }
+
   void renderSkybox(Resource firstImageResource) {
     using namespace oglplus;
 
