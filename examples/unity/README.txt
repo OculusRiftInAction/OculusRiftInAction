@@ -1,57 +1,51 @@
 UNITY PRO 4 EXAMPLES - README
 
-The scripts and Unity package in this directory are for use with Chapter 12 of “Oculus Rift in Action.”  Chapter 12 provides all of the instructions you need to build a simple Rift-compatible scene using Unity Pro 4.5 or later and the Oculus Integration package version 0.4.1. 
+The scripts and Unity package in this directory are for use with Chapter 12 and 13 of “Oculus Rift in Action.”  Chapter 12 provides all of the instructions you need to build a simple Rift-compatible scene using Unity Pro 4.5.5 or later and the Oculus Integration package version 0.4.3. Chapter 13 builds on those examples by adding a simple GUI.
 
-The completed examples are available in the OculusRiftinAction.unitypackage, however, we recommend creating the scenes on your own using the scripts available here and the instructions in chapter 12 to fully understand the process. 
+The scripts and a base scene are available in the OculusRiftinAction.unitypackage. 
 
 
 ———————
 SCRIPTS
 ———————
-The Scripts directory contains all of the scripts used to create the examples in chapter 12 of Oculus Rift in Action excluding those available in the Oculus Rift Integration Package from Oculus VR.
+The Scripts directory contains all of the scripts used to create the examples in chapter 12  and 13 of Oculus Rift in Action excluding those available in the Oculus Rift Integration Package from Oculus VR.
 
 Character Controller Scripts  
 ———————————————————————————
-These are the first person controller scripts from the Unity Standard Assets that have been modified to work with the Oculus OVRCameraController Prefab.
+These are the first person controller scripts from the Unity Standard Assets. The MouseLook Script has been modified to work with the Oculus OVRCameraRig Prefab.
 
 - CharacterMotor.js
 - FPSInputController.js
 - MouseLook.cs
 
+Getting user profile information
+————————————————————————————————
+This script is used to print the current profile name to the console log.
+
+report.cs
+
+GUI Scripts
+——————————
+These scripts are used to create the same GUI for non-Rift application and a Rift application.
+
+GUI2d.cs
+GUI3d.cs
+
 
 Moving Objects Using Rift Head Tracking
 ———————————————————————————————————————
-These are the required scripts for creating the final example in chapter 12 that allows you to create a Unity scene where head tracking is used to move objects.
+These are the required scripts for creating the example in chapter 13 that allows you to create a Unity scene where head tracking is used to move objects.
 
 movegaze.js
 cubecollision.js
 
 
-
 ————————————————
-COMPLETE EXAMPLE - OculusRiftinAction.unitypackage
+OculusRiftinAction.unitypackage
 ———————————————
 
-The OculusRiftinAction.unitypackage package contains the completed Unity example scenes used in Chapter 12 of “Oculus Rift in Action.” This package requires Unity Pro 4.5 or later AND the Oculus Pro 4 Integration package version 0.4.1, OculusUnityIntegration.unitypackage, from Oculus VR.
+The OculusRiftinAction.unitypackage package contains the scripts and the base scene for use with Chapters 12 and 13.
 
-To use this package:
 
-1. Create a new Unity project using Unity Pro 4.5 or later. (You do not need to add any of the standard assets.)
-
-2. Download and unzip the “Oculus Pro 4 Integration” package from  the “Downloads” page  “0.4.1” panel at https://developer.oculusvr.com/.
-
-3. Select Assets > Import Package > Custom Package and then select OculusUnityIntegration.unitypackage from the downloaded files and import all packages.
-
-4. Select Assets > Import Package > Custom Package and then select OculusRiftinAction.unitypackage. Import all packages.
-
-There are four scenes in this package. All scenes are in Project View: Assets > OculusRiftinAction > Scenes.
-
-Beach_basic - A simple beach scene without a player controller.
-
-Beach_OVRPlayerController -  A simple beach scene with the Oculus OVRPlayerController prefab used to add Rift compatibility and navigation.
-
-Beach_OVRCameraController - A simple beach scene with the OVRCameraController prefab used to add Rift compatibility. The navigation is a custom controller based on the Unity standard assets character controller.
-
-Beach_movecrates - The same scene as beach_OVRCameraController but with “crates” added that the user can select and move by looking at them. When looked at, a crate will turn blue and after 2 seconds the crate will turn red. The crate can then be moved using the Rift. To put the crate down, the crate needs to collide with the Beach.
 
 

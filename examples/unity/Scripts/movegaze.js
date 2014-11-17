@@ -1,45 +1,15 @@
 
 #pragma strict
 
-var cameraLeft : Camera;
-var cameraRight : Camera;
-
 var startTime = System.DateTime.UtcNow;
 var attachedObject : GameObject = null;
 var lookedatObject : GameObject = null;
 
-// Find the two cameras
-function Awake() {
-  var cameras;
-  var ovrCameraController : GameObject;
-  ovrCameraController = GameObject.Find("OVRCameraController");
-  cameras = ovrCameraController.GetComponentsInChildren(Camera);
-  
-  for (var camera : Camera in cameras)
-  {
-    if(camera.name == "CameraLeft"){
-      cameraLeft = camera;
-      }
-    if(camera.name == "CameraRight"){
-      cameraRight = camera;
-      }
-  }
 
-  if((cameraLeft == null) || (cameraRight == null)){
-    Debug.Log("WARNING: Unity Cameras in OVRCameraController not found!");
-    }
-}
 
 function Update (){
 
-  var camRightTransform : Transform = cameraRight.transform;
-  var camLeftTransform : Transform = cameraLeft.transform;
-  // forward is same vector for both cameras... pick one
-  var forward = camRightTransform.forward;
-  // choose position halfway between two cameras
-  var position = (camRightTransform.position + camLeftTransform.position)/2;
-  
-  var ray = new Ray(position, forward);
+  var ray = new Ray(this.transform.position, this.transform.forward);
   var hit : RaycastHit;
   var currentTime = System.DateTime.UtcNow;
 
@@ -51,7 +21,7 @@ function Update (){
         attachedObject = lookedatObject;
         attachedObject.rigidbody.useGravity = false;
         attachedObject.rigidbody.isKinematic = false;
-        attachedObject.transform.parent = cameraRight.transform;
+        attachedObject.transform.parent = this.transform;
         attachedObject.renderer.material.color = Color.red;
 
       } else {
