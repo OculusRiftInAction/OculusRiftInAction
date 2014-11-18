@@ -1,8 +1,8 @@
-#include "Leap.h"
-#include "Common.h"
-
+#include <Leap.h>
 #include <thread>
 #include <mutex>
+
+#include "Common.h"
 
 /**
  Minimal demo of using the Leap Motion controller.
