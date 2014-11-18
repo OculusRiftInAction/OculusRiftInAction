@@ -361,7 +361,10 @@ gl::GeometryPtr GlUtils::getSphereGeometry(float radius, int du, int dv) {
     for (int v = 0; v <= dv; v++) {
       double s = (double) u / (double) du;
       double t = (double) v / (double) dv;
-      vertices.push_back(glm::vec4(-radius * sin(s * PI * 2) * sin(t * PI), radius * cos(t * PI), radius * cos(s * PI * 2) * sin(t * PI), 1));
+      glm::vec3 pt(sin(s * PI * 2) * sin(t * PI), cos(t * PI), cos(s * PI * 2) * sin(t * PI));
+      vertices.push_back(glm::vec4(radius * pt.x, radius * pt.y, radius * pt.z, 1));
+      vertices.push_back(glm::vec4(pt.x, pt.y, pt.z, 1));
+      vertices.push_back(glm::vec4(0.8, 0.8, 0.8, 1));
       vertices.push_back(glm::vec4(s, t, 0, 0));
     }
   }
@@ -380,7 +383,7 @@ gl::GeometryPtr GlUtils::getSphereGeometry(float radius, int du, int dv) {
 
   return gl::GeometryPtr(new gl::Geometry(
       vertices, indices, numTriangles,
-      gl::Geometry::Flag::HAS_TEXTURE,
+      gl::Geometry::Flag::HAS_TEXTURE | gl::Geometry::Flag::HAS_NORMAL | gl::Geometry::Flag::HAS_COLOR,
       GL_TRIANGLES, 3));
 }
 
@@ -847,9 +850,19 @@ void GlUtils::draw3dVector(glm::vec3 vec, const glm::vec3 & col) {
   gl::ProgramPtr program = getProgram(
       Resource::SHADERS_COLORED_VS,
       Resource::SHADERS_COLORED_FS);
-  program->use();
   renderGeometry(g, program);
   gl::Program::clear();
+}
+
+void GlUtils::draw3dLine(glm::vec3 & A, glm::vec3 & B) {
+  Mesh m;
+
+  m.addVertex(A);
+  m.addVertex(B);
+
+  renderGeometry(
+    m.getGeometry(GL_LINES), 
+    getProgram(Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS));
 }
 
 std::wstring toUtf16(const std::string & text) {
@@ -857,24 +870,6 @@ std::wstring toUtf16(const std::string & text) {
   std::wstring wide(text.begin(), text.end()); //= converter.from_bytes(narrow.c_str());
   return wide;
 }
-
-//
-//static gl::GeometryPtr line;
-//if (!line) {
-//  Mesh mesh;
-//  mesh.color = Colors::white;
-//  mesh.addVertex(glm::vec3());
-//  mesh.addVertex(GlUtils::X_AXIS * 2.0f);
-//  mesh.fillColors();
-//  line = mesh.getGeometry(GL_LINES);
-//}
-// Draw a line at the cursor
-//{
-//  gl::ProgramPtr lineProgram = GlUtils::getProgram(
-//    Resource::SHADERS_SIMPLE_VS,
-//    Resource::SHADERS_SIMPLE_FS);
-//  renderGeometry(line, lineProgram);
-//}
 
 void GlUtils::renderString(const std::string & cstr, glm::vec2 & cursor,
     float fontSize, Resource fontResource) {

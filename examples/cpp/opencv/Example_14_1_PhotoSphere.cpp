@@ -19,6 +19,7 @@ public:
     static gl::TexturePtr t = loadAndPositionPhotoSphereImage(filepath);
 
     t->bind();
+    gl::Stacks::modelview().scale(glm::vec3(-1, 1, 1));  // Invert the sphere to see its insides
     GlUtils::renderGeometry(geometry);
     t->unbind();
   }
