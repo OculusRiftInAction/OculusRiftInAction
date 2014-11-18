@@ -20,40 +20,38 @@
 #include "Common.h"
 
 
-static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
   instance->onKey(key, scancode, action, mods);
 }
 
-static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
   GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
   instance->onMouseButton(button, action, mods);
 }
 
-static void CursorEnterCallback(GLFWwindow* window, int enter) {
+void CursorEnterCallback(GLFWwindow* window, int enter) {
   GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
   instance->onMouseEnter(enter);
 }
 
-static void MouseMoveCallback(GLFWwindow* window, double x, double y) {
+void MouseMoveCallback(GLFWwindow* window, double x, double y) {
   GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
   instance->onMouseMove(x, y);
 }
 
-static void CharacterCallback(GLFWwindow* window, unsigned int codepoint)
+void CharacterCallback(GLFWwindow* window, unsigned int codepoint)
 {
   GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
   instance->onCharacter(codepoint);
 }
 
-
-
-static void ScrollCallback(GLFWwindow * window, double x, double y) {
+void ScrollCallback(GLFWwindow * window, double x, double y) {
   GlfwApp * instance = (GlfwApp *)glfwGetWindowUserPointer(window);
   instance->onScroll(x, y);
 }
 
-static void ErrorCallback(int error, const char* description) {
+void ErrorCallback(int error, const char* description) {
   FAIL(description);
 }
 
@@ -81,6 +79,7 @@ int GlfwApp::run() {
       FAIL("Unable to create OpenGL window");
     }
 
+    glGetError();
     initGl();
     // Ensure we shutdown the GL resources even if we throw an exception
     Finally f([&]{
@@ -184,8 +183,8 @@ GLFWwindow * GlfwApp::getWindow() {
 
 void GlfwApp::initGl() {
   using namespace oglplus;
-  DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
-  DefaultFramebuffer().Bind(Framebuffer::Target::Read);
+//  DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+//  DefaultFramebuffer().Bind(Framebuffer::Target::Read);
   Context::Enable(Capability::CullFace);
   Context::Enable(Capability::DepthTest);
   Context::Disable(Capability::Dither);

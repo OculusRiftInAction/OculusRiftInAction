@@ -7,25 +7,26 @@ namespace ui {
 
 
   /// Helper Macro
-#define mapKey(a) case GLFW_KEY_##a: return CEGUI::Key::##a;
-#define mapKey2(a, b) case GLFW_KEY_##a: return CEGUI::Key::##b;
-#define mapMouse(a, b) case GLFW_MOUSE_BUTTON_##a: return CEGUI::MouseButton::##b;
+#define mapKey(a) case GLFW_KEY_##a: return Key::a;
+#define mapKey2(a, b) case GLFW_KEY_##a: return Key::b;
+#define mapMouse(a, b) case GLFW_MOUSE_BUTTON_##a: return b;
 
   CEGUI::MouseButton TranslateMouseButton(int glfwButton)
   {
+    using namespace CEGUI;
     switch (glfwButton)
     {
-      mapMouse(LEFT, LeftButton)
-        mapMouse(RIGHT, RightButton)
-        mapMouse(MIDDLE, MiddleButton)
+        mapMouse(LEFT, LeftButton)
+      mapMouse(RIGHT, RightButton)
+      mapMouse(MIDDLE, MiddleButton)
     default:
       return CEGUI::MouseButton::NoButton;
     }
   }
 
   CEGUI::Key::Scan TranslateKey(int glfwKey) {
+    using namespace CEGUI;
     switch (glfwKey) {
-      CEGUI::Key::Return;
       mapKey2(SPACE, Space)
         mapKey2(APOSTROPHE, Apostrophe)
         mapKey2(COMMA, Comma)
@@ -149,8 +150,8 @@ namespace ui {
 
     myRenderer.setDisplaySize(CEGUI::Sizef(size.x, size.y));
     CEGUI::System::create(myRenderer);
-    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");
-    CEGUI::Logger::getSingleton().setLoggingLevel(CEGUI::LoggingLevel::Insane);
+//    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");
+//    CEGUI::Logger::getSingleton().setLoggingLevel(CEGUI::LoggingLevel::Insane);
     //  OpenGL3Renderer::bootstrapSystem();
 
     {
@@ -161,7 +162,7 @@ namespace ui {
       rp->setResourceGroupDirectory("layouts", PROJECT_DIR "/resources/cegui/layouts/");
       rp->setResourceGroupDirectory("looknfeels", PROJECT_DIR "/resources/cegui/looknfeel/");
       rp->setResourceGroupDirectory("lua_scripts", PROJECT_DIR "/resources/cegui/lua_scripts/");
-      rp->setResourceGroupDirectory("resources", PROJECT_DIR "/resources/");
+      rp->setResourceGroupDirectory("resources", "/");
     }
 
     // set the default resource groups to be used

@@ -107,8 +107,7 @@ struct UiContainer {
     Context::Enable(Capability::Blend);
     fbo.color->Bind(oglplus::Texture::Target::_2D);
     oria::renderGeometry(shape, program);
-  }
-};
+  }};
 
 
 
@@ -180,9 +179,9 @@ public:
 
   virtual void onMouseEnter(int entered) {
     if (entered){
-      ShowCursor(false);
+      glfwSetInputMode(getWindow(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
     } else {
-      ShowCursor(true);
+      glfwSetInputMode(getWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
   }
 
@@ -247,6 +246,17 @@ public:
     PARENT_CLASS::initGl();
   }
 
+  static std::string replaceAll(const std::string & input, const std::string & find, const std::string & replace) {
+
+    std::string result = input;
+    std::string::size_type find_size = find.size();
+    std::string::size_type n = 0;
+    while (std::string::npos != (n = result.find(find, n))) {
+      result.replace(n, find_size, replace);
+    }
+    return result;
+  }
+           
   virtual void setFragmentSource(const std::string & source) {
     using namespace oglplus;
     fragmentSource = source;
@@ -256,8 +266,10 @@ public:
         vertexShader->Source(Platform::getResourceData(Resource::SHADERS_SHADERTOY_VS));
         vertexShader->Compile();
       }
+      
       FragmentShaderPtr newFragmentShader(new FragmentShader());
-      newFragmentShader->Source(GLSLSource(std::string(SHADER_HEADER) + source));
+      std::string newSource = replaceAll(source, "gl_FragColor", "FragColor");
+      newFragmentShader->Source(GLSLSource(std::string(SHADER_HEADER) + newSource));
       newFragmentShader->Compile();
       ProgramPtr result(new Program());
       result->AttachShader(*vertexShader);
