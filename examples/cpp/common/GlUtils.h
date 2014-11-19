@@ -34,6 +34,7 @@ public:
   static void drawAngleTicks();
   static void draw3dGrid();
   static void draw3dVector(glm::vec3 vec, const glm::vec3 & col);
+  static void draw3dLine(glm::vec3 & A, glm::vec3 & B);
 
   static gl::GeometryPtr getColorCubeGeometry();
   static gl::GeometryPtr getCubeGeometry();
