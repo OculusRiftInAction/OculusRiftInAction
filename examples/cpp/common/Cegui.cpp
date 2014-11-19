@@ -147,7 +147,8 @@ namespace ui {
     using namespace CEGUI;
     static CEGUI::OpenGL3Renderer & myRenderer =
       CEGUI::OpenGL3Renderer::create();
-
+    myRenderer.enableExtraStateSettings (true);
+    
     myRenderer.setDisplaySize(CEGUI::Sizef(size.x, size.y));
     CEGUI::System::create(myRenderer);
 //    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");

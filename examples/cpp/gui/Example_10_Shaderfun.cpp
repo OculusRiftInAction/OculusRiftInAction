@@ -42,7 +42,6 @@ const Resource TEXTURES[] = {
   Resource::SHADERTOY_TEXTURES_TEX14_PNG,
   Resource::SHADERTOY_TEXTURES_TEX15_PNG,
   Resource::SHADERTOY_TEXTURES_TEX16_PNG,
-  NO_RESOURCE
 };
 
 template <typename F>
@@ -118,6 +117,11 @@ struct UiContainer {
 typedef std::shared_ptr<oglplus::VertexShader> VertexShaderPtr;
 typedef std::shared_ptr<oglplus::FragmentShader> FragmentShaderPtr;
 
+struct Channel {
+  TexturePtr texture;
+  oglplus::Texture::Target target;
+  vec3 resolution;
+};
 
 class DynamicFramebufferScaleExample : public PARENT_CLASS {
   const char * SHADER_HEADER = "#version 330\n"
@@ -145,6 +149,13 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
   const char * UNIFORM_DATE = "iDate";
   const char * UNIFORM_SAMPLE_RATE = "iSampleRate";
   const char * UNIFORM_POSITION = "iPos";
+  const char * UNIFORM_CHANNELS[4] = {
+    "iChannel0",
+    "iChannel1",
+    "iChannel2",
+    "iChannel3",
+  };
+  
 
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
@@ -155,10 +166,13 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
   ShapeWrapperPtr cube;
   VertexShaderPtr vertexShader;
   FragmentShaderPtr fragmentShader;
-  std::string fragmentSource;
   UiContainer ui;
+  std::string fragmentSource;
+  std::function<void()> uniformLambda;
+  Channel channels[4];
   CEGUI::FrameWindow * rootWindow;
   bool uiVisible{ false };
+  std::set<std::string> activeUniforms;
 
 public:
   DynamicFramebufferScaleExample() {
@@ -175,6 +189,10 @@ public:
   }
 
   virtual ~DynamicFramebufferScaleExample() {
+  }
+
+  uvec2 renderSize() {
+    return uvec2(texRes * vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize)));
   }
 
   virtual void onMouseEnter(int entered) {
@@ -233,12 +251,13 @@ public:
             pWnd->setProperty("PushedImage", imageName);
             pWnd->setProperty("HoverImage", imageName);
             pWnd->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-              setChannelInput(TEXTURE, res);
+              setChannelInput(0, TEXTURE, res);
               return true;
             });
           }
         }
-        rootWindow->getChild("ShaderChannels")->hide();
+        //rootWindow->getChild("ShaderChannels")->hide();
+        rootWindow->getChild("ShaderEdit")->hide();
       }
       System::getSingleton().getDefaultGUIContext().setRootWindow(rootWindow);
     });
@@ -247,7 +266,6 @@ public:
   }
 
   static std::string replaceAll(const std::string & input, const std::string & find, const std::string & replace) {
-
     std::string result = input;
     std::string::size_type find_size = find.size();
     std::string::size_type n = 0;
@@ -277,14 +295,88 @@ public:
       result->Link();
       cubeProgram.swap(result);
       fragmentShader.swap(newFragmentShader);
+      size_t uniformCount = cubeProgram->ActiveUniforms().Size();
+      for (int i = 0; i < uniformCount; ++i) {
+        std::string name = cubeProgram->ActiveUniforms().At(i).Name().c_str();
+        activeUniforms.insert(name);
+      }
     }
     catch (ProgramBuildError & err) {
       SAY_ERR((const char*)err.Message);
     }
+    updateUniforms();
   }
 
-  virtual void setChannelInput(ChannelInputType type, Resource res) {
-    SAY(Resources::getResourcePath(res).c_str());
+//public static Texture getTexture(Resource resource) {
+//  Texture texture = new Texture(GL_TEXTURE_2D);
+//  texture.bind();
+//  texture.parameter(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+//  texture.parameter(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+//  texture.parameter(GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+//  texture.parameter(GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+//  texture.parameter(GL_TEXTURE_WRAP_R, GL_MIRRORED_REPEAT);
+//  texture.loadImageData(Images.load(resource), GL_TEXTURE_2D);
+//  texture.unbind();
+//  return texture;
+//}
+//
+//public void setTextureSource(Resource res, int index) {
+//  assert(index >= 0);
+//  assert(index < channels.length);
+//  channels[index] = getTexture(res);
+//  assert(0 == glGetError());
+//  updateUniforms();
+//}
+
+  virtual void setChannelInput(int channel, ChannelInputType type, Resource res) {
+    using namespace oglplus;
+    Channel newChannel;
+    uvec2 size;
+    switch (type) {
+    case TEXTURE:
+      newChannel.texture = oria::load2dTexture(res, size);
+      newChannel.target = Texture::Target::_2D;
+      newChannel.resolution = vec3(size, 0);
+      break;
+    case CUBEMAP:
+      newChannel.texture = oria::loadCubemapTexture(res);
+      newChannel.target = Texture::Target::CubeMap;
+      break;
+    case VIDEO:
+      break;
+    case AUDIO:
+      break;
+    }
+    
+    channels[channel] = newChannel;
+    updateUniforms();
+  }
+
+  void updateUniforms() {
+    if (activeUniforms.count(UNIFORM_RESOLUTION)) {
+      Uniform<vec3>(*cubeProgram, UNIFORM_RESOLUTION).Set(vec3(getSize(), 0));
+    }
+//    UNIFORM_DATE;
+    for (int i = 0; i < 4; ++i) {
+      std::string uniform =Platform::format("iChannel%d",i);
+      if (activeUniforms.count(uniform)) {
+        Uniform<GLuint>(*cubeProgram, uniform).Set(i);
+      }
+    }
+    uniformLambda = [&]{
+      if (activeUniforms.count(UNIFORM_GLOBALTIME)) {
+        Uniform<GLfloat>(*cubeProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds());
+      }
+      if (activeUniforms.count(UNIFORM_POSITION)) {
+        Uniform<vec3>(*cubeProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
+      }
+      for (int i = 0; i < 4; ++i) {
+        if (activeUniforms.count(UNIFORM_CHANNELS[i]) && channels[i].texture) {
+          Texture::Active(i);
+          channels[i].texture->Bind(channels[i].target);
+        }
+      }
+    };
   }
 
   virtual void onMouseButton(int button, int action, int mods) { 
@@ -309,12 +401,12 @@ public:
     }
   }
 
-
   virtual void onCharacter(unsigned int codepoint) {
     if (uiVisible) {
       ui::handleGlfwCharacterEvent(codepoint);
     }
   }
+
   virtual void onKey(int key, int scancode, int action, int mods) {
     if (uiVisible) {
       if (GLFW_PRESS == action && GLFW_KEY_ESCAPE == key) {
@@ -377,10 +469,7 @@ public:
       mv.untranslate();
       Context::Disable(Capability::DepthTest);
       Context::Disable(Capability::CullFace);
-      oria::renderGeometry(cube, cubeProgram, { [&]{
-        Uniform<GLfloat>(*cubeProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds());
-        //Uniform<vec3>(*cubeProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
-      }});
+      oria::renderGeometry(cube, cubeProgram, { uniformLambda });
       Context::Enable(Capability::CullFace);
       Context::Enable(Capability::DepthTest);
     });
