@@ -28,8 +28,10 @@ namespace oria {
   ShapeWrapperPtr loadShape(const std::initializer_list<const GLchar*>& names, Resource resource, ProgramPtr program);
   ShapeWrapperPtr loadSphere(const std::initializer_list<const GLchar*>& names, ProgramPtr program);
   ShapeWrapperPtr loadSkybox(ProgramPtr program);
+  ShapeWrapperPtr loadPlane(ProgramPtr program, float aspect);
   void bindLights(ProgramPtr & program);
 
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::list<std::function<void()>> & list);
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list);
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program);
   void renderCube(const glm::vec3 & color = Colors::white);
@@ -59,3 +61,12 @@ namespace oria {
     const GLchar * message,
     void * userParam);
 }
+
+template <typename F>
+void withContext(GLFWwindow * newContext, F f) {
+  GLFWwindow * save = glfwGetCurrentContext();
+  glfwMakeContextCurrent(newContext);
+  f();
+  glfwMakeContextCurrent(save);
+}
+

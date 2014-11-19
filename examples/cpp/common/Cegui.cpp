@@ -148,7 +148,6 @@ namespace ui {
     static CEGUI::OpenGL3Renderer & myRenderer =
       CEGUI::OpenGL3Renderer::create();
     myRenderer.enableExtraStateSettings (true);
-    
     myRenderer.setDisplaySize(CEGUI::Sizef(size.x, size.y));
     CEGUI::System::create(myRenderer);
 //    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");
@@ -163,7 +162,7 @@ namespace ui {
       rp->setResourceGroupDirectory("layouts", PROJECT_DIR "/resources/cegui/layouts/");
       rp->setResourceGroupDirectory("looknfeels", PROJECT_DIR "/resources/cegui/looknfeel/");
       rp->setResourceGroupDirectory("lua_scripts", PROJECT_DIR "/resources/cegui/lua_scripts/");
-      rp->setResourceGroupDirectory("resources", "/");
+      rp->setResourceGroupDirectory("resources", "");
     }
 
     // set the default resource groups to be used
@@ -227,5 +226,65 @@ namespace ui {
     //return true;
     //case SDL_KEYDOWN:
     //return true;
+
+
+
+  Wrapper::~Wrapper() {
+      if (context) {
+        glfwDestroyWindow(context);
+        context = nullptr;
+      }
+    }
+
+  void Wrapper::init(const uvec2 & size, std::function<void()> & f) {
+    using namespace oglplus;
+    this->size = size;
+    glfwWindowHint(GLFW_VISIBLE, 0);
+    context = glfwCreateWindow(100, 100, "", nullptr, glfwGetCurrentContext());
+    glfwWindowHint(GLFW_VISIBLE, 1);
+    withContext(context, [&]{
+      Context::Disable(Capability::CullFace);
+      fbo.init(size);
+      fbo.Bound([&]{
+        Context::Enable(Capability::Blend);
+        Context::Disable(Capability::DepthTest);
+        ui::initWindow(size);
+        f();
+      });
+    });
+    using namespace oglplus;
+    program = oria::loadProgram(
+      Resource::SHADERS_TEXTURED_VS,
+      Resource::SHADERS_TEXTURED_FS);
+    float aspect = (float)size.x / (float)size.y;
+    shape = oria::loadPlane(program, aspect);
+  }
+
+  void Wrapper::update() {
+    using namespace oglplus;
+    withContext(context, [&]{
+      fbo.Bound([&]{
+        Context::Viewport(0, 0, size.x, size.y);
+        DefaultTexture().Bind(Texture::Target::_2D);
+        NoProgram().Bind();
+        Texture::Active(0);
+        Context::ClearColor(0, 0, 0, 1);
+        Context::Clear().ColorBuffer().DepthBuffer();
+        Context::Enable(oglplus::Capability::Blend);
+        CEGUI::System::getSingleton().renderAllGUIContexts();
+      });
+    });
+    glGetError();
+  }
+
+  void Wrapper::render() {
+    using namespace oglplus;
+    Context::Enable(Capability::Blend);
+      fbo.color->Bind(Texture::Target::_2D);
+    oria::renderGeometry(shape, program);
+  }
 }
+
+
+
 #endif

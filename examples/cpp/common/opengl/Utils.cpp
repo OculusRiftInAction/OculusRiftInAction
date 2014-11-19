@@ -375,13 +375,16 @@ namespace oria {
     }
   }
 
-  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list) {
+  typedef std::function<void()> Lambda;
+  typedef std::list<Lambda> LambdaList;
+  template <typename Iter>
+  void renderGeometryWithLambdas(ShapeWrapperPtr & shape, ProgramPtr & program, Iter begin, const Iter & end) {
     program->Use();
 
     Mat4Uniform(*program, "ModelView").Set(Stacks::modelview().top());
     Mat4Uniform(*program, "Projection").Set(Stacks::projection().top());
 
-    std::for_each(list.begin(), list.end(), [&](const std::function<void()>&f){
+    std::for_each(begin, end, [&](const std::function<void()>&f){
       f();
     });
 
@@ -390,6 +393,14 @@ namespace oria {
 
     oglplus::NoProgram().Bind();
     oglplus::NoVertexArray().Bind();
+  }
+
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::list<std::function<void()>> & list) {
+    renderGeometryWithLambdas(shape, program, list.begin(), list.end());
+  }
+
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list) {
+    renderGeometryWithLambdas(shape, program, list.begin(), list.end());
   }
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program) {
@@ -439,6 +450,25 @@ namespace oria {
       shape.reset();
     });
     return shape;
+  }
+
+
+  ShapeWrapperPtr loadPlane(ProgramPtr program, float aspect) {
+    using namespace oglplus;
+    Vec3f a(1, 0, 0);
+    Vec3f b(0, 1, 0);
+    if (aspect > 1) {
+      b[1] /= aspect;
+    } else {
+      a[0] *= aspect;
+    }
+    return ShapeWrapperPtr(
+      new shapes::ShapeWrapper(
+        { "Position", "TexCoord" }, 
+        shapes::Plane(a, b), 
+        *program
+      )
+    );
   }
 
   void renderSkybox(Resource firstImageResource) {

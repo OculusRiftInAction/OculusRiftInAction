@@ -44,76 +44,6 @@ const Resource TEXTURES[] = {
   Resource::SHADERTOY_TEXTURES_TEX16_PNG,
 };
 
-template <typename F>
-void withContext(GLFWwindow * newContext, F f) {
-  GLFWwindow * save = glfwGetCurrentContext();
-  glfwMakeContextCurrent(newContext);
-  f();
-  glfwMakeContextCurrent(save);
-}
-
-
-
-struct UiContainer {
-  ProgramPtr program;
-  ShapeWrapperPtr shape;
-  FramebufferWrapper fbo;
-
-  GLFWwindow * context;
-
-  template <typename F>
-  void init(F f) {
-    glfwWindowHint(GLFW_VISIBLE, 0);
-    context = glfwCreateWindow(100, 100, "", nullptr, glfwGetCurrentContext());
-    glfwWindowHint(GLFW_VISIBLE, 1);
-    withContext(context, [&]{
-      Context::Disable(Capability::CullFace);
-      fbo.init(UI_SIZE);
-      fbo.Bound([&]{
-        Context::Enable(Capability::Blend);
-        Context::Disable(Capability::DepthTest);
-        ui::initWindow(UI_SIZE);
-        f();
-      });
-    });
-    using namespace oglplus;
-    program = oria::loadProgram(
-      Resource::SHADERS_TEXTURED_VS,
-      Resource::SHADERS_TEXTURED_FS);
-    shape = ShapeWrapperPtr(new shapes::ShapeWrapper({ "Position", "TexCoord" }, shapes::Plane(
-      Vec3f(1, 0, 0),
-      Vec3f(0, 1 / ASPECT, 0)
-      ), *program));
-  }
-
-  void update() {
-    withContext(context, [&]{
-      fbo.Bound([]{
-        glViewport(0, 0, UI_X, UI_Y);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glUseProgram(0);
-        glActiveTexture(GL_TEXTURE0);
-        Context::ClearColor(0, 0, 0, 1);
-        Context::Clear().ColorBuffer().DepthBuffer();
-        Context::Enable(Capability::Blend);
-        CEGUI::System::getSingleton().renderAllGUIContexts();
-      });
-    });
-    glGetError();
-  }
-
-  void render() {
-    Context::Enable(Capability::Blend);
-    fbo.color->Bind(oglplus::Texture::Target::_2D);
-    oria::renderGeometry(shape, program);
-  }};
-
-
-
-
-
-
-
 typedef std::shared_ptr<oglplus::VertexShader> VertexShaderPtr;
 typedef std::shared_ptr<oglplus::FragmentShader> FragmentShaderPtr;
 
@@ -122,6 +52,45 @@ struct Channel {
   oglplus::Texture::Target target;
   vec3 resolution;
 };
+
+struct RateCounter {
+  unsigned int count{ 0 };
+  float start{ -1 };
+
+  void reset() {
+    count = 0;
+    start = -1; 
+  }
+
+  unsigned int getCount() const {
+    return count;
+  }
+
+  void increment() {
+    if (start < 0) {
+      start = ovr_GetTimeInSeconds();
+    } else {
+      ++count;
+    }
+  }
+
+  float getRate() const {
+    float elapsed = ovr_GetTimeInSeconds() - start;
+    return (float)count / elapsed;
+  }
+};
+
+std::set<std::string> getActiveUniforms(ProgramPtr & program) {
+  std::set<std::string> activeUniforms;
+  activeUniforms.clear();
+  size_t uniformCount = program->ActiveUniforms().Size();
+  for (int i = 0; i < uniformCount; ++i) {
+    std::string name = program->ActiveUniforms().At(i).Name().c_str();
+    activeUniforms.insert(name);
+  }
+  return activeUniforms;
+}
+
 
 class DynamicFramebufferScaleExample : public PARENT_CLASS {
   const char * SHADER_HEADER = "#version 330\n"
@@ -141,20 +110,15 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
     "in vec3 iDir; // Direction from viewer\n"
     "out vec4 FragColor;\n";
 
-  const char * UNIFORM_RESOLUTION = "iResolution";
-  const char * UNIFORM_GLOBALTIME = "iGlobalTime";
-  const char * UNIFORM_CHANNEL_TIME = "iChannelTime";
-  const char * UNIFORM_CHANNEL_RESOLUTION = "iChannelResolution";
-  const char * UNIFORM_MOUSE_COORDS = "iMouse";
-  const char * UNIFORM_DATE = "iDate";
-  const char * UNIFORM_SAMPLE_RATE = "iSampleRate";
-  const char * UNIFORM_POSITION = "iPos";
-  const char * UNIFORM_CHANNELS[4] = {
-    "iChannel0",
-    "iChannel1",
-    "iChannel2",
-    "iChannel3",
-  };
+  static const char * UNIFORM_RESOLUTION;
+  static const char * UNIFORM_GLOBALTIME;
+  static const char * UNIFORM_CHANNEL_TIME;
+  static const char * UNIFORM_CHANNEL_RESOLUTION;
+  static const char * UNIFORM_MOUSE_COORDS; 
+  static const char * UNIFORM_DATE; 
+  static const char * UNIFORM_SAMPLE_RATE;
+  static const char * UNIFORM_POSITION;
+  static const char * UNIFORM_CHANNELS[4];
   
 
   float ipd{ OVR_DEFAULT_IPD };
@@ -163,16 +127,18 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
   float texRes{ 1.0f };
 #endif
   ProgramPtr cubeProgram;
+  RateCounter rateCounter;
   ShapeWrapperPtr cube;
   VertexShaderPtr vertexShader;
   FragmentShaderPtr fragmentShader;
-  UiContainer ui;
+  RateCounter fps;
+  ui::Wrapper uiWrapper;
   std::string fragmentSource;
-  std::function<void()> uniformLambda;
+  std::list<std::function<void()>> uniformLambdas;
   Channel channels[4];
   CEGUI::FrameWindow * rootWindow;
   bool uiVisible{ false };
-  std::set<std::string> activeUniforms;
+  
 
 public:
   DynamicFramebufferScaleExample() {
@@ -213,54 +179,73 @@ public:
     });
 
 
-    ui.init([&]{
+    std::function<void()> initFunction([&]{
       using namespace CEGUI;
       WindowManager & wmgr = WindowManager::getSingleton();
       rootWindow = dynamic_cast<FrameWindow *>(wmgr.createWindow("TaharezLook/FrameWindow", "root"));
       rootWindow->setFrameEnabled(false);
       rootWindow->setTitleBarEnabled(false);
       rootWindow->setAlpha(0.5f);
+      rootWindow->setCloseButtonEnabled(false);
       rootWindow->setSize(CEGUI::USize(cegui_absdim(UI_X), cegui_absdim(UI_Y)));
+      rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderChannels.layout"));
+      rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderEdit.layout"));
+      Window * pShaderEditor = rootWindow->getChild("ShaderEdit");
+      Window * pShaderChannels = rootWindow->getChild("ShaderChannels");
       {
-        rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderEdit.layout"));
-        Window * pShaderEdit = rootWindow->getChild("ShaderEdit/ShaderText");
+        Window * pShaderText = pShaderEditor->getChild("ShaderText");
         FontManager::getSingleton().createFromFile("Inconsolata-14.font");
-
-        pShaderEdit->setFont("Inconsolata-14");
-        pShaderEdit->setText(fragmentSource);
-        Window * pWnd = rootWindow->getChild("ShaderEdit/ButtonRun");
-        pWnd->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-          setFragmentSource(pShaderEdit->getText().c_str());
+        pShaderText->setFont("Inconsolata-14");
+        pShaderText->setText(fragmentSource);
+        Window * pRunButton = pShaderEditor->getChild("ButtonRun");
+        pRunButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+          setFragmentSource(pShaderText->getText().c_str());
           return true;
         });
+        for (int i = 0; i < 4; ++i) {
+          std::string controlName = Platform::format("ButtonC%d", i);
+          Window * pButton = pShaderEditor->getChild(controlName);
+          pButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+            pShaderChannels->setUserData((void*)i);
+            pShaderEditor->hide();
+            pShaderChannels->show();
+            return true;
+          });
+        }
       }
 
       {
-        rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderChannels.layout"));
         ImageManager & im = CEGUI::ImageManager::getSingleton();
         for (int i = 0; i < 17; ++i) {
           std::string str = Platform::format("Tex%02d", i);
-          std::string buttonName = "ShaderChannels/" + str;
-          if (rootWindow->isChild(buttonName)) {
+          if (pShaderChannels->isChild(str)) {
             std::string imageName = "Image" + str;
             Resource res = TEXTURES[i];
-            Window * pWnd = rootWindow->getChild(buttonName);
+            Window * pChannelButton = pShaderChannels->getChild(str);
             std::string file = Resources::getResourcePath(res);
             im.addFromImageFile(imageName, file, "resources");
-            pWnd->setProperty("NormalImage", imageName);
-            pWnd->setProperty("PushedImage", imageName);
-            pWnd->setProperty("HoverImage", imageName);
-            pWnd->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-              setChannelInput(0, TEXTURE, res);
+            pChannelButton->setProperty("NormalImage", imageName);
+            pChannelButton->setProperty("PushedImage", imageName);
+            pChannelButton->setProperty("HoverImage", imageName);
+            pChannelButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+              int channel = (int)pShaderChannels->getUserData();
+              std::string controlName = Platform::format("ButtonC%d", channel);
+              Window * pButton = pShaderEditor->getChild(controlName);
+              pButton->setProperty("NormalImage", imageName);
+              pButton->setProperty("PushedImage", imageName);
+              pButton->setProperty("HoverImage", imageName);
+              setChannelInput(channel, TEXTURE, res);
+              pShaderChannels->hide();
+              pShaderEditor->show();
               return true;
             });
           }
         }
-        //rootWindow->getChild("ShaderChannels")->hide();
-        rootWindow->getChild("ShaderEdit")->hide();
+        pShaderChannels->hide();
       }
       System::getSingleton().getDefaultGUIContext().setRootWindow(rootWindow);
     });
+    uiWrapper.init(UI_SIZE, initFunction);
 
     PARENT_CLASS::initGl();
   }
@@ -296,37 +281,12 @@ public:
       cubeProgram.swap(result);
       fragmentShader.swap(newFragmentShader);
       size_t uniformCount = cubeProgram->ActiveUniforms().Size();
-      for (int i = 0; i < uniformCount; ++i) {
-        std::string name = cubeProgram->ActiveUniforms().At(i).Name().c_str();
-        activeUniforms.insert(name);
-      }
     }
     catch (ProgramBuildError & err) {
       SAY_ERR((const char*)err.Message);
     }
     updateUniforms();
   }
-
-//public static Texture getTexture(Resource resource) {
-//  Texture texture = new Texture(GL_TEXTURE_2D);
-//  texture.bind();
-//  texture.parameter(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-//  texture.parameter(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-//  texture.parameter(GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-//  texture.parameter(GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-//  texture.parameter(GL_TEXTURE_WRAP_R, GL_MIRRORED_REPEAT);
-//  texture.loadImageData(Images.load(resource), GL_TEXTURE_2D);
-//  texture.unbind();
-//  return texture;
-//}
-//
-//public void setTextureSource(Resource res, int index) {
-//  assert(index >= 0);
-//  assert(index < channels.length);
-//  channels[index] = getTexture(res);
-//  assert(0 == glGetError());
-//  updateUniforms();
-//}
 
   virtual void setChannelInput(int channel, ChannelInputType type, Resource res) {
     using namespace oglplus;
@@ -353,30 +313,42 @@ public:
   }
 
   void updateUniforms() {
-    if (activeUniforms.count(UNIFORM_RESOLUTION)) {
-      Uniform<vec3>(*cubeProgram, UNIFORM_RESOLUTION).Set(vec3(getSize(), 0));
-    }
-//    UNIFORM_DATE;
+
+    std::set<std::string> activeUniforms = getActiveUniforms(cubeProgram);
+    cubeProgram->Bind();
+    //    UNIFORM_DATE;
     for (int i = 0; i < 4; ++i) {
-      std::string uniform =Platform::format("iChannel%d",i);
-      if (activeUniforms.count(uniform)) {
-        Uniform<GLuint>(*cubeProgram, uniform).Set(i);
+      const char * uniformName = UNIFORM_CHANNELS[i];
+      if (activeUniforms.count(uniformName)) {
+        // setting the active texture slot for the channels
+//        Uniform<GLuint>(*cubeProgram, uniformName).Set(i);
       }
     }
-    uniformLambda = [&]{
-      if (activeUniforms.count(UNIFORM_GLOBALTIME)) {
+    if (activeUniforms.count(UNIFORM_RESOLUTION)) {
+      vec3 textureSize = vec3(ovr::toGlm(this->eyeTextures[0].Header.TextureSize), 0);
+      Uniform<vec3>(*cubeProgram, UNIFORM_RESOLUTION).Set(textureSize);
+    }
+    NoProgram().Bind();
+
+    uniformLambdas.clear();
+    if (activeUniforms.count(UNIFORM_GLOBALTIME)) {
+      uniformLambdas.push_back([&]{
         Uniform<GLfloat>(*cubeProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds());
-      }
-      if (activeUniforms.count(UNIFORM_POSITION)) {
+      });
+    }
+    if (activeUniforms.count(UNIFORM_POSITION)) {
+      uniformLambdas.push_back([&]{
         Uniform<vec3>(*cubeProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
-      }
-      for (int i = 0; i < 4; ++i) {
-        if (activeUniforms.count(UNIFORM_CHANNELS[i]) && channels[i].texture) {
+      });
+    }
+    for (int i = 0; i < 4; ++i) {
+      if (activeUniforms.count(UNIFORM_CHANNELS[i]) && channels[i].texture) {
+        uniformLambdas.push_back([=]{
           Texture::Active(i);
           channels[i].texture->Bind(channels[i].target);
-        }
+        });
       }
-    };
+    }
   }
 
   virtual void onMouseButton(int button, int action, int mods) { 
@@ -413,7 +385,28 @@ public:
         uiVisible = false;
         return;
       } else {
-        ui::handleGlfwKeyboardEvent(key, scancode, action, mods);
+        if (GLFW_MOD_CONTROL == mods) {
+          switch (key) {
+          case GLFW_KEY_C:
+            CEGUI::System::getSingleton().getDefaultGUIContext().injectCopyRequest();
+            return;
+          case GLFW_KEY_V:
+            CEGUI::System::getSingleton().getDefaultGUIContext().injectPasteRequest();
+            return;
+          case GLFW_KEY_X:
+            CEGUI::System::getSingleton().getDefaultGUIContext().injectCutRequest();
+            return;
+          case GLFW_KEY_A:
+            // CEGUI::System::getSingleton().getDefaultGUIContext().injectinjectCutRequest();
+            return;
+          default: break;
+          }
+        }
+        if (!ui::handleGlfwKeyboardEvent(key, scancode, action, mods)) {
+          if (GLFW_RELEASE == action) {
+            SAY("Key not accepted");
+          }
+        }
         return;
       }
     }
@@ -458,7 +451,19 @@ public:
   void update() {
     using namespace oglplus;
     PARENT_CLASS::update();
-    ui.update();
+    uiWrapper.update();
+    for_each_eye([&](ovrEyeType eye){
+      eyeTextures[eye].Header.RenderViewport.Size = ovr::fromGlm(renderSize());
+    });
+    if (fps.getCount() > 50) {
+      float rate = fps.getRate();
+      if (rate < 70) {
+        SAY("%f %f", rate, texRes);
+        texRes *= 0.9f;
+      }
+      fps.reset();
+    }
+    fps.increment();
   }
 
   void renderSkybox() {
@@ -469,7 +474,7 @@ public:
       mv.untranslate();
       Context::Disable(Capability::DepthTest);
       Context::Disable(Capability::CullFace);
-      oria::renderGeometry(cube, cubeProgram, { uniformLambda });
+      oria::renderGeometry(cube, cubeProgram, uniformLambdas );
       Context::Enable(Capability::CullFace);
       Context::Enable(Capability::DepthTest);
     });
@@ -477,6 +482,7 @@ public:
   }
 
   void renderScene() {
+    viewport(ivec2(0), renderSize());
     Context::Clear().DepthBuffer();
     Context::Enable(Capability::Blend);
     Context::BlendFunc(BlendFunction::SrcAlpha, BlendFunction::OneMinusSrcAlpha);
@@ -486,7 +492,7 @@ public:
       renderSkybox();
       if (uiVisible) {
         mv.translate(vec3(0, OVR_DEFAULT_EYE_HEIGHT, -1));
-        ui.render();
+        uiWrapper.render();
       }
     });
   }
@@ -508,6 +514,22 @@ public:
 #endif
 
 };
+
+const char * DynamicFramebufferScaleExample::UNIFORM_RESOLUTION = "iResolution";
+const char * DynamicFramebufferScaleExample::UNIFORM_GLOBALTIME = "iGlobalTime";
+const char * DynamicFramebufferScaleExample::UNIFORM_CHANNEL_TIME = "iChannelTime";
+const char * DynamicFramebufferScaleExample::UNIFORM_CHANNEL_RESOLUTION = "iChannelResolution";
+const char * DynamicFramebufferScaleExample::UNIFORM_MOUSE_COORDS = "iMouse";
+const char * DynamicFramebufferScaleExample::UNIFORM_DATE = "iDate";
+const char * DynamicFramebufferScaleExample::UNIFORM_SAMPLE_RATE = "iSampleRate";
+const char * DynamicFramebufferScaleExample::UNIFORM_POSITION = "iPos";
+const char * DynamicFramebufferScaleExample::UNIFORM_CHANNELS[4] = {
+  "iChannel0",
+  "iChannel1",
+  "iChannel2",
+  "iChannel3",
+};
+
 
 #ifdef RIFT
 RUN_OVR_APP(DynamicFramebufferScaleExample);
