@@ -5,11 +5,16 @@
 #include "Common.h"
 
 /**
- Minimal demo of using the Leap Motion controller.
- Unlike other demos, this file relies on the Leap SDK which is not
- provided on our Github repo.  The Leap SDK evolves rapidly, so
- downloading it is left as an exercise for the reader.
-*/
+ * Minimal demo of using the Leap Motion controller.  The user can
+ * drag a sphere around in the XY plane.
+ *
+ * Unlike other demos, this file relies on the Leap SDK which is not
+ * provided on our Github repo.  The Leap SDK evolves rapidly, so
+ * downloading it is left as an exercise for the reader.
+ *
+ * This example was written against version 2.1.6 of the Leap Motion SDK.
+ * The Leap Motion SDK can be downloaded from https://developer.leapmotion.com/.
+ */
 
 struct CaptureData {
   glm::mat4 leapPose;
@@ -47,10 +52,10 @@ public:
   }
 
   bool get(CaptureData & out) {
+    std::lock_guard<std::mutex> guard(mutex);
     if (!hasFrame) {
       return false;
     }
-    std::lock_guard<std::mutex> guard(mutex);
     out = frame;
     hasFrame = false;
     return true;
@@ -110,7 +115,7 @@ public:
         Leap::Hand hand = hands[iHand];
         if (hand.isValid()) {
           Leap::Finger finger = hand.fingers()[1];  // Index only
-          if (finger.isExtended()) {
+          if (finger.isValid && finger.isExtended()) {
             glm::vec3 riftCoords = leapToRiftPosition(finger.tipPosition());
             riftCoords = riftCoords + glm::vec3(0, 0, -0.070);
             riftCoords = glm::vec3(latestFrame.leapPose * glm::vec4(riftCoords, 1));
