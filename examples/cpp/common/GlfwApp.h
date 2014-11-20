@@ -158,6 +158,8 @@ protected:
   virtual void onMouseEnter(int entered);
   virtual void update();
   virtual void viewport(const glm::ivec2 & pos, const glm::uvec2 & size);
+  virtual void viewport(const glm::uvec2 & size, const glm::ivec2 & pos = ivec2(0));
+  virtual void viewport(const glm::vec2 & size, const glm::vec2 & pos = vec2(0));
   virtual void renderStringAt(const std::string & string, float x, float y);
   virtual void renderStringAt(const std::string & string, const glm::vec2 & position);
 

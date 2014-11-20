@@ -5,7 +5,6 @@ using namespace oglplus;
 
 #define UI_X 1280
 #define UI_Y 720
-#define ASPECT (float)((float)UI_X/(float)UI_Y)
 
 static uvec2 UI_SIZE(UI_X, UI_Y);
 
@@ -126,17 +125,36 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
 #ifdef RIFT
   float texRes{ 1.0f };
 #endif
-  ProgramPtr cubeProgram;
-  RateCounter rateCounter;
-  ShapeWrapperPtr cube;
-  VertexShaderPtr vertexShader;
-  FragmentShaderPtr fragmentShader;
+
+  // Renders the shader to a skybox
+  ProgramPtr skyboxProgram;
+  // Skybox geometry
+  ShapeWrapperPtr skybox;
+
+  ProgramPtr planeProgram;
+  ShapeWrapperPtr plane;
+  
+  // Measure the FPS for use in dynamic scaling
   RateCounter fps;
+  
+  // The vertex shader, constant
+  VertexShaderPtr vertexShader;
+
+  // The fragment shader, which can be edited
+  FragmentShaderPtr fragmentShader;
+  
+  // We actually render the shader to one FBO for dynamic framebuffer scaling,
+  // while leaving the actual texture we pass to the Oculus SDK fixed.
+  // This allows us to have a clear UI regardless of the shader performance
+  FramebufferWrapper shaderFramebuffer;
+
+  // UI for editing the shader
   ui::Wrapper uiWrapper;
+  
+  // The current fragment source
   std::string fragmentSource;
   std::list<std::function<void()>> uniformLambdas;
   Channel channels[4];
-  CEGUI::FrameWindow * rootWindow;
   bool uiVisible{ false };
   
 
@@ -157,8 +175,12 @@ public:
   virtual ~DynamicFramebufferScaleExample() {
   }
 
+  vec2 textureSize() {
+    return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
+  }
+  
   uvec2 renderSize() {
-    return uvec2(texRes * vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize)));
+    return uvec2(texRes * textureSize());
   }
 
   virtual void onMouseEnter(int entered) {
@@ -169,19 +191,11 @@ public:
     }
   }
 
-  virtual void initGl() {
-    setFragmentSource(Platform::getResourceData(Resource::SHADERS_SHADERTOY_FS));
-    assert(cubeProgram);
-    cube = oria::loadSkybox(cubeProgram);
-    Platform::addShutdownHook([&]{
-      cubeProgram.reset();
-      cube.reset();
-    });
-
-
+  virtual void initUi() {
     std::function<void()> initFunction([&]{
       using namespace CEGUI;
       WindowManager & wmgr = WindowManager::getSingleton();
+      CEGUI::FrameWindow * rootWindow;
       rootWindow = dynamic_cast<FrameWindow *>(wmgr.createWindow("TaharezLook/FrameWindow", "root"));
       rootWindow->setFrameEnabled(false);
       rootWindow->setTitleBarEnabled(false);
@@ -213,7 +227,7 @@ public:
           });
         }
       }
-
+      
       {
         ImageManager & im = CEGUI::ImageManager::getSingleton();
         for (int i = 0; i < 17; ++i) {
@@ -228,7 +242,7 @@ public:
             pChannelButton->setProperty("PushedImage", imageName);
             pChannelButton->setProperty("HoverImage", imageName);
             pChannelButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-              int channel = (int)pShaderChannels->getUserData();
+              size_t channel = (size_t)pShaderChannels->getUserData();
               std::string controlName = Platform::format("ButtonC%d", channel);
               Window * pButton = pShaderEditor->getChild(controlName);
               pButton->setProperty("NormalImage", imageName);
@@ -246,6 +260,26 @@ public:
       System::getSingleton().getDefaultGUIContext().setRootWindow(rootWindow);
     });
     uiWrapper.init(UI_SIZE, initFunction);
+  }
+  
+  virtual void initGl() {
+    initUi();
+    
+    planeProgram = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
+    plane = oria::loadPlane(planeProgram, 1.0f);
+
+    setFragmentSource(Platform::getResourceData(Resource::SHADERS_SHADERTOY_FS));
+    assert(skyboxProgram);
+
+    skybox = oria::loadSkybox(skyboxProgram);
+    Platform::addShutdownHook([&]{
+      planeProgram.reset();
+      plane.reset();
+      skyboxProgram.reset();
+      skybox.reset();
+    });
+    
+    shaderFramebuffer.init(ovr::toGlm(eyeTextures[0].Header.TextureSize));
 
     PARENT_CLASS::initGl();
   }
@@ -278,9 +312,8 @@ public:
       result->AttachShader(*vertexShader);
       result->AttachShader(*newFragmentShader);
       result->Link();
-      cubeProgram.swap(result);
+      skyboxProgram.swap(result);
       fragmentShader.swap(newFragmentShader);
-      size_t uniformCount = cubeProgram->ActiveUniforms().Size();
     }
     catch (ProgramBuildError & err) {
       SAY_ERR((const char*)err.Message);
@@ -314,8 +347,8 @@ public:
 
   void updateUniforms() {
 
-    std::set<std::string> activeUniforms = getActiveUniforms(cubeProgram);
-    cubeProgram->Bind();
+    std::set<std::string> activeUniforms = getActiveUniforms(skyboxProgram);
+    skyboxProgram->Bind();
     //    UNIFORM_DATE;
     for (int i = 0; i < 4; ++i) {
       const char * uniformName = UNIFORM_CHANNELS[i];
@@ -326,19 +359,19 @@ public:
     }
     if (activeUniforms.count(UNIFORM_RESOLUTION)) {
       vec3 textureSize = vec3(ovr::toGlm(this->eyeTextures[0].Header.TextureSize), 0);
-      Uniform<vec3>(*cubeProgram, UNIFORM_RESOLUTION).Set(textureSize);
+      Uniform<vec3>(*skyboxProgram, UNIFORM_RESOLUTION).Set(textureSize);
     }
     NoProgram().Bind();
 
     uniformLambdas.clear();
     if (activeUniforms.count(UNIFORM_GLOBALTIME)) {
       uniformLambdas.push_back([&]{
-        Uniform<GLfloat>(*cubeProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds());
+        Uniform<GLfloat>(*skyboxProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds());
       });
     }
     if (activeUniforms.count(UNIFORM_POSITION)) {
       uniformLambdas.push_back([&]{
-        Uniform<vec3>(*cubeProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
+        Uniform<vec3>(*skyboxProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
       });
     }
     for (int i = 0; i < 4; ++i) {
@@ -452,12 +485,9 @@ public:
     using namespace oglplus;
     PARENT_CLASS::update();
     uiWrapper.update();
-    for_each_eye([&](ovrEyeType eye){
-      eyeTextures[eye].Header.RenderViewport.Size = ovr::fromGlm(renderSize());
-    });
     if (fps.getCount() > 50) {
       float rate = fps.getRate();
-      if (rate < 70) {
+      if (rate < 55) {
         SAY("%f %f", rate, texRes);
         texRes *= 0.9f;
       }
@@ -468,28 +498,43 @@ public:
 
   void renderSkybox() {
     using namespace oglplus;
-    cubeProgram->Bind();
-    MatrixStack & mv = Stacks::modelview();
-    mv.withPush([&]{
-      mv.untranslate();
-      Context::Disable(Capability::DepthTest);
-      Context::Disable(Capability::CullFace);
-      oria::renderGeometry(cube, cubeProgram, uniformLambdas );
-      Context::Enable(Capability::CullFace);
-      Context::Enable(Capability::DepthTest);
+    shaderFramebuffer.Bound([&]{
+      viewport(renderSize());
+      skyboxProgram->Bind();
+      MatrixStack & mv = Stacks::modelview();
+      mv.withPush([&]{
+        mv.untranslate();
+        oria::renderGeometry(skybox, skyboxProgram, uniformLambdas );
+      });
+      DefaultTexture().Bind(TextureTarget::CubeMap);
     });
-    DefaultTexture().Bind(TextureTarget::CubeMap);
+    viewport(textureSize());
   }
 
   void renderScene() {
-    viewport(ivec2(0), renderSize());
-    Context::Clear().DepthBuffer();
-    Context::Enable(Capability::Blend);
-    Context::BlendFunc(BlendFunction::SrcAlpha, BlendFunction::OneMinusSrcAlpha);
+    Context::Disable(Capability::DepthTest);
+    Context::Disable(Capability::CullFace);
+    Context::Clear().DepthBuffer().ColorBuffer();
     MatrixStack & mv = Stacks::modelview();
+    MatrixStack & pr = Stacks::projection();
+
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
       renderSkybox();
+    });
+      
+    Stacks::withPush([&]{
+      pr.identity();
+      mv.identity();
+      Stacks::projection().identity();
+      shaderFramebuffer.color->Bind(Texture::Target::_2D);
+      oria::renderGeometry(plane, planeProgram, { [&]{
+        Uniform<vec2>(*planeProgram, "UvMultiplier").Set(vec2(texRes));
+      }} );
+    });
+    
+    mv.withPush([&]{
+      mv.postMultiply(glm::inverse(player));
       if (uiVisible) {
         mv.translate(vec3(0, OVR_DEFAULT_EYE_HEIGHT, -1));
         uiWrapper.render();

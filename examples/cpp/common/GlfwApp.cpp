@@ -234,6 +234,14 @@ void GlfwApp::viewport(const glm::ivec2 & pos, const glm::uvec2 & size) {
   oglplus::Context::Viewport(pos.x, pos.y, size.x, size.y);
 }
 
+void GlfwApp::viewport(const glm::uvec2 & size, const glm::ivec2 & pos) {
+  oglplus::Context::Viewport(pos.x, pos.y, size.x, size.y);
+}
+
+void GlfwApp::viewport(const glm::vec2 & size, const glm::vec2 & pos) {
+  viewport(uvec2(size), ivec2(pos));
+}
+
 void GlfwApp::renderStringAt(const std::string & string, float x, float y) {
   renderStringAt(string, vec2(x, y));
 }

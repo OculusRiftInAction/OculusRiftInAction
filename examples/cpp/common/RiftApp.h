@@ -70,8 +70,8 @@ public:
   using GlfwApp::viewport;
   virtual void viewport(ovrEyeType eye) {
     const glm::uvec2 & windowSize = getSize();
-    glm::uvec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
-    GlfwApp::viewport(viewportPosition,  glm::uvec2(windowSize.x / 2, windowSize.y));
+    glm::ivec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
+    GlfwApp::viewport(glm::uvec2(windowSize.x / 2, windowSize.y), viewportPosition);
   }
     
   int getEnabledCaps() {

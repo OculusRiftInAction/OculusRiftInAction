@@ -86,8 +86,10 @@ struct FramebufferWrapper {
 
   template <typename F> 
   void Bound(F f, oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {
+    GLint oldBinding;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldBinding);
     Bind(target);
     f();
-    Unbind(target);
+    glBindFramebuffer(GL_FRAMEBUFFER, oldBinding);
   }
 };
