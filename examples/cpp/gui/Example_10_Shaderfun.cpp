@@ -43,6 +43,7 @@ const Resource TEXTURES[] = {
   Resource::SHADERTOY_TEXTURES_TEX16_PNG,
 };
 
+
 typedef std::shared_ptr<oglplus::VertexShader> VertexShaderPtr;
 typedef std::shared_ptr<oglplus::FragmentShader> FragmentShaderPtr;
 
@@ -51,6 +52,16 @@ struct Channel {
   oglplus::Texture::Target target;
   vec3 resolution;
 };
+
+std::string replaceAll(const std::string & input, const std::string & find, const std::string & replace) {
+  std::string result = input;
+  std::string::size_type find_size = find.size();
+  std::string::size_type n = 0;
+  while (std::string::npos != (n = result.find(find, n))) {
+    result.replace(n, find_size, replace);
+  }
+  return result;
+}
 
 struct RateCounter {
   unsigned int count{ 0 };
@@ -90,6 +101,9 @@ std::set<std::string> getActiveUniforms(ProgramPtr & program) {
   return activeUniforms;
 }
 
+const char * WINDOW_EDIT = "ShaderEdit";
+const char * WINDOW_CHANNELS = "ShaderChannels";
+const char * WINDOW_LOAD = "ShaderLoad";
 
 class DynamicFramebufferScaleExample : public PARENT_CLASS {
   const char * SHADER_HEADER = "#version 330\n"
@@ -107,7 +121,8 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
     "uniform sampler2D iChannel3;\n"
     "\n"
     "in vec3 iDir; // Direction from viewer\n"
-    "out vec4 FragColor;\n";
+    "out vec4 FragColor;\n"
+    "#line 1\n";
 
   static const char * UNIFORM_RESOLUTION;
   static const char * UNIFORM_GLOBALTIME;
@@ -120,42 +135,48 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
   static const char * UNIFORM_CHANNELS[4];
   
 
+  enum UiState {
+    INACTIVE,
+    EDIT,
+    CHANNEL,
+    LOAD,
+    SAVE,
+  };
+
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
 #ifdef RIFT
   float texRes{ 1.0f };
 #endif
 
-  // Renders the shader to a skybox
+  // GLSL and geometry for the shader skybox
   ProgramPtr skyboxProgram;
-  // Skybox geometry
   ShapeWrapperPtr skybox;
+  VertexShaderPtr vertexShader;
+  FragmentShaderPtr fragmentShader;
+  // We actually render the shader to one FBO for dynamic framebuffer scaling,
+  // while leaving the actual texture we pass to the Oculus SDK fixed.
+  // This allows us to have a clear UI regardless of the shader performance
+  FramebufferWrapper shaderFramebuffer;
 
+
+  // GLSL and geometry for the UI
   ProgramPtr planeProgram;
   ShapeWrapperPtr plane;
   
   // Measure the FPS for use in dynamic scaling
   RateCounter fps;
   
-  // The vertex shader, constant
-  VertexShaderPtr vertexShader;
-
-  // The fragment shader, which can be edited
-  FragmentShaderPtr fragmentShader;
-  
-  // We actually render the shader to one FBO for dynamic framebuffer scaling,
-  // while leaving the actual texture we pass to the Oculus SDK fixed.
-  // This allows us to have a clear UI regardless of the shader performance
-  FramebufferWrapper shaderFramebuffer;
 
   // UI for editing the shader
   ui::Wrapper uiWrapper;
   
   // The current fragment source
   std::string fragmentSource;
+  std::string lastError;
   std::list<std::function<void()>> uniformLambdas;
   Channel channels[4];
-  bool uiVisible{ false };
+  UiState uiState{ INACTIVE };
   
 
 public:
@@ -195,25 +216,28 @@ public:
     std::function<void()> initFunction([&]{
       using namespace CEGUI;
       WindowManager & wmgr = WindowManager::getSingleton();
-      CEGUI::FrameWindow * rootWindow;
-      rootWindow = dynamic_cast<FrameWindow *>(wmgr.createWindow("TaharezLook/FrameWindow", "root"));
-      rootWindow->setFrameEnabled(false);
-      rootWindow->setTitleBarEnabled(false);
-      rootWindow->setAlpha(0.5f);
-      rootWindow->setCloseButtonEnabled(false);
-      rootWindow->setSize(CEGUI::USize(cegui_absdim(UI_X), cegui_absdim(UI_Y)));
+      auto rootWindow = uiWrapper.getWindow();
       rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderChannels.layout"));
       rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderEdit.layout"));
-      Window * pShaderEditor = rootWindow->getChild("ShaderEdit");
-      Window * pShaderChannels = rootWindow->getChild("ShaderChannels");
+      Window * pShaderEditor = rootWindow->getChild(WINDOW_EDIT);
+      Window * pShaderChannels = rootWindow->getChild(WINDOW_CHANNELS);
       {
         Window * pShaderText = pShaderEditor->getChild("ShaderText");
         FontManager::getSingleton().createFromFile("Inconsolata-14.font");
         pShaderText->setFont("Inconsolata-14");
         pShaderText->setText(fragmentSource);
         Window * pRunButton = pShaderEditor->getChild("ButtonRun");
+        Window * pStatus = pShaderEditor->getChild("Status");
+        pStatus->setFont("Inconsolata-14");
+        pStatus->setTextParsingEnabled(true);
+        RenderedStringParser & parser = pStatus->getRenderedStringParser();
         pRunButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-          setFragmentSource(pShaderText->getText().c_str());
+          if (!setFragmentSource(pShaderText->getText().c_str())) {
+            pStatus->setText(lastError.c_str());
+          } else {
+            pStatus->setTextParsingEnabled(true);
+            pStatus->setText("Success");
+          }
           return true;
         });
         for (int i = 0; i < 4; ++i) {
@@ -262,13 +286,44 @@ public:
     uiWrapper.init(UI_SIZE, initFunction);
   }
   
+
+  bool uiVisible() {
+    return uiState != INACTIVE;
+  }
+
+  void setUiState(UiState newState) {
+    auto rootWindow = uiWrapper.getWindow();
+    int childCount = rootWindow->getChildCount();
+    for (int i = 0; i < childCount; ++i) {
+      rootWindow->getChildAtIdx(i)->hide();
+    }
+
+    switch (newState) {
+    case INACTIVE:
+      break;
+    case EDIT:
+      rootWindow->getChild(WINDOW_EDIT)->show();
+      break;
+    case CHANNEL:
+      rootWindow->getChild(WINDOW_CHANNELS)->show();
+      break;
+    case LOAD:
+      break;
+    case SAVE:
+      break;
+    }
+    uiState = newState;
+  }
+
   virtual void initGl() {
+    fragmentSource = Platform::getResourceData(Resource::SHADERTOY_SHADERS_DEFAULT_FS);
+
     initUi();
     
     planeProgram = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
     plane = oria::loadPlane(planeProgram, 1.0f);
 
-    setFragmentSource(Platform::getResourceData(Resource::SHADERS_SHADERTOY_FS));
+    setFragmentSource(fragmentSource);
     assert(skyboxProgram);
 
     skybox = oria::loadSkybox(skyboxProgram);
@@ -284,23 +339,14 @@ public:
     PARENT_CLASS::initGl();
   }
 
-  static std::string replaceAll(const std::string & input, const std::string & find, const std::string & replace) {
-    std::string result = input;
-    std::string::size_type find_size = find.size();
-    std::string::size_type n = 0;
-    while (std::string::npos != (n = result.find(find, n))) {
-      result.replace(n, find_size, replace);
-    }
-    return result;
-  }
            
-  virtual void setFragmentSource(const std::string & source) {
+  virtual bool setFragmentSource(const std::string & source) {
     using namespace oglplus;
     fragmentSource = source;
     try {
       if (!vertexShader) {
         vertexShader = VertexShaderPtr(new VertexShader());
-        vertexShader->Source(Platform::getResourceData(Resource::SHADERS_SHADERTOY_VS));
+        vertexShader->Source(Platform::getResourceData(Resource::SHADERTOY_SHADERS_DEFAULT_VS));
         vertexShader->Compile();
       }
       
@@ -314,11 +360,14 @@ public:
       result->Link();
       skyboxProgram.swap(result);
       fragmentShader.swap(newFragmentShader);
+      updateUniforms();
+      return true;
     }
     catch (ProgramBuildError & err) {
-      SAY_ERR((const char*)err.Message);
+      lastError  = err.Log().c_str();
+      SAY_ERR((const char*)err.Log().c_str());
     }
-    updateUniforms();
+    return false;
   }
 
   virtual void setChannelInput(int channel, ChannelInputType type, Resource res) {
@@ -384,14 +433,15 @@ public:
     }
   }
 
+
   virtual void onMouseButton(int button, int action, int mods) { 
-    if (uiVisible) {
+    if (uiVisible()) {
       ui::handleGlfwMouseButtonEvent(button, action, mods);
     }
   }
 
   virtual void onMouseMove(double x, double y) {
-    if (uiVisible) {
+    if (uiVisible()) {
       vec2 mousePosition(x, y);
       vec2 windowSize(getSize());
       mousePosition /= windowSize;
@@ -401,21 +451,21 @@ public:
   }
 
   virtual void onScroll(double x, double y) {
-    if (uiVisible) {
+    if (uiVisible()) {
       ui::handleGlfwMouseScrollEvent(x, y);
     }
   }
 
   virtual void onCharacter(unsigned int codepoint) {
-    if (uiVisible) {
+    if (uiVisible()) {
       ui::handleGlfwCharacterEvent(codepoint);
     }
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (uiVisible) {
+    if (uiVisible()) {
       if (GLFW_PRESS == action && GLFW_KEY_ESCAPE == key) {
-        uiVisible = false;
+        setUiState(INACTIVE);
         return;
       } else {
         if (GLFW_MOD_CONTROL == mods) {
@@ -463,7 +513,7 @@ public:
         break;
 
       case GLFW_KEY_SPACE:
-        uiVisible = true;
+        setUiState(EDIT);
         break;
       }
     } else {
@@ -491,6 +541,12 @@ public:
         SAY("%f %f", rate, texRes);
         texRes *= 0.9f;
       }
+      uiWrapper.getWindow()->getChild("ShaderEdit/TextFps")->setText(Platform::format("%2.1f", rate));
+      uiWrapper.getWindow()->getChild("ShaderEdit/TextRez")->setText(Platform::format("%2.1f", texRes));
+      float mpx = renderSize().x * renderSize().y;
+      mpx /= 1e6f;
+      uiWrapper.getWindow()->getChild("ShaderEdit/TextMpx")->setText(Platform::format("%02.2f", mpx));
+
       fps.reset();
     }
     fps.increment();
@@ -535,7 +591,8 @@ public:
     
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
-      if (uiVisible) {
+      //mv.top() = glm::inverse(player);
+      if (uiVisible()) {
         mv.translate(vec3(0, OVR_DEFAULT_EYE_HEIGHT, -1));
         uiWrapper.render();
       }

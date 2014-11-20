@@ -22,12 +22,15 @@ namespace ui {
     FramebufferWrapper fbo;
     uvec2 size;
     GLFWwindow * context{ nullptr };
+    CEGUI::FrameWindow * rootWindow;
+
 
   public:
     ~Wrapper();
     void init(const uvec2 & size, std::function<void()> & f);
     void update();
     void render();
+    CEGUI::FrameWindow * getWindow();
   };
 
 

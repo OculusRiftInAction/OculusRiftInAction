@@ -173,12 +173,14 @@ namespace ui {
     WindowManager::setDefaultResourceGroup("layouts");
     // ScriptModule::setDefaultResourceGroup("lua_scripts");
     // AnimationManager::setDefaultResourceGroup("animations");
-
+    
     SchemeManager::getSingleton().createFromFile("TaharezLook.scheme");
     FontManager::getSingleton().createFromFile("Bitwise-24.font");
 
     System::getSingleton().getDefaultGUIContext().setDefaultFont("Bitwise-24");
     System::getSingleton().getDefaultGUIContext().getMouseCursor().setDefaultImage("TaharezLook/MouseArrow");
+    System::getSingleton().setDefaultCustomRenderedStringParser(new BasicRenderedStringParser());
+
   }
 
   CEGUI::GUIContext & getContext() {
@@ -236,6 +238,10 @@ namespace ui {
       }
     }
 
+  CEGUI::FrameWindow * Wrapper::getWindow() {
+    return rootWindow;
+  }
+  
   void Wrapper::init(const uvec2 & size, std::function<void()> & f) {
     using namespace oglplus;
     this->size = size;
@@ -249,6 +255,13 @@ namespace ui {
         Context::Enable(Capability::Blend);
         Context::Disable(Capability::DepthTest);
         ui::initWindow(size);
+        CEGUI::WindowManager & wmgr = CEGUI::WindowManager::getSingleton();
+        rootWindow = dynamic_cast<CEGUI::FrameWindow *>(wmgr.createWindow("TaharezLook/FrameWindow", "root"));
+        rootWindow->setFrameEnabled(false);
+        rootWindow->setTitleBarEnabled(false);
+        rootWindow->setAlpha(0.5f);
+        rootWindow->setCloseButtonEnabled(false);
+        rootWindow->setSize(CEGUI::USize(cegui_absdim(size.x), cegui_absdim(size.y)));
         f();
       });
     });

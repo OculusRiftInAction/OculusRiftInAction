@@ -43,7 +43,7 @@ namespace glfw {
         continue;
       }
       glm::uvec2 curSize = getSize(cur);
-      if (best == nullptr || (bestSize.x < curSize.x && bestSize.y < curSize.y)) {
+      if (best == nullptr || (bestSize.x < curSize.x || bestSize.y < curSize.y)) {
         best = cur;
         bestSize = curSize;
       }
