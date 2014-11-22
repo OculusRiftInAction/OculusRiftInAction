@@ -62,7 +62,7 @@ void readPngToTexture(const char * data, size_t size,  TexturePtr & texture, glm
   using namespace oglplus;
   std::vector<uint8_t> pngData(size);
   memcpy(&pngData[0], data, size);
-  ImagePtr image = oria::loadPngImage(pngData);
+  ImagePtr image = oria::loadImage(pngData);
   textureSize = glm::vec2(image->Width(), image->Height());
   texture = oria::load2dTextureFromPngData(pngData);
 }

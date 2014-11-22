@@ -43,6 +43,49 @@ const Resource TEXTURES[] = {
   Resource::SHADERTOY_TEXTURES_TEX16_PNG,
 };
 
+const Resource CUBEMAPS[] = {
+  Resource::SHADERTOY_CUBEMAPS_CUBE00_0_JPG,
+  Resource::SHADERTOY_CUBEMAPS_CUBE01_0_PNG,
+  Resource::SHADERTOY_CUBEMAPS_CUBE02_0_JPG,
+  Resource::SHADERTOY_CUBEMAPS_CUBE03_0_PNG,
+  Resource::SHADERTOY_CUBEMAPS_CUBE04_0_PNG,
+  Resource::SHADERTOY_CUBEMAPS_CUBE05_0_PNG,
+};
+
+const Resource PRESETS[] = {
+  Resource::SHADERTOY_SHADERS_DEFAULT_FS,
+  Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_FS,
+  Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_FS,
+  Resource::SHADERTOY_SHADERS_4DFGZS_VOXEL_EDGES_FS,
+  Resource::SHADERTOY_SHADERS_4DJGWR_ROUNDED_VOXELS_FS,
+  Resource::SHADERTOY_SHADERS_4SBGD1_FAST_BALLS_FS,
+  Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_FS,
+  Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_FS,
+  Resource::SHADERTOY_SHADERS_MSSGD1_HAND_DRAWN_SKETCH_FS,
+  Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_FS,
+  Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_FS,
+  Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_FS,
+  Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_FS,
+  Resource::SHADERTOY_SHADERS_LSS3WS_RELENTLESS_FS,
+  Resource::NO_RESOURCE,
+};
+
+const char * PRESET_NAMES[] = {
+  "Default",
+  "Steel Cubes",
+  "Infinite City",
+  "Voxel Edges",
+  "Rounded Voxels",
+  "Fast Balls",
+  "Oceanic",
+  "Elevated",
+  "Hand Drawn",
+  "Voronoi Rocks",
+  "Morning City",
+  "Abandoned Base",
+  "Cubemap",
+  "Relentless",
+};
 
 typedef std::shared_ptr<oglplus::VertexShader> VertexShaderPtr;
 typedef std::shared_ptr<oglplus::FragmentShader> FragmentShaderPtr;
@@ -104,6 +147,7 @@ std::set<std::string> getActiveUniforms(ProgramPtr & program) {
 const char * WINDOW_EDIT = "ShaderEdit";
 const char * WINDOW_CHANNELS = "ShaderChannels";
 const char * WINDOW_LOAD = "ShaderLoad";
+const char * WINDOW_SAVE = "ShaderSave";
 
 class DynamicFramebufferScaleExample : public PARENT_CLASS {
   const char * SHADER_HEADER = "#version 330\n"
@@ -115,13 +159,16 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
     "uniform vec4      iDate;                 // (year, month, day, time in seconds)\n"
     "uniform float     iSampleRate;           // sound sample rate (i.e., 44100)\n"
     "uniform vec3      iPos; // Head position\n"
+    "in vec3 iDir; // Direction from viewer\n"
+    "out vec4 FragColor;\n";
+
+  const char * CHANNEL_HEADER =
     "uniform sampler2D iChannel0;\n"
     "uniform sampler2D iChannel1;\n"
     "uniform sampler2D iChannel2;\n"
-    "uniform sampler2D iChannel3;\n"
-    "\n"
-    "in vec3 iDir; // Direction from viewer\n"
-    "out vec4 FragColor;\n"
+    "uniform sampler2D iChannel3;\n";
+
+  const char * LINE_NUMBER_HEADER = 
     "#line 1\n";
 
   static const char * UNIFORM_RESOLUTION;
@@ -219,39 +266,60 @@ public:
       auto rootWindow = uiWrapper.getWindow();
       rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderChannels.layout"));
       rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderEdit.layout"));
+      rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderLoad.layout"));
       Window * pShaderEditor = rootWindow->getChild(WINDOW_EDIT);
       Window * pShaderChannels = rootWindow->getChild(WINDOW_CHANNELS);
+      Window * pShaderLoad = rootWindow->getChild(WINDOW_LOAD);
+
+
+      // Set up the editor window
       {
         Window * pShaderText = pShaderEditor->getChild("ShaderText");
         FontManager::getSingleton().createFromFile("Inconsolata-14.font");
         pShaderText->setFont("Inconsolata-14");
         pShaderText->setText(fragmentSource);
-        Window * pRunButton = pShaderEditor->getChild("ButtonRun");
         Window * pStatus = pShaderEditor->getChild("Status");
         pStatus->setFont("Inconsolata-14");
         pStatus->setTextParsingEnabled(true);
-        RenderedStringParser & parser = pStatus->getRenderedStringParser();
+
+        // Run button
+        Window * pRunButton = pShaderEditor->getChild("ButtonRun");
         pRunButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
           if (!setFragmentSource(pShaderText->getText().c_str())) {
             pStatus->setText(lastError.c_str());
           } else {
-            pStatus->setTextParsingEnabled(true);
             pStatus->setText("Success");
           }
           return true;
         });
+
+        // Load button
+        Window * pLoadButton = pShaderEditor->getChild("ButtonLoad");
+        pLoadButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+          setUiState(LOAD);
+          return true;
+        });
+
+        // Save button
+        Window * pSaveButton = pShaderEditor->getChild("ButtonSave");
+        pSaveButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+          setUiState(SAVE);
+          return true;
+        });
+
+        // Channel buttons
         for (int i = 0; i < 4; ++i) {
           std::string controlName = Platform::format("ButtonC%d", i);
           Window * pButton = pShaderEditor->getChild(controlName);
           pButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
             pShaderChannels->setUserData((void*)i);
-            pShaderEditor->hide();
-            pShaderChannels->show();
+            setUiState(CHANNEL);
             return true;
           });
         }
       }
-      
+
+      // Set up the channel selection window
       {
         ImageManager & im = CEGUI::ImageManager::getSingleton();
         for (int i = 0; i < 17; ++i) {
@@ -273,14 +341,76 @@ public:
               pButton->setProperty("PushedImage", imageName);
               pButton->setProperty("HoverImage", imageName);
               setChannelInput(channel, TEXTURE, res);
-              pShaderChannels->hide();
-              pShaderEditor->show();
+              setUiState(EDIT);
               return true;
             });
           }
         }
-        pShaderChannels->hide();
+        for (int i = 0; i < 6; ++i) {
+          std::string str = Platform::format("Cube%02d", i);
+          if (pShaderChannels->isChild(str)) {
+            std::string imageName = "Image" + str;
+            Resource res = CUBEMAPS[i];
+            Window * pChannelButton = pShaderChannels->getChild(str);
+            std::string file = Resources::getResourcePath(res);
+            im.addFromImageFile(imageName, file, "resources");
+            pChannelButton->setProperty("NormalImage", imageName);
+            pChannelButton->setProperty("PushedImage", imageName);
+            pChannelButton->setProperty("HoverImage", imageName);
+            pChannelButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+              size_t channel = (size_t)pShaderChannels->getUserData();
+              std::string controlName = Platform::format("ButtonC%d", channel);
+              Window * pButton = pShaderEditor->getChild(controlName);
+              pButton->setProperty("NormalImage", imageName);
+              pButton->setProperty("PushedImage", imageName);
+              pButton->setProperty("HoverImage", imageName);
+              setChannelInput(channel, CUBEMAP, res);
+              setUiState(EDIT);
+              return true;
+            });
+          }
+        }
       }
+
+      // Set up the load window
+      {
+        Listbox * lb = (Listbox*)pShaderLoad->getChild("ListboxPresets");
+        const CEGUI::Image* sel_img = &ImageManager::getSingleton().get("TaharezLook/MultiListSelectionBrush");
+        for (int i = 0; Resource::NO_RESOURCE != PRESETS[i]; ++i) {
+          ListboxTextItem * itm = new ListboxTextItem(PRESET_NAMES[i], i, (void*)PRESETS[i], false);
+          itm->setSelectionBrushImage(sel_img);
+          lb->addItem(itm);
+        }
+        lb->subscribeEvent(Listbox::EventSelectionChanged, [=](const EventArgs& e) -> bool {
+          ListboxItem * itm = lb->getFirstSelectedItem();
+          if (nullptr != itm) {
+            pShaderLoad->setUserData(itm->getUserData());
+          } else {
+            pShaderLoad->setUserData(nullptr);
+          }
+          return true;
+        });
+        Window * pButtonOk = pShaderLoad->getChild("ButtonOk");
+        pButtonOk->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+          void * selected = pShaderLoad->getUserData();
+          if (nullptr != selected) {
+            std::string newSource = Platform::getResourceData((Resource)(int)selected);
+            pShaderEditor->getChild("ShaderText")->setText(newSource.c_str());
+          }
+          pShaderLoad->setUserData(nullptr);
+          setUiState(EDIT);
+          return true;
+        });
+        Window * pButtonCancel = pShaderLoad->getChild("ButtonOk");
+        pButtonOk->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
+          pShaderLoad->setUserData(nullptr);
+          setUiState(EDIT);
+          return true;
+        });
+
+        
+      }
+      setUiState(INACTIVE);
       System::getSingleton().getDefaultGUIContext().setRootWindow(rootWindow);
     });
     uiWrapper.init(UI_SIZE, initFunction);
@@ -308,6 +438,7 @@ public:
       rootWindow->getChild(WINDOW_CHANNELS)->show();
       break;
     case LOAD:
+      rootWindow->getChild(WINDOW_LOAD)->show();
       break;
     case SAVE:
       break;
@@ -350,9 +481,20 @@ public:
         vertexShader->Compile();
       }
       
+      std::string header = SHADER_HEADER;
+      for (int i = 0; i < 4; ++i) {
+        const Channel & channel = channels[i];
+        // "uniform sampler2D iChannel0;\n"
+        std::string line = Platform::format("uniform sampler%s iChannel%d;\n",
+          channel.target == Texture::Target::CubeMap ? "Cube" : "2D", i);
+        header += line;
+      }
+      header += LINE_NUMBER_HEADER;
       FragmentShaderPtr newFragmentShader(new FragmentShader());
       std::string newSource = replaceAll(source, "gl_FragColor", "FragColor");
-      newFragmentShader->Source(GLSLSource(std::string(SHADER_HEADER) + newSource));
+      newSource = header + newSource;
+      SAY(newSource.c_str());
+      newFragmentShader->Source(GLSLSource(newSource));
       newFragmentShader->Compile();
       ProgramPtr result(new Program());
       result->AttachShader(*vertexShader);
@@ -381,8 +523,13 @@ public:
       newChannel.resolution = vec3(size, 0);
       break;
     case CUBEMAP:
-      newChannel.texture = oria::loadCubemapTexture(res);
-      newChannel.target = Texture::Target::CubeMap;
+      {
+        static int resourceOrder[] = {
+          0, 1, 2, 3, 4, 5
+        };
+        newChannel.texture = oria::loadCubemapTexture(res, resourceOrder, false);
+        newChannel.target = Texture::Target::CubeMap;
+      }
       break;
     case VIDEO:
       break;
@@ -402,6 +549,8 @@ public:
     for (int i = 0; i < 4; ++i) {
       const char * uniformName = UNIFORM_CHANNELS[i];
       if (activeUniforms.count(uniformName)) {
+        int loc = glGetUniformLocation(oglplus::GetName(*skyboxProgram), uniformName);
+        glUniform1i(loc, i);
         // setting the active texture slot for the channels
 //        Uniform<GLuint>(*cubeProgram, uniformName).Set(i);
       }
@@ -466,32 +615,27 @@ public:
     if (uiVisible()) {
       if (GLFW_PRESS == action && GLFW_KEY_ESCAPE == key) {
         setUiState(INACTIVE);
-        return;
-      } else {
-        if (GLFW_MOD_CONTROL == mods) {
-          switch (key) {
-          case GLFW_KEY_C:
-            CEGUI::System::getSingleton().getDefaultGUIContext().injectCopyRequest();
-            return;
-          case GLFW_KEY_V:
-            CEGUI::System::getSingleton().getDefaultGUIContext().injectPasteRequest();
-            return;
-          case GLFW_KEY_X:
-            CEGUI::System::getSingleton().getDefaultGUIContext().injectCutRequest();
-            return;
-          case GLFW_KEY_A:
-            // CEGUI::System::getSingleton().getDefaultGUIContext().injectinjectCutRequest();
-            return;
-          default: break;
-          }
+      } 
+      if (GLFW_PRESS == action && GLFW_MOD_CONTROL == mods) {
+        switch (key) {
+        case GLFW_KEY_C:
+          CEGUI::System::getSingleton().getDefaultGUIContext().injectCopyRequest();
+          return;
+        case GLFW_KEY_V:
+          CEGUI::System::getSingleton().getDefaultGUIContext().injectPasteRequest();
+          return;
+        case GLFW_KEY_X:
+          CEGUI::System::getSingleton().getDefaultGUIContext().injectCutRequest();
+          return;
+        case GLFW_KEY_A:
+          // CEGUI::System::getSingleton().getDefaultGUIContext().injectinjectCutRequest();
+          // return;
+        default: 
+          break;
         }
-        if (!ui::handleGlfwKeyboardEvent(key, scancode, action, mods)) {
-          if (GLFW_RELEASE == action) {
-            SAY("Key not accepted");
-          }
-        }
-        return;
       }
+      ui::handleGlfwKeyboardEvent(key, scancode, action, mods);
+      return;
     }
 
     static const float ROOT_2 = sqrt(2.0f);
@@ -512,7 +656,7 @@ public:
         resetCamera();
         break;
 
-      case GLFW_KEY_SPACE:
+      case GLFW_KEY_ESCAPE:
         setUiState(EDIT);
         break;
       }
@@ -562,7 +706,12 @@ public:
         mv.untranslate();
         oria::renderGeometry(skybox, skyboxProgram, uniformLambdas );
       });
-      DefaultTexture().Bind(TextureTarget::CubeMap);
+      for (int i = 0; i < 4; ++i) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        DefaultTexture().Bind(Texture::Target::_2D);
+        DefaultTexture().Bind(Texture::Target::CubeMap);
+      }
+      glActiveTexture(GL_TEXTURE0);
     });
     viewport(textureSize());
   }
