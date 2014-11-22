@@ -569,7 +569,11 @@ public:
     }
     if (activeUniforms.count(UNIFORM_POSITION)) {
       uniformLambdas.push_back([&]{
-        Uniform<vec3>(*skyboxProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
+        if (uiVisible()) {
+          Uniform<vec3>(*skyboxProgram, UNIFORM_POSITION).Set(vec3(0));
+        } else {
+          Uniform<vec3>(*skyboxProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
+        }
       });
     }
     for (int i = 0; i < 4; ++i) {
