@@ -4,7 +4,8 @@
 
 #pragma warning( disable : 4275 )
 #include <CEGUI/CEGUI.h>
-#pragma warning( default : 4275 )
+#include <CEGUI/MemoryStdAllocator.h>
+#pragma warning( default : 4725 )
 
 
 namespace ui {
@@ -27,7 +28,7 @@ namespace ui {
 
   public:
     ~Wrapper();
-    void init(const uvec2 & size, std::function<void()> & f);
+    void init(const uvec2 & size, std::function<void()> f);
     void update();
     void render();
     CEGUI::FrameWindow * getWindow();

@@ -1,10 +1,11 @@
 #include "Common.h"
 
 #ifdef HAVE_CEGUI
+
 #include <CEGUI/RendererModules/OpenGL/GL3Renderer.h>
+#include <CEGUI/CompositeResourceProvider.h>
 
 namespace ui {
-
 
   /// Helper Macro
 #define mapKey(a) case GLFW_KEY_##a: return Key::a;
@@ -143,27 +144,76 @@ namespace ui {
     }
   }
 
+  using namespace CEGUI;
+  class MyResourceProvider : public CEGUI::DefaultResourceProvider {
+    std::map<CEGUI::String, Resource> invMap;
+
+    Resource getResourceForPath(const CEGUI::String & filename) {
+      if (!invMap.count(filename)) {
+        return NO_RESOURCE;
+      }
+      return invMap[filename];
+    }
+
+  public:
+    MyResourceProvider() {
+      for (int i = 0; i != Resource::NO_RESOURCE; ++i) {
+        Resource res = static_cast<Resource>(i);
+        invMap[Resources::getResourcePath(res).c_str()] = res;
+      }
+      setResourceGroupDirectory("schemes", "cegui/schemes/");
+      setResourceGroupDirectory("imagesets", "cegui/imagesets/");
+      setResourceGroupDirectory("fonts", "cegui/fonts/");
+      setResourceGroupDirectory("layouts", "cegui/layouts/");
+      setResourceGroupDirectory("looknfeels", "cegui/looknfeel/");
+      setResourceGroupDirectory("lua_scripts", "cegui/lua_scripts/");
+      setResourceGroupDirectory("resources", "");
+    }
+
+    virtual void loadRawDataContainer(const CEGUI::String& filename, CEGUI::RawDataContainer& output, const CEGUI::String& resourceGroup) {
+      const CEGUI::String path(getFinalFilename(filename, resourceGroup));
+      Resource res = getResourceForPath(path);
+      size_t size = Resources::getResourceSize(res);
+      uint8_t* const buffer = static_cast<uint8_t*>(RawDataContainer::Allocator::allocateBytes(size));
+      Resources::getResourceData(res, buffer);
+      output.setData(buffer);
+      output.setSize(size);
+    }
+
+    virtual void unloadRawDataContainer(CEGUI::RawDataContainer& container)  {
+      container.release();
+    }
+
+    virtual size_t getResourceGroupFileNames(std::vector<CEGUI::String>& out_vec, const CEGUI::String& file_pattern, const CEGUI::String& resource_group) {
+      const CEGUI::String path(getFinalFilename(file_pattern, resource_group));
+
+      Resource res = getResourceForPath(path);
+      if (res == NO_RESOURCE) {
+        return 0;
+      }
+      out_vec.push_back(file_pattern);
+      return 1;
+    }
+  };
+
+  template <typename T> 
+  T * ceguiCreate() {
+    void * buffer = DefaultResourceProvider::Allocator::allocateBytes(sizeof(T));
+    return new (buffer)T();
+  }
+
   void initWindow(const uvec2 & size) {
     using namespace CEGUI;
     static CEGUI::OpenGL3Renderer & myRenderer =
       CEGUI::OpenGL3Renderer::create();
+    
     myRenderer.enableExtraStateSettings (true);
     myRenderer.setDisplaySize(CEGUI::Sizef(size.x, size.y));
-    CEGUI::System::create(myRenderer);
+
+    void * rp = DefaultResourceProvider::Allocator::allocateBytes(sizeof(MyResourceProvider));
+    CEGUI::System::create(myRenderer, ceguiCreate<MyResourceProvider>());
 //    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");
 //    CEGUI::Logger::getSingleton().setLoggingLevel(CEGUI::LoggingLevel::Insane);
-    //  OpenGL3Renderer::bootstrapSystem();
-
-    {
-      DefaultResourceProvider* rp = static_cast<CEGUI::DefaultResourceProvider*>(CEGUI::System::getSingleton().getResourceProvider());
-      rp->setResourceGroupDirectory("schemes", PROJECT_DIR "/resources/cegui/schemes/");
-      rp->setResourceGroupDirectory("imagesets", PROJECT_DIR "/resources/cegui/imagesets/");
-      rp->setResourceGroupDirectory("fonts", PROJECT_DIR "/resources/cegui/fonts/");
-      rp->setResourceGroupDirectory("layouts", PROJECT_DIR "/resources/cegui/layouts/");
-      rp->setResourceGroupDirectory("looknfeels", PROJECT_DIR "/resources/cegui/looknfeel/");
-      rp->setResourceGroupDirectory("lua_scripts", PROJECT_DIR "/resources/cegui/lua_scripts/");
-      rp->setResourceGroupDirectory("resources", "");
-    }
 
     // set the default resource groups to be used
     ImageManager::setImagesetDefaultResourceGroup("imagesets");
@@ -173,14 +223,11 @@ namespace ui {
     WindowManager::setDefaultResourceGroup("layouts");
     // ScriptModule::setDefaultResourceGroup("lua_scripts");
     // AnimationManager::setDefaultResourceGroup("animations");
-    
     SchemeManager::getSingleton().createFromFile("TaharezLook.scheme");
     FontManager::getSingleton().createFromFile("Bitwise-24.font");
-
     System::getSingleton().getDefaultGUIContext().setDefaultFont("Bitwise-24");
     System::getSingleton().getDefaultGUIContext().getMouseCursor().setDefaultImage("TaharezLook/MouseArrow");
     System::getSingleton().setDefaultCustomRenderedStringParser(new BasicRenderedStringParser());
-
   }
 
   CEGUI::GUIContext & getContext() {
@@ -242,7 +289,7 @@ namespace ui {
     return rootWindow;
   }
   
-  void Wrapper::init(const uvec2 & size, std::function<void()> & f) {
+  void Wrapper::init(const uvec2 & size, std::function<void()> f) {
     using namespace oglplus;
     this->size = size;
     glfwWindowHint(GLFW_VISIBLE, 0);
@@ -271,6 +318,10 @@ namespace ui {
       Resource::SHADERS_TEXTURED_FS);
     float aspect = (float)size.x / (float)size.y;
     shape = oria::loadPlane(program, aspect);
+    Platform::addShutdownHook([&]{
+      program.reset();
+      shape.reset();
+    });
   }
 
   void Wrapper::update() {
@@ -278,9 +329,9 @@ namespace ui {
     withContext(context, [&]{
       fbo.Bound([&]{
         Context::Viewport(0, 0, size.x, size.y);
-        DefaultTexture().Bind(Texture::Target::_2D);
+        DefaultTexture().Bind(oglplus::Texture::Target::_2D);
         NoProgram().Bind();
-        Texture::Active(0);
+        oglplus::Texture::Active(0);
         Context::ClearColor(0, 0, 0, 1);
         Context::Clear().ColorBuffer().DepthBuffer();
         Context::Enable(oglplus::Capability::Blend);
@@ -293,7 +344,7 @@ namespace ui {
   void Wrapper::render() {
     using namespace oglplus;
     Context::Enable(Capability::Blend);
-      fbo.color->Bind(Texture::Target::_2D);
+    fbo.color->Bind(oglplus::Texture::Target::_2D);
     oria::renderGeometry(shape, program);
   }
 }

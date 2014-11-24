@@ -122,9 +122,7 @@ public:
 #include "GlfwApp.h"
 #include "Interaction.h"
 //#include "Awesomium.h"
-#pragma warning( disable : 4725 )
 #include "Cegui.h"
-#pragma warning( default : 4725 )
 
 #if defined(OS_WIN)
 #define OVR_OS_WIN32
