@@ -17,9 +17,9 @@ namespace ui {
     using namespace CEGUI;
     switch (glfwButton)
     {
-        mapMouse(LEFT, LeftButton)
-      mapMouse(RIGHT, RightButton)
-      mapMouse(MIDDLE, MiddleButton)
+      mapMouse(LEFT, LeftButton)
+        mapMouse(RIGHT, RightButton)
+        mapMouse(MIDDLE, MiddleButton)
     default:
       return CEGUI::MouseButton::NoButton;
     }
@@ -196,7 +196,7 @@ namespace ui {
     }
   };
 
-  template <typename T> 
+  template <typename T>
   T * ceguiCreate() {
     void * buffer = DefaultResourceProvider::Allocator::allocateBytes(sizeof(T));
     return new (buffer)T();
@@ -206,14 +206,14 @@ namespace ui {
     using namespace CEGUI;
     static CEGUI::OpenGL3Renderer & myRenderer =
       CEGUI::OpenGL3Renderer::create();
-    
-    myRenderer.enableExtraStateSettings (true);
+
+    myRenderer.enableExtraStateSettings(true);
     myRenderer.setDisplaySize(CEGUI::Sizef(size.x, size.y));
 
     void * rp = DefaultResourceProvider::Allocator::allocateBytes(sizeof(MyResourceProvider));
     CEGUI::System::create(myRenderer, ceguiCreate<MyResourceProvider>());
-//    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");
-//    CEGUI::Logger::getSingleton().setLoggingLevel(CEGUI::LoggingLevel::Insane);
+    //    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");
+    //    CEGUI::Logger::getSingleton().setLoggingLevel(CEGUI::LoggingLevel::Insane);
 
     // set the default resource groups to be used
     ImageManager::setImagesetDefaultResourceGroup("imagesets");
@@ -270,63 +270,46 @@ namespace ui {
     return true;
   }
 
-    //case SDL_MOUSEWHEEL:
-    //System::getSingleton().getDefaultGUIContext().injectMouseWheelChange(event.wheel.y);
-    //return true;
-    //case SDL_KEYDOWN:
-    //return true;
-
-
-
   Wrapper::~Wrapper() {
-      if (context) {
-        glfwDestroyWindow(context);
-        context = nullptr;
-      }
+#ifdef UI_CONTEXT
+    if (context) {
+      glfwDestroyWindow(context);
+      context = nullptr;
     }
+#endif
+  }
 
   CEGUI::FrameWindow * Wrapper::getWindow() {
     return rootWindow;
   }
-  
-  void Wrapper::init(const uvec2 & size, std::function<void()> f) {
+
+  void Wrapper::init(const uvec2 & size) {
     using namespace oglplus;
     this->size = size;
+
     glfwWindowHint(GLFW_VISIBLE, 0);
     context = glfwCreateWindow(100, 100, "", nullptr, glfwGetCurrentContext());
     glfwWindowHint(GLFW_VISIBLE, 1);
-    withContext(context, [&]{
-      Context::Disable(Capability::CullFace);
+
+    withUiContext([&]{
       fbo.init(size);
       fbo.Bound([&]{
-        Context::Enable(Capability::Blend);
-        Context::Disable(Capability::DepthTest);
         ui::initWindow(size);
         CEGUI::WindowManager & wmgr = CEGUI::WindowManager::getSingleton();
         rootWindow = dynamic_cast<CEGUI::FrameWindow *>(wmgr.createWindow("TaharezLook/FrameWindow", "root"));
         rootWindow->setFrameEnabled(false);
         rootWindow->setTitleBarEnabled(false);
-        rootWindow->setAlpha(0.5f);
+        rootWindow->setAlpha(1.0f);
         rootWindow->setCloseButtonEnabled(false);
         rootWindow->setSize(CEGUI::USize(cegui_absdim(size.x), cegui_absdim(size.y)));
-        f();
       });
-    });
-    using namespace oglplus;
-    program = oria::loadProgram(
-      Resource::SHADERS_TEXTURED_VS,
-      Resource::SHADERS_TEXTURED_FS);
-    float aspect = (float)size.x / (float)size.y;
-    shape = oria::loadPlane(program, aspect);
-    Platform::addShutdownHook([&]{
-      program.reset();
-      shape.reset();
     });
   }
 
-  void Wrapper::update() {
+  void Wrapper::update(std::function<void()> f) {
     using namespace oglplus;
-    withContext(context, [&]{
+    withUiContext([&]{
+      f();
       fbo.Bound([&]{
         Context::Viewport(0, 0, size.x, size.y);
         DefaultTexture().Bind(oglplus::Texture::Target::_2D);
@@ -334,21 +317,29 @@ namespace ui {
         oglplus::Texture::Active(0);
         Context::ClearColor(0, 0, 0, 1);
         Context::Clear().ColorBuffer().DepthBuffer();
-        Context::Enable(oglplus::Capability::Blend);
+        Context::Enable(Capability::Blend);
+        Context::Enable(Capability::ScissorTest);
+        Context::Enable(Capability::DepthTest);
+        Context::Enable(Capability::CullFace);
         CEGUI::System::getSingleton().renderAllGUIContexts();
       });
     });
-    glGetError();
+    //glGetError();
   }
 
-  void Wrapper::render() {
-    using namespace oglplus;
-    Context::Enable(Capability::Blend);
+  void Wrapper::bindTexture() {
     fbo.color->Bind(oglplus::Texture::Target::_2D);
-    oria::renderGeometry(shape, program);
+  }
+
+  void Wrapper::withUiContext(std::function<void()> f) {
+#ifdef UI_CONTEXT
+    withContext(context, [&]{
+#endif
+      f();
+#ifdef UI_CONTEXT
+    });
+#endif
   }
 }
-
-
 
 #endif

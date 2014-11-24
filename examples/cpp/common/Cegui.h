@@ -7,6 +7,7 @@
 #include <CEGUI/MemoryStdAllocator.h>
 #pragma warning( default : 4725 )
 
+#define UI_CONTEXT
 
 namespace ui {
   void initWindow(const uvec2 & size);
@@ -18,20 +19,21 @@ namespace ui {
 
 
   class Wrapper {
-    ProgramPtr program;
-    ShapeWrapperPtr shape;
-    FramebufferWrapper fbo;
     uvec2 size;
-    GLFWwindow * context{ nullptr };
     CEGUI::FrameWindow * rootWindow;
-
+    FramebufferWrapper fbo;
+#ifdef UI_CONTEXT
+    GLFWwindow * context{ nullptr };
+#endif
 
   public:
     ~Wrapper();
-    void init(const uvec2 & size, std::function<void()> f);
-    void update();
-    void render();
+    void init(const uvec2 & size);
+    void update(std::function<void()> f);
+    void bindTexture();
     CEGUI::FrameWindow * getWindow();
+    void withUiContext(std::function<void()> f);
+
   };
 
 

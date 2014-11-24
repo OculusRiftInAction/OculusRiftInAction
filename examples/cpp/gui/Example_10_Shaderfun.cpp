@@ -1,4 +1,5 @@
 #include "Common.h"
+#include <oglplus/error/basic.hpp>
 #include <oglplus/shapes/plane.hpp>
 #include <regex>
 
@@ -190,9 +191,8 @@ namespace shadertoy {
     struct ChannelWindow {
       CEGUI::Window * pWindow;
       EditUi & parent;
-      ChannelWindow(EditUi & parent) : parent(parent) {
-      }
 
+      ChannelWindow(EditUi & parent) : parent(parent) { }
 
       void setupButton(ChannelInputType type, int index) {
         using namespace CEGUI;
@@ -301,7 +301,8 @@ namespace shadertoy {
       this->channelFunction = channelFunction;
       this->sourceFunction = sourceFunction;
       this->loadPresetFunction = loadPresetFunction;
-      ui::Wrapper::init(UI_SIZE, std::function<void()>([&]{
+      ui::Wrapper::init(UI_SIZE);
+      withUiContext([&]{
         using namespace CEGUI;
         WindowManager & wmgr = WindowManager::getSingleton();
         auto rootWindow = getWindow();
@@ -315,7 +316,7 @@ namespace shadertoy {
 
         setUiState(INACTIVE);
         System::getSingleton().getDefaultGUIContext().setRootWindow(rootWindow);
-      }));
+      });
     }
 
     CEGUI::Window * getEditWindow() {
@@ -327,28 +328,30 @@ namespace shadertoy {
     }
 
     void setUiState(UiState newState) {
-      auto rootWindow = getWindow();
-      int childCount = rootWindow->getChildCount();
-      for (int i = 0; i < childCount; ++i) {
-        rootWindow->getChildAtIdx(i)->hide();
-      }
+      withUiContext([&]{
+        auto rootWindow = getWindow();
+        int childCount = rootWindow->getChildCount();
+        for (int i = 0; i < childCount; ++i) {
+          rootWindow->getChildAtIdx(i)->hide();
+        }
 
-      switch (newState) {
-      case INACTIVE:
-        break;
-      case EDIT:
-        rootWindow->getChild(WINDOW_EDIT)->show();
-        break;
-      case CHANNEL:
-        rootWindow->getChild(WINDOW_CHANNELS)->show();
-        break;
-      case LOAD:
-        rootWindow->getChild(WINDOW_LOAD)->show();
-        break;
-      case SAVE:
-        break;
-      }
-      uiState = newState;
+        switch (newState) {
+        case INACTIVE:
+          break;
+        case EDIT:
+          rootWindow->getChild(WINDOW_EDIT)->show();
+          break;
+        case CHANNEL:
+          rootWindow->getChild(WINDOW_CHANNELS)->show();
+          break;
+        case LOAD:
+          rootWindow->getChild(WINDOW_LOAD)->show();
+          break;
+        case SAVE:
+          break;
+        }
+        uiState = newState;
+      });
     }
 
     void setChannelButton(int channel, ChannelInputType type, int index) {
@@ -421,14 +424,14 @@ struct RateCounter {
 
   void increment() {
     if (start < 0) {
-      start = ovr_GetTimeInSeconds();
+      start = Platform::elapsedSeconds();
     } else {
       ++count;
     }
   }
 
   float getRate() const {
-    float elapsed = ovr_GetTimeInSeconds() - start;
+    float elapsed = Platform::elapsedSeconds() - start;
     return (float)count / elapsed;
   }
 };
@@ -464,19 +467,19 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
     "uniform sampler2D iChannel2;\n"
     "uniform sampler2D iChannel3;\n";
 
-  const char * LINE_NUMBER_HEADER = 
+  const char * LINE_NUMBER_HEADER =
     "#line 1\n";
 
   static const char * UNIFORM_RESOLUTION;
   static const char * UNIFORM_GLOBALTIME;
   static const char * UNIFORM_CHANNEL_TIME;
   static const char * UNIFORM_CHANNEL_RESOLUTION;
-  static const char * UNIFORM_MOUSE_COORDS; 
-  static const char * UNIFORM_DATE; 
+  static const char * UNIFORM_MOUSE_COORDS;
+  static const char * UNIFORM_DATE;
   static const char * UNIFORM_SAMPLE_RATE;
   static const char * UNIFORM_POSITION;
   static const char * UNIFORM_CHANNELS[4];
-  
+
 
   enum UiState {
     INACTIVE,
@@ -487,10 +490,7 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
   };
 
   float ipd{ OVR_DEFAULT_IPD };
-  float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
-#ifdef RIFT
   float texRes{ 1.0f };
-#endif
 
   // GLSL and geometry for the shader skybox
   ProgramPtr skyboxProgram;
@@ -506,14 +506,14 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
   // GLSL and geometry for the UI
   ProgramPtr planeProgram;
   ShapeWrapperPtr plane;
-  
+
   // Measure the FPS for use in dynamic scaling
   RateCounter fps;
-  
+
 
   // UI for editing the shader
   shadertoy::EditUi editUi;
-  
+
   // The current fragment source
   std::string lastError;
   std::list<std::function<void()>> uniformLambdas;
@@ -527,9 +527,6 @@ public:
       OVR_KEY_IPD, 
       OVR_DEFAULT_IPD);
 
-    eyeHeight = ovrHmd_GetFloat(hmd, 
-      OVR_KEY_PLAYER_HEIGHT, 
-      OVR_DEFAULT_PLAYER_HEIGHT);
 #endif
     resetCamera();
   }
@@ -537,18 +534,27 @@ public:
   virtual ~DynamicFramebufferScaleExample() {
   }
 
+#ifdef RIFT
   vec2 textureSize() {
     return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
   }
-  
   uvec2 renderSize() {
     return uvec2(texRes * textureSize());
   }
+#else
+  vec2 textureSize() {
+    return vec2(UI_SIZE);
+  }
+  uvec2 renderSize() {
+    return UI_SIZE;
+  }
+#endif
 
   virtual void onMouseEnter(int entered) {
     if (entered){
       glfwSetInputMode(getWindow(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-    } else {
+    }
+    else {
       glfwSetInputMode(getWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
   }
@@ -562,12 +568,17 @@ public:
   }
 
 
+
   virtual void initGl() {
     initUi();
-
+    PARENT_CLASS::initGl();
+    program = oria::loadProgram(
+      Resource::SHADERS_TEXTURED_VS,
+      Resource::SHADERS_TEXTURED_FS);
+    shape = oria::loadPlane(program, (float)UI_X / (float)UI_Y);
 
     planeProgram = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
-    plane = oria::loadPlane(planeProgram, 1.0f);
+    plane = oria::loadPlane(planeProgram, 1.0);
 
     setFragmentSource(editUi.fragmentSource);
     assert(skyboxProgram);
@@ -585,12 +596,17 @@ public:
       skybox.reset();
     });
 
+
+#ifdef RIFT
     shaderFramebuffer.init(ovr::toGlm(eyeTextures[0].Header.TextureSize));
+#else
+    shaderFramebuffer.init(UI_SIZE);
+#endif
+    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
 
     loadShaderResource(Resource::SHADERTOY_SHADERS_DEFAULT_FS);
-    PARENT_CLASS::initGl();
   }
-  
+
   void loadShaderResource(Resource resource) {
     loadShader(Platform::getResourceData(resource));
   }
@@ -629,9 +645,11 @@ public:
         shadertoy::ChannelInputType type;
         if (std::string("tex") == typeStr) {
           type = shadertoy::ChannelInputType::TEXTURE;
-        } else if (std::string("cube") == typeStr) {
+        }
+        else if (std::string("cube") == typeStr) {
           type = shadertoy::ChannelInputType::CUBEMAP;
-        } else {
+        }
+        else {
           return;
         }
         setChannelInput(channel, type, index);
@@ -640,7 +658,7 @@ public:
     setFragmentSource(shader);
   }
 
-         
+
   virtual bool setFragmentSource(const std::string & source) {
     using namespace oglplus;
     editUi.fragmentSource = source;
@@ -650,7 +668,7 @@ public:
         vertexShader->Source(Platform::getResourceData(Resource::SHADERTOY_SHADERS_DEFAULT_VS));
         vertexShader->Compile();
       }
-      
+
       std::string header = SHADER_HEADER;
       for (int i = 0; i < 4; ++i) {
         const Channel & channel = channels[i];
@@ -676,7 +694,7 @@ public:
       return true;
     }
     catch (ProgramBuildError & err) {
-      lastError  = err.Log().c_str();
+      lastError = err.Log().c_str();
       SAY_ERR((const char*)err.Log().c_str());
     }
     return false;
@@ -702,20 +720,20 @@ public:
       newChannel.resolution = vec3(size, 0);
       break;
     case shadertoy::ChannelInputType::CUBEMAP:
-      {
-        static int resourceOrder[] = {
-          0, 1, 2, 3, 4, 5
-        };
-        newChannel.texture = oria::loadCubemapTexture(res, resourceOrder, false);
-        newChannel.target = Texture::Target::CubeMap;
-      }
-      break;
+    {
+      static int resourceOrder[] = {
+        0, 1, 2, 3, 4, 5
+      };
+      newChannel.texture = oria::loadCubemapTexture(res, resourceOrder, false);
+      newChannel.target = Texture::Target::CubeMap;
+    }
+    break;
     case shadertoy::ChannelInputType::VIDEO:
       break;
     case shadertoy::ChannelInputType::AUDIO:
       break;
     }
-    
+
     channels[channel] = newChannel;
     updateUniforms();
   }
@@ -734,8 +752,12 @@ public:
       }
     }
     if (activeUniforms.count(UNIFORM_RESOLUTION)) {
+#ifdef RIFT
       vec3 textureSize = vec3(ovr::toGlm(this->eyeTextures[0].Header.TextureSize), 0);
       Uniform<vec3>(*skyboxProgram, UNIFORM_RESOLUTION).Set(textureSize);
+#else
+      Uniform<vec3>(*skyboxProgram, UNIFORM_RESOLUTION).Set(vec3(1920, 1080, 0));
+#endif
     }
     NoProgram().Bind();
 
@@ -749,8 +771,11 @@ public:
       uniformLambdas.push_back([&]{
         if (editUi.uiVisible()) {
           Uniform<vec3>(*skyboxProgram, UNIFORM_POSITION).Set(vec3(0));
-        } else {
+        }
+        else {
+#ifdef RIFT
           Uniform<vec3>(*skyboxProgram, UNIFORM_POSITION).Set(ovr::toGlm(getEyePose().Position));
+#endif
         }
       });
     }
@@ -765,7 +790,7 @@ public:
   }
 
 
-  virtual void onMouseButton(int button, int action, int mods) { 
+  virtual void onMouseButton(int button, int action, int mods) {
     if (editUi.uiVisible()) {
       ui::handleGlfwMouseButtonEvent(button, action, mods);
     }
@@ -797,7 +822,7 @@ public:
     if (editUi.uiVisible()) {
       if (GLFW_PRESS == action && GLFW_KEY_ESCAPE == key) {
         editUi.setUiState(shadertoy::UiState::INACTIVE);
-      } 
+      }
       if (GLFW_PRESS == action && GLFW_MOD_CONTROL == mods) {
         switch (key) {
         case GLFW_KEY_C:
@@ -812,7 +837,7 @@ public:
         case GLFW_KEY_A:
           // CEGUI::System::getSingleton().getDefaultGUIContext().injectinjectCutRequest();
           // return;
-        default: 
+        default:
           break;
         }
       }
@@ -824,6 +849,7 @@ public:
     static const float INV_ROOT_2 = 1.0f / ROOT_2;
     if (action == GLFW_PRESS) {
       switch (key) {
+#ifdef RIFT
       case GLFW_KEY_HOME:
         if (texRes < 0.95f) {
           texRes = std::min(texRes * ROOT_2, 1.0f);
@@ -834,6 +860,7 @@ public:
           texRes *= INV_ROOT_2;
         }
         break;
+#endif
       case GLFW_KEY_R:
         resetCamera();
         break;
@@ -842,15 +869,16 @@ public:
         editUi.setUiState(shadertoy::UiState::EDIT);
         break;
       }
-    } else {
+    }
+    else {
       PARENT_CLASS::onKey(key, scancode, action, mods);
     }
   }
 
   void resetCamera() {
     player = glm::inverse(glm::lookAt(
-      glm::vec3(0, eyeHeight, ipd * 2),  // Position of the camera
-      glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
+      glm::vec3(0, 0, ipd * 2),  // Position of the camera
+      glm::vec3(0, 0, 0),  // Where the camera is looking
       Vectors::Y_AXIS));           // Camera up axis
 #ifdef RIFT
     ovrHmd_RecenterPose(hmd);
@@ -858,25 +886,28 @@ public:
   }
 
   void update() {
-    using namespace oglplus;
     PARENT_CLASS::update();
-    editUi.update();
-    if (fps.getCount() > 50) {
-      float rate = fps.getRate();
-      if (rate < 55) {
-        SAY("%f %f", rate, texRes);
-        texRes *= 0.9f;
-      }
-      editUi.getWindow()->getChild("ShaderEdit/TextFps")->setText(Platform::format("%2.1f", rate));
-      editUi.getWindow()->getChild("ShaderEdit/TextRez")->setText(Platform::format("%2.1f", texRes));
-      float mpx = renderSize().x * renderSize().y;
-      mpx /= 1e6f;
-      editUi.getWindow()->getChild("ShaderEdit/TextMpx")->setText(Platform::format("%02.2f", mpx));
+    editUi.update([&]{
+      if (fps.getCount() > 50) {
+        float rate = fps.getRate();
+        if (rate < 55) {
+          SAY("%f %f", rate, texRes);
+          texRes *= 0.9f;
+        }
+        editUi.getWindow()->getChild("ShaderEdit/TextFps")->setText(Platform::format("%2.1f", rate));
+        editUi.getWindow()->getChild("ShaderEdit/TextRez")->setText(Platform::format("%2.1f", texRes));
+        float mpx = renderSize().x * renderSize().y;
+        mpx /= 1e6f;
+        editUi.getWindow()->getChild("ShaderEdit/TextMpx")->setText(Platform::format("%02.2f", mpx));
 
-      fps.reset();
-    }
+        fps.reset();
+      }
+    });
     fps.increment();
   }
+
+  ProgramPtr program;
+  ShapeWrapperPtr shape;
 
   void renderSkybox() {
     using namespace oglplus;
@@ -899,17 +930,21 @@ public:
   }
 
   void renderScene() {
+    throw std::string("Foo");
+    glGetError();
+    viewport(textureSize());
+    //Context::Disable(Capability::Blend);
+    //Context::Disable(Capability::ScissorTest);
     Context::Disable(Capability::DepthTest);
     Context::Disable(Capability::CullFace);
     Context::Clear().DepthBuffer().ColorBuffer();
     MatrixStack & mv = Stacks::modelview();
     MatrixStack & pr = Stacks::projection();
-
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
       renderSkybox();
     });
-      
+
     Stacks::withPush([&]{
       pr.identity();
       mv.identity();
@@ -919,23 +954,27 @@ public:
         Uniform<vec2>(*planeProgram, "UvMultiplier").Set(vec2(texRes));
       }} );
     });
-    
-    mv.withPush([&]{
-      mv.postMultiply(glm::inverse(player));
-      //mv.top() = glm::inverse(player);
-      if (editUi.uiVisible()) {
-        mv.translate(vec3(0, OVR_DEFAULT_EYE_HEIGHT, -1));
-        editUi.render();
-      }
-    });
+    //Context::Clear().DepthBuffer().ColorBuffer();
+
+    if (editUi.uiVisible()) {
+      mv.withPush([&]{
+        mv.translate(vec3(0, 0, -1));
+        mv.postMultiply(glm::inverse(player));
+//        editUi.render();
+        editUi.bindTexture();
+        oria::renderGeometry(shape, program);
+      });
+    }
   }
 
 #ifndef RIFT
   void draw() {
+    glGetError();
+    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
     Context::Viewport(0, 0, UI_X, UI_Y);
     Context::ClearColor(0, 0, 1, 1);
     Context::Clear().ColorBuffer().DepthBuffer();
-    Stacks::projection().top() = glm::perspective(1.6f, ASPECT, 0.01f, 100.0f);
+    Stacks::projection().top() = glm::perspective(1.6f, 128.0f/72.0f, 0.01f, 100.0f);
     renderScene();
   }
 

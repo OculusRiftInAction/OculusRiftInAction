@@ -65,10 +65,16 @@ struct FramebufferWrapper {
           PixelDataInternalFormat::DepthComponent,
           size.x, size.y);
 
-    Context::Bound(Framebuffer::Target::Draw, *fbo)
-      .AttachTexture(FramebufferAttachment::Color, *color, 0)
-      .AttachRenderbuffer(FramebufferAttachment::Depth, *depth)
-      .Complete();
+    Bound([&]{
+      fbo->AttachTexture(Framebuffer::Target::Draw, FramebufferAttachment::Color, *color, 0);
+      fbo->AttachRenderbuffer(Framebuffer::Target::Draw, FramebufferAttachment::Depth, *depth);
+      fbo->Complete(Framebuffer::Target::Draw);
+    });
+    //Context::Bound(Framebuffer::Target::Draw, *fbo)
+    //  .AttachTexture(FramebufferAttachment::Color, *color, 0)
+    //  .AttachRenderbuffer(FramebufferAttachment::Depth, *depth)
+    //  .Complete();
+    //DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
   }
 
   void Bind(oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {

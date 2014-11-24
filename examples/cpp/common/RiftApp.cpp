@@ -60,7 +60,7 @@ void RiftApp::initGl() {
   ovrGLConfig cfg;
   memset(&cfg, 0, sizeof(cfg));
   cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-  cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
+  cfg.OGL.Header.RTSize = ovr::fromGlm(getSize());
   cfg.OGL.Header.Multisample = 1;
 
   int distortionCaps =
