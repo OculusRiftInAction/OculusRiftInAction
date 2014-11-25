@@ -78,7 +78,8 @@ list(APPEND EXAMPLE_LIBS OpenCTM)
 # Computer vision library with advanced image loading and manipulation 
 # functionality.  
 # OpenCV is OPTIONAL.  
-find_package( OpenCV QUIET)
+set(OpenCV_DIR "/dev/opencv-2.4.9/build")
+find_package(OpenCV QUIET)
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
@@ -150,25 +151,16 @@ else()
     endif()
 endif()
 
-
-set(CEGUI_DIR /dev/cegui-0.8.4)
-find_library(CEGUI_BASE_LIBRARY CEGUIBase-0_d ${CEGUI_DIR}/lib)
-if (CEGUI_BASE_LIBRARY)
-    message("Found CEGUI") 
-    list(APPEND CEGUI_LIBS CEGUIBase-0_d)
-    list(APPEND CEGUI_LIBS CEGUISILLYImageCodec_d)
-    list(APPEND CEGUI_LIBS CEGUIExpatParser_d) 
-    list(APPEND CEGUI_LIBS CEGUICoreWindowRendererSet_d)
-    list(APPEND CEGUI_LIBS CEGUIOpenGLRenderer-0_d)
-    list(APPEND CEGUI_LIBS CEGUICommonDialogs-0_d)
-    include_directories(${CEGUI_DIR}/cegui/include)
-    link_directories(${CEGUI_DIR}/lib)
-    list(APPEND EXAMPLE_LIBS ${CEGUI_LIBS})
-    set(HAVE_CEGUI 1)
-endif()
-
-
-
+set(Qt5_DIR /Qt/Qt5.4.0/5.4/msvc2013_opengl/lib/cmake/Qt5)
+find_package(Qt5 REQUIRED Core Gui Widgets OpenGL)
+include_directories(${Qt5Core_INCLUDE_DIRS})
+include_directories(${Qt5Gui_INCLUDE_DIRS})
+include_directories(${Qt5Widgets_INCLUDE_DIRS})
+include_directories(${Qt5OpenGL_INCLUDE_DIRS})
+list(APPEND EXAMPLE_LIBS ${Qt5Core_LIBRARIES})
+list(APPEND EXAMPLE_LIBS ${Qt5Gui_LIBRARIES})
+list(APPEND EXAMPLE_LIBS ${Qt5OpenGL_LIBRARIES})
+list(APPEND EXAMPLE_LIBS ${Qt5Widgets_LIBRARIES})
 
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)

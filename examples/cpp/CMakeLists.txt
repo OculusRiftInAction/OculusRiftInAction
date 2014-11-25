@@ -67,7 +67,7 @@ if (EXPERIMENTAL)
     make_examples(experimental/*.cpp "Examples/Experimental")
 endif()
 
-if (HAVE_CEGUI)
+if (Qt5_FOUND)
     make_examples(gui/*.cpp "Examples")
 endif()
 

@@ -1,14 +1,21 @@
 #include "Common.h"
-#include <oglplus/error/basic.hpp>
-#include <oglplus/shapes/plane.hpp>
+#include <QtGui/QGuiApplication>
+#include <QtGui/QOpenGLWindow>
+#include <QtWidgets/QGraphicsView>
+#include <QtGui/QResizeEvent>
+#include <QGLWidget>
+#include <QtWidgets>
+#include <QPixmap>
+
 #include <regex>
+#include <mutex>
+#include <thread>
 #include <set>
+
+#define RIFT
 using namespace oglplus;
 
-#define UI_X 1280
-#define UI_Y 720
-
-static uvec2 UI_SIZE(UI_X, UI_Y);
+static uvec2 UI_SIZE(1280, 720);
 
 #define RIFT
 #ifdef RIFT
@@ -17,6 +24,62 @@ static uvec2 UI_SIZE(UI_X, UI_Y);
 #define PARENT_CLASS GlfwApp
 glm::mat4 player;
 #endif
+
+class OffscreenUi {
+  typedef std::mutex Mutex;
+  typedef std::unique_lock<Mutex> Lock;
+  typedef std::function<void(QWidget & widget)> InitFunction;
+  typedef std::thread Thread;
+  typedef std::unique_ptr<Thread> ThreadPtr;
+
+  Mutex mutex;
+  ThreadPtr thread;
+  InitFunction initFunction;
+  QImage image;
+  QOpenGLContext context;
+
+  void run() {
+    static int argc = 0;
+    static char ** argv = nullptr;
+    QApplication app(argc, argv);
+    QWidget window;
+    initFunction(window);
+    while (true) {
+      // Process the Qt message pump to run the standard window controls
+      //      if (app.hasPendingEvents())
+      //        app.processEvents();
+      //      app.postEvent();
+      {
+        Lock lock(mutex);
+        image = QPixmap::grabWidget(&window).toImage();
+          // If the system depth is 16 and the pixmap doesn't have an alpha channel
+          // then we convert it to RGB16 in the hope that it gets uploaded as a 16
+          // bit texture which is much faster to access than a 32-bit one.
+          if (pixmap.depth() == 16 && !image.hasAlphaChannel())
+            image = image.convertToFormat(QImage::Format_RGB16);
+          texture = bindTexture(image, target, format, key, options);
+        }
+        // NOTE: bindTexture(const QImage&, GLenum, GLint, const qint64, bool) should never return null
+        Q_ASSERT(texture);
+
+        if (texture->id > 0)
+          QImagePixmapCleanupHooks::enableCleanupHooks(pixmap);
+
+        return texture;
+      }
+    }
+  }
+
+public:
+
+  void start(std::function<void(QWidget & widget)> init = 
+      [](QWidget & widget){}) {
+    initFunction = init;
+    thread = ThreadPtr(new Thread([&]{
+      run(); 
+    }));
+  }
+};
 
 namespace shadertoy {
   const int MAX_CHANNELS = 4;
@@ -40,30 +103,20 @@ namespace shadertoy {
     "iChannel3",
   };
 
+  const char * SHADER_HEADER = "#version 330\n"
+    "uniform vec3      iResolution;           // viewport resolution (in pixels)\n"
+    "uniform float     iGlobalTime;           // shader playback time (in seconds)\n"
+    "uniform float     iChannelTime[4];       // channel playback time (in seconds)\n"
+    "uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)\n"
+    "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\n"
+    "uniform vec4      iDate;                 // (year, month, day, time in seconds)\n"
+    "uniform float     iSampleRate;           // sound sample rate (i.e., 44100)\n"
+    "uniform vec3      iPos; // Head position\n"
+    "in vec3 iDir; // Direction from viewer\n"
+    "out vec4 FragColor;\n";
 
-  struct Preset {
-    const Resource res;
-    const char * name;
-    Preset(Resource res, const char * name) : res(res), name(name) {};
-  };
-
-  Preset PRESETS[] {
-    Preset(Resource::SHADERTOY_SHADERS_DEFAULT_FS, "Default"),
-    Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_FS, "Steel Cubes"),
-    Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_FS, "Infinite City"),
-//    Preset(Resource::SHADERTOY_SHADERS_4DFGZS_VOXEL_EDGES_FS, "Voxel Edges"),
-    Preset(Resource::SHADERTOY_SHADERS_4DJGWR_ROUNDED_VOXELS_FS, "Rounded Voxels"),
-    Preset(Resource::SHADERTOY_SHADERS_4SBGD1_FAST_BALLS_FS, "Fast Balls"),
-    Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_FS, "Oceanic"),
-    Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_FS, "Elevated"),
-//    Preset(Resource::SHADERTOY_SHADERS_MSSGD1_HAND_DRAWN_SKETCH_FS, "Hand Drawn"),
-    Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_FS, "Voronoi Rocks"),
-    Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_FS, "Morning City"),
-    Preset(Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_FS, "Abandoned Base"),
-    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_FS, "Cubemap"),
-    Preset(Resource::SHADERTOY_SHADERS_LSS3WS_RELENTLESS_FS, "Relentless"),
-    Preset(Resource::NO_RESOURCE, nullptr),
-  };
+  const char * LINE_NUMBER_HEADER =
+    "#line 1\n";
 
 
   const Resource TEXTURES[] = {
@@ -97,7 +150,7 @@ namespace shadertoy {
   };
   const int MAX_CUBEMAPS = 6;
 
-  static std::string getChannelInputName(ChannelInputType type, int index) {
+  std::string getChannelInputName(ChannelInputType type, int index) {
     switch (type) {
     case ChannelInputType::TEXTURE:
       return Platform::format("Tex%02d", index);
@@ -108,7 +161,7 @@ namespace shadertoy {
     }
   }
 
-  static Resource getChannelInputResource(ChannelInputType type, int index) {
+  Resource getChannelInputResource(ChannelInputType type, int index) {
     switch (type) {
     case ChannelInputType::TEXTURE:
       return TEXTURES[index];
@@ -118,6 +171,30 @@ namespace shadertoy {
       return NO_RESOURCE;
     }
   }
+
+  struct Preset {
+    const Resource res;
+    const char * name;
+    Preset(Resource res, const char * name) : res(res), name(name) {};
+  };
+
+  Preset PRESETS[] {
+    Preset(Resource::SHADERTOY_SHADERS_DEFAULT_FS, "Default"),
+      Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_FS, "Steel Cubes"),
+      Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_FS, "Infinite City"),
+      //    Preset(Resource::SHADERTOY_SHADERS_4DFGZS_VOXEL_EDGES_FS, "Voxel Edges"),
+      Preset(Resource::SHADERTOY_SHADERS_4DJGWR_ROUNDED_VOXELS_FS, "Rounded Voxels"),
+      Preset(Resource::SHADERTOY_SHADERS_4SBGD1_FAST_BALLS_FS, "Fast Balls"),
+      Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_FS, "Oceanic"),
+      Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_FS, "Elevated"),
+      //    Preset(Resource::SHADERTOY_SHADERS_MSSGD1_HAND_DRAWN_SKETCH_FS, "Hand Drawn"),
+      Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_FS, "Voronoi Rocks"),
+      Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_FS, "Morning City"),
+      Preset(Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_FS, "Abandoned Base"),
+      Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_FS, "Cubemap"),
+      Preset(Resource::SHADERTOY_SHADERS_LSS3WS_RELENTLESS_FS, "Relentless"),
+      Preset(Resource::NO_RESOURCE, nullptr),
+  };
 
   enum UiState {
     INACTIVE,
@@ -163,7 +240,7 @@ struct RateCounter {
 
   void reset() {
     count = 0;
-    start = -1; 
+    start = -1;
   }
 
   unsigned int getCount() const {
@@ -173,7 +250,8 @@ struct RateCounter {
   void increment() {
     if (start < 0) {
       start = Platform::elapsedSeconds();
-    } else {
+    }
+    else {
       ++count;
     }
   }
@@ -197,28 +275,6 @@ std::set<std::string> getActiveUniforms(ProgramPtr & program) {
 
 
 class DynamicFramebufferScaleExample : public PARENT_CLASS {
-  const char * SHADER_HEADER = "#version 330\n"
-    "uniform vec3      iResolution;           // viewport resolution (in pixels)\n"
-    "uniform float     iGlobalTime;           // shader playback time (in seconds)\n"
-    "uniform float     iChannelTime[4];       // channel playback time (in seconds)\n"
-    "uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)\n"
-    "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\n"
-    "uniform vec4      iDate;                 // (year, month, day, time in seconds)\n"
-    "uniform float     iSampleRate;           // sound sample rate (i.e., 44100)\n"
-    "uniform vec3      iPos; // Head position\n"
-    "in vec3 iDir; // Direction from viewer\n"
-    "out vec4 FragColor;\n";
-
-  const char * CHANNEL_HEADER =
-    "uniform sampler2D iChannel0;\n"
-    "uniform sampler2D iChannel1;\n"
-    "uniform sampler2D iChannel2;\n"
-    "uniform sampler2D iChannel3;\n";
-
-  const char * LINE_NUMBER_HEADER =
-    "#line 1\n";
-
-
 
   enum UiState {
     INACTIVE,
@@ -249,6 +305,8 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
   // Measure the FPS for use in dynamic scaling
   RateCounter fps;
 
+  OffscreenUi ui;
+
   // The current fragment source
   std::string lastError;
   std::list<std::function<void()>> uniformLambdas;
@@ -258,10 +316,7 @@ class DynamicFramebufferScaleExample : public PARENT_CLASS {
 public:
   DynamicFramebufferScaleExample() {
 #ifdef RIFT
-    ipd = ovrHmd_GetFloat(hmd, 
-      OVR_KEY_IPD, 
-      OVR_DEFAULT_IPD);
-
+    ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, OVR_DEFAULT_IPD);
 #endif
     resetCamera();
   }
@@ -288,20 +343,35 @@ public:
   virtual void onMouseEnter(int entered) {
     if (entered){
       glfwSetInputMode(getWindow(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-    }
-    else {
+    } else {
       glfwSetInputMode(getWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
   }
 
+  void initUi() {
+    ui.start([&](QWidget& widget){
+      widget.resize(UI_SIZE.x, UI_SIZE.y);
+      //! [create, position and show]
+      QPushButton *button = new QPushButton(
+        QApplication::translate("childwidget", "Press me"), &widget);
+      button->move(100, 100);
+      button->show();
+    });
+  }
+  
   virtual void initGl() {
+    initUi();
+
     PARENT_CLASS::initGl();
     program = oria::loadProgram(
       Resource::SHADERS_TEXTURED_VS,
       Resource::SHADERS_TEXTURED_FS);
-    shape = oria::loadPlane(program, (float)UI_X / (float)UI_Y);
+    float aspect = (float)UI_SIZE.x / (float)UI_SIZE.y;
+    shape = oria::loadPlane(program, aspect);
 
-    planeProgram = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
+    planeProgram = oria::loadProgram(
+      Resource::SHADERS_TEXTURED_VS, 
+      Resource::SHADERS_TEXTURED_FS);
     plane = oria::loadPlane(planeProgram, 1.0);
 
     setFragmentSource(Platform::getResourceData(Resource::SHADERTOY_SHADERS_DEFAULT_FS));
@@ -382,7 +452,6 @@ public:
     setFragmentSource(shader);
   }
 
-
   virtual bool setFragmentSource(const std::string & source) {
     using namespace oglplus;
     try {
@@ -392,7 +461,7 @@ public:
         vertexShader->Compile();
       }
 
-      std::string header = SHADER_HEADER;
+      std::string header = shadertoy::SHADER_HEADER;
       for (int i = 0; i < 4; ++i) {
         const Channel & channel = channels[i];
         // "uniform sampler2D iChannel0;\n"
@@ -400,7 +469,7 @@ public:
           channel.target == Texture::Target::CubeMap ? "Cube" : "2D", i);
         header += line;
       }
-      header += LINE_NUMBER_HEADER;
+      header += shadertoy::LINE_NUMBER_HEADER;
       FragmentShaderPtr newFragmentShader(new FragmentShader());
       std::string newSource = replaceAll(source, "gl_FragColor", "FragColor");
       newSource = header + newSource;
@@ -467,10 +536,7 @@ public:
     for (int i = 0; i < 4; ++i) {
       const char * uniformName = shadertoy::UNIFORM_CHANNELS[i];
       if (activeUniforms.count(uniformName)) {
-        int loc = glGetUniformLocation(oglplus::GetName(*skyboxProgram), uniformName);
-        glUniform1i(loc, i);
-        // setting the active texture slot for the channels
-        // Uniform<GLuint>(*cubeProgram, uniformName).Set(i);
+        Uniform<GLuint>(*skyboxProgram, uniformName).Set(i);
       }
     }
     if (activeUniforms.count(UNIFORM_RESOLUTION)) {
@@ -489,7 +555,7 @@ public:
         Uniform<GLfloat>(*skyboxProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds());
       });
     }
-    
+
     if (activeUniforms.count(shadertoy::UNIFORM_POSITION)) {
       uniformLambdas.push_back([&]{
 #ifdef RIFT
@@ -635,14 +701,14 @@ public:
       MatrixStack & mv = Stacks::modelview();
       mv.withPush([&]{
         mv.untranslate();
-        oria::renderGeometry(skybox, skyboxProgram, uniformLambdas );
+        oria::renderGeometry(skybox, skyboxProgram, uniformLambdas);
       });
       for (int i = 0; i < 4; ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
+        Texture::Active(i);
         DefaultTexture().Bind(Texture::Target::_2D);
         DefaultTexture().Bind(Texture::Target::CubeMap);
       }
-      glActiveTexture(GL_TEXTURE0);
+      Texture::Active(0);
     });
     viewport(textureSize());
   }
@@ -669,19 +735,19 @@ public:
       shaderFramebuffer.color->Bind(Texture::Target::_2D);
       oria::renderGeometry(plane, planeProgram, { [&]{
         Uniform<vec2>(*planeProgram, "UvMultiplier").Set(vec2(texRes));
-      }} );
+      } });
     });
     //Context::Clear().DepthBuffer().ColorBuffer();
 
-//    if (editUi.uiVisible()) {
-//      mv.withPush([&]{
-//        mv.translate(vec3(0, 0, -1));
-//        mv.postMultiply(glm::inverse(player));
-////        editUi.render();
-//        editUi.bindTexture();
-//        oria::renderGeometry(shape, program);
-//      });
-//    }
+    //    if (editUi.uiVisible()) {
+    //      mv.withPush([&]{
+    //        mv.translate(vec3(0, 0, -1));
+    //        mv.postMultiply(glm::inverse(player));
+    ////        editUi.render();
+    //        editUi.bindTexture();
+    //        oria::renderGeometry(shape, program);
+    //      });
+    //    }
   }
 
 #ifndef RIFT
@@ -711,3 +777,135 @@ RUN_OVR_APP(DynamicFramebufferScaleExample);
 #else
 RUN_APP(DynamicFramebufferScaleExample);
 #endif
+
+
+//
+//
+//using namespace oglplus;
+//class UiWidget : public QWidget {
+//public:
+//  UiWidget(QWidget * widget, int windowFlags = 0) {
+//    widget->installEventFilter(this);
+//  }
+//
+//  bool eventFilter(QObject *object, QEvent *event) {
+//    if (QEvent::MouseButtonPress == event->type()) {
+//      this->event(event);
+//      return true;
+//    }
+//    return false;
+//  }
+//};
+//
+//
+//class OculusWidget : public QGLWidget
+//{
+//  ShapeWrapperPtr shape;
+//  ProgramPtr program;
+//  UiWidget uiWidget;
+//
+//public:
+//
+//  OculusWidget(QGLWidget *parent = 0) 
+//    : QGLWidget(parent), uiWidget(this) {
+//
+//    uiWidget.resize(640, 480);
+//    uiWidget.setWindowTitle("Child widget");
+//    {
+//      //! [create, position and show]
+//      QPushButton *button = new QPushButton("Press me", &uiWidget);
+//      button->move(100, 100);
+//      button->show();
+//    }
+//  }
+//
+//  virtual ~OculusWidget() {
+//  }
+//
+//private:
+//  void initializeGL() {
+//    SAY("INIT");
+//    glewExperimental = true;
+//    glewInit();
+//    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+//
+//    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+//    GLuint unusedIds = 0;
+//    if (glDebugMessageCallback) {
+//      glDebugMessageCallback(oria::debugCallback, this);
+//      glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
+//        0, &unusedIds, true);
+//    }
+//
+//    program = oria::loadProgram(
+//      Resource::SHADERS_TEXTURED_VS, 
+//      Resource::SHADERS_TEXTURED_FS);
+//    shape = oria::loadPlane(program, 1.0f);
+//  }
+//
+//  void resizeGL(int w, int h) {
+//    glGetError();
+//    SAY("Resize %d %d", w, h);
+//    Context::Viewport(0, 0, w, h);
+//  }
+//
+//  void paintGL() {
+//    Context::Viewport(0, 0, 640, 480);
+//    Context::ClearColor(0, 0, 1, 1);
+//    Context::Clear().ColorBuffer();
+//    bindTexture(QPixmap::grabWidget(&uiWidget));
+//    oria::renderGeometry(shape, program);
+//    update();
+//  }
+//
+//  void mouseMoveEvent(QMouseEvent * event) {
+//    QGLWidget::mouseMoveEvent(event);
+//  }
+//
+//  void mousePressEvent(QMouseEvent * event) {
+//    QGLWidget::mousePressEvent(event);
+//  }
+//};
+//
+//
+//class OpenGLScene : public QGraphicsScene {
+//  void drawBackground(QPainter *painter, const QRectF &)
+//  {
+//    if (painter->paintEngine()->type()
+//      != QPaintEngine::OpenGL) {
+//      qWarning("OpenGLScene: drawBackground needs a "
+//        "QGLWidget to be set as viewport on the "
+//        "graphics view");
+//      return;
+//    }
+//  }
+//};
+//
+//
+//
+//class MyApp {
+//public:
+//  MyApp()  {
+//
+//  }
+//
+//  int run() {
+//
+//    //QWidget window;
+//    //uiWidget = &window;
+//    //window.resize(640, 480);
+//    // window.resize(size.x, size.y);
+//    //window.setWindowTitle("Child widget");
+//    //{
+//    //  //! [create, position and show]
+//    //  QPushButton *button = new QPushButton(
+//    //    QApplication::translate("childwidget", "Press me"), &window);
+//    //  button->move(100, 100);
+//    //  button->show();
+//    //}
+//    //window.show();
+//  }
+//};
+//
+//
+//RUN_OVR_APP(MyApp);
