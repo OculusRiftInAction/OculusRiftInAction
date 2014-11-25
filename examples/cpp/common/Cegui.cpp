@@ -159,7 +159,7 @@ namespace ui {
     MyResourceProvider() {
       for (int i = 0; i != Resource::NO_RESOURCE; ++i) {
         Resource res = static_cast<Resource>(i);
-        invMap[Resources::getResourcePath(res).c_str()] = res;
+        invMap[Resources::getResourceMnemonic(res).c_str()] = res;
       }
       setResourceGroupDirectory("schemes", "cegui/schemes/");
       setResourceGroupDirectory("imagesets", "cegui/imagesets/");
@@ -173,6 +173,7 @@ namespace ui {
     virtual void loadRawDataContainer(const CEGUI::String& filename, CEGUI::RawDataContainer& output, const CEGUI::String& resourceGroup) {
       const CEGUI::String path(getFinalFilename(filename, resourceGroup));
       Resource res = getResourceForPath(path);
+      assert(res != NO_RESOURCE);
       size_t size = Resources::getResourceSize(res);
       uint8_t* const buffer = static_cast<uint8_t*>(RawDataContainer::Allocator::allocateBytes(size));
       Resources::getResourceData(res, buffer);
@@ -206,11 +207,9 @@ namespace ui {
     using namespace CEGUI;
     static CEGUI::OpenGL3Renderer & myRenderer =
       CEGUI::OpenGL3Renderer::create();
-
     myRenderer.enableExtraStateSettings(true);
     myRenderer.setDisplaySize(CEGUI::Sizef(size.x, size.y));
 
-    void * rp = DefaultResourceProvider::Allocator::allocateBytes(sizeof(MyResourceProvider));
     CEGUI::System::create(myRenderer, ceguiCreate<MyResourceProvider>());
     //    CEGUI::Logger::getSingleton().setLogFilename("/dev/cegui.log");
     //    CEGUI::Logger::getSingleton().setLoggingLevel(CEGUI::LoggingLevel::Insane);
@@ -221,8 +220,7 @@ namespace ui {
     Scheme::setDefaultResourceGroup("schemes");
     WidgetLookManager::setDefaultResourceGroup("looknfeels");
     WindowManager::setDefaultResourceGroup("layouts");
-    // ScriptModule::setDefaultResourceGroup("lua_scripts");
-    // AnimationManager::setDefaultResourceGroup("animations");
+    AnimationManager::setDefaultResourceGroup("animations");
     SchemeManager::getSingleton().createFromFile("TaharezLook.scheme");
     FontManager::getSingleton().createFromFile("Bitwise-24.font");
     System::getSingleton().getDefaultGUIContext().setDefaultFont("Bitwise-24");
@@ -324,7 +322,6 @@ namespace ui {
         CEGUI::System::getSingleton().renderAllGUIContexts();
       });
     });
-    //glGetError();
   }
 
   void Wrapper::bindTexture() {
