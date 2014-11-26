@@ -118,8 +118,14 @@ list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 #
 # Qt is a cross platform GUI framework
 #
-#set(Qt5_DIR /Users/bradd/Qt5.4.0/5.4/clang_64/lib/cmake/Qt5)
+if(WIN32)
 set(Qt5_DIR /Qt/Qt5.4.0/5.4/msvc2013_opengl/lib/cmake/Qt5)
+elseif(APPLE)
+set(Qt5_DIR /Users/bradd/Qt5.4.0/5.4/clang_64/lib/cmake/Qt5)
+else()
+endif()
+
+
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
