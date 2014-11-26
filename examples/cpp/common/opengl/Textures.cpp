@@ -33,7 +33,7 @@ namespace oria {
   ImagePtr loadImage(std::vector<uint8_t> & data, bool flip) {
     using namespace oglplus;
 #ifdef HAVE_OPENCV
-    cv::Mat image = cv::imdecode(data, CV_LOAD_IMAGE_COLOR);
+    cv::Mat image = cv::imdecode(data, cv::IMREAD_COLOR);
     if (flip) {
       cv::flip(image, image, 0);
     }

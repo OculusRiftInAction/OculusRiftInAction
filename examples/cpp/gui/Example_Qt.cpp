@@ -1,6 +1,5 @@
 #include "Common.h"
 #include <QtGui/QGuiApplication>
-#include <QtGui/QOpenGLWindow>
 #include <QtWidgets/QGraphicsView>
 #include <QtGui/QResizeEvent>
 #include <QGLWidget>
@@ -11,6 +10,7 @@
 #include <mutex>
 #include <thread>
 #include <set>
+#if 0
 
 #define RIFT
 using namespace oglplus;
@@ -28,7 +28,7 @@ glm::mat4 player;
 class OffscreenUi {
   typedef std::mutex Mutex;
   typedef std::unique_lock<Mutex> Lock;
-  typedef std::function<void(QWidget & widget)> InitFunction;
+  typedef std::function<void(QWidget &, QOpenGLContext &)> InitFunction;
   typedef std::thread Thread;
   typedef std::unique_ptr<Thread> ThreadPtr;
 
@@ -43,40 +43,38 @@ class OffscreenUi {
     static char ** argv = nullptr;
     QApplication app(argc, argv);
     QWidget window;
-    initFunction(window);
+//    initFunction(window, context);
     while (true) {
+      Platform::sleepMillis(100);
       // Process the Qt message pump to run the standard window controls
       //      if (app.hasPendingEvents())
       //        app.processEvents();
       //      app.postEvent();
-      {
-        Lock lock(mutex);
-        image = QPixmap::grabWidget(&window).toImage();
-          // If the system depth is 16 and the pixmap doesn't have an alpha channel
-          // then we convert it to RGB16 in the hope that it gets uploaded as a 16
-          // bit texture which is much faster to access than a 32-bit one.
-          if (pixmap.depth() == 16 && !image.hasAlphaChannel())
-            image = image.convertToFormat(QImage::Format_RGB16);
-          texture = bindTexture(image, target, format, key, options);
-        }
-        // NOTE: bindTexture(const QImage&, GLenum, GLint, const qint64, bool) should never return null
-        Q_ASSERT(texture);
+//        Lock lock(mutex);
+//        image = QPixmap::grabWidget(&window).toImage();
+//          // If the system depth is 16 and the pixmap doesn't have an alpha channel
+//          // then we convert it to RGB16 in the hope that it gets uploaded as a 16
+//          // bit texture which is much faster to access than a 32-bit one.
+//          if (pixmap.depth() == 16 && !image.hasAlphaChannel())
+//            image = image.convertToFormat(QImage::Format_RGB16);
+//          texture = bindTexture(image, target, format, key, options);
+//        }
+//        // NOTE: bindTexture(const QImage&, GLenum, GLint, const qint64, bool) should never return null
+//        Q_ASSERT(texture);
 
-        if (texture->id > 0)
-          QImagePixmapCleanupHooks::enableCleanupHooks(pixmap);
-
-        return texture;
-      }
+//        if (texture->id > 0)
+//          QImagePixmapCleanupHooks::enableCleanupHooks(pixmap);
+//
+//        return texture;
     }
   }
 
 public:
 
-  void start(std::function<void(QWidget & widget)> init = 
-      [](QWidget & widget){}) {
+  void start(InitFunction init = [](QWidget &, QOpenGLContext &){}) {
     initFunction = init;
     thread = ThreadPtr(new Thread([&]{
-      run(); 
+      run();
     }));
   }
 };
@@ -349,7 +347,7 @@ public:
   }
 
   void initUi() {
-    ui.start([&](QWidget& widget){
+    ui.start([&](QWidget& widget, QOpenGLContext & context){
       widget.resize(UI_SIZE.x, UI_SIZE.y);
       //! [create, position and show]
       QPushButton *button = new QPushButton(
@@ -778,6 +776,8 @@ RUN_OVR_APP(DynamicFramebufferScaleExample);
 RUN_APP(DynamicFramebufferScaleExample);
 #endif
 
+#else
+
 
 //
 //
@@ -796,116 +796,265 @@ RUN_APP(DynamicFramebufferScaleExample);
 //    return false;
 //  }
 //};
-//
-//
-//class OculusWidget : public QGLWidget
-//{
-//  ShapeWrapperPtr shape;
-//  ProgramPtr program;
-//  UiWidget uiWidget;
-//
+
+using namespace oglplus;
+
+class OculusWidget : public QGLWidget
+{
+  ShapeWrapperPtr shape;
+  ProgramPtr program;
+public:
+
+  OculusWidget(QGLFormat & format)
+  : QGLWidget(format) { }
+
+  virtual ~OculusWidget() {
+  }
+
+private:
+  void initializeGL() {
+    SAY("INIT");
+    glewExperimental = true;
+    glewInit();
+    glGetError();
+    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    GLuint unusedIds = 0;
+    if (glDebugMessageCallback) {
+      glDebugMessageCallback(oria::debugCallback, this);
+      glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
+        0, &unusedIds, true);
+    }
+    glGetError();
+
+    program = oria::loadProgram(
+      Resource::SHADERS_TEXTURED_VS, 
+      Resource::SHADERS_TEXTURED_FS);
+    shape = oria::loadPlane(program, 1.0f);
+  }
+
+  void resizeGL(int w, int h) {
+    glGetError();
+    SAY("Resize %d %d", w, h);
+    Context::Viewport(0, 0, w, h);
+  }
+
+  void paintGL() {
+    Context::ClearColor(0, 1, 1, 1);
+    Context::Clear().ColorBuffer();
+    oria::renderGeometry(shape, program);
+    update();
+  }
+};
+
+QGLWidget * glWidget = nullptr;
+
+class MyView : public QGraphicsView {
+public:
+  static MyView * INSTANCE;
+
+  MyView() {
+    INSTANCE = this;
+  }
+  
+  void resizeEvent(QResizeEvent *event) {
+    if (scene())
+      scene()->setSceneRect(
+                            QRect(QPoint(0, 0), event->size()));
+    QGraphicsView::resizeEvent(event);
+  }
+  
+  friend class MyOtherWidget;
+};
+
+MyView * MyView::INSTANCE = nullptr;
+
+
+class MyScene : public QGraphicsScene {
+  Q_OBJECT
+public:
+  static MyScene * INSTANCE;
+  QWidget * uiWidget;
+  ShapeWrapperPtr shape;
+  ProgramPtr program;
+
+  
+  static QDialog * createDialog() {
+    QDialog * dialog = new QDialog(0, Qt::CustomizeWindowHint | Qt::WindowTitleHint);
+    dialog->setWindowOpacity(0.0);
+    dialog->setWindowTitle("Test");
+    dialog->setLayout(new QVBoxLayout());
+    return dialog;
+  }
+
+  MyScene() {
+    INSTANCE = this;
+    uiWidget = createDialog();
+    for (int i = 0; i < 20; ++i) {
+      QPushButton * button = new QPushButton("Press me");
+      uiWidget->layout()->addWidget(button);
+      connect(button, SIGNAL(pressed()), this, SLOT(customSlot()));
+    }
+    uiWidget->resize(640, 480);
+    addWidget(uiWidget)->setPos(0, 0);
+
+    //    dialog = createDialog();
+    //    dialog->layout()->addWidget(new QLabel("Use mouse wheel to zoom model, and click and drag to rotate model"));
+    //    dialog->layout()->addWidget(new QLabel("Move the sun around to change the light position"));
+    //    addWidget(dialog);
+
+    foreach (QGraphicsItem *item, items()) {
+      item->setFlag(QGraphicsItem::ItemIsMovable);
+      item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    }
+    
+  }
+  
+  void drawBackground(QPainter *painter, const QRectF & rect) {
+    
+    auto type = painter->paintEngine()->type();
+    if (type != QPaintEngine::OpenGL && type != QPaintEngine::OpenGL2) {
+      qWarning("OpenGLScene: drawBackground needs a "
+               "QGLWidget to be set as viewport on the "
+               "graphics view");
+      return;
+    }
+
+    static bool init = false;
+    if (!init) {
+      init = true;
+      glewExperimental = true;
+      glewInit();
+      glGetError();
+      DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+      
+      glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+      GLuint unusedIds = 0;
+      if (glDebugMessageCallback) {
+        glDebugMessageCallback(oria::debugCallback, this);
+        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &unusedIds, true);
+      }
+      glGetError();
+      
+//      program = oria::loadProgram(
+//                                  Resource::SHADERS_TEXTURED_VS,
+//                                  Resource::SHADERS_TEXTURED_FS);
+//      shape = oria::loadPlane(program, 1.0f);
+    }
+
+    Context::Viewport(0, 0, 640, 480);
+    Context::ClearColor(1, 0, 1, 1);
+    Context::Clear().ColorBuffer();
+
+//    uiWidget->setWindowOpacity(1.0);
+//    QPixmap pixmap = uiWidget->grab();
+//    glWidget->context()->bindTexture(pixmap);
+//    uiWidget->setWindowOpacity(0.0);
+    glEnable(GL_TEXTURE_2D);
+    glBegin(GL_QUADS);
+#define S 0.5f
+    glTexCoord2f(0, 0);
+    glVertex3f(-S, -S, 0);
+    glTexCoord2f(1, 0);
+    glVertex3f(S, -S, 0);
+    glTexCoord2f(1, 1);
+    glVertex3f(S, S, 0);
+    glTexCoord2f(0, 1);
+    glVertex3f(-S, S, 0);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+    
+    QTimer::singleShot(20, this, SLOT(update()));
+  }
+  
+  private slots:
+  void customSlot() {
+    SAY("Click");
+  }
+};
+
+MyScene * MyScene::INSTANCE = nullptr;
+
+//class MyOtherWidget : public QWidget {
+//  
 //public:
+//  bool event(QEvent * event) {
+//    auto t = event->type();
+//    MyView * view = MyView::INSTANCE;
+//    QMouseEvent * me = (QMouseEvent *)event;
+//    switch (t) {
+//      case QEvent::MouseButtonPress:
+//      case QEvent::MouseButtonRelease:
+//        QMouseEvent ne(t, me->localPos(), view->mapToGlobal(me->localPos().toPoint()), me->button(), me->buttons(), me->modifiers());
+//        QApplication::sendEvent(view, &ne);
+//        return true;
+//        
 //
-//  OculusWidget(QGLWidget *parent = 0) 
-//    : QGLWidget(parent), uiWidget(this) {
-//
-//    uiWidget.resize(640, 480);
-//    uiWidget.setWindowTitle("Child widget");
+////      default:
+////        return QWidget::event(event);
+//    }
+//    return QWidget::event(event);
+//  }
+//};
+
+class MyApp {
+public:
+
+  int run() {
+    static int argc = 0;
+    static char ** argv = nullptr;
+    QApplication app(argc, argv);
+    
+    QGLFormat glFormat;
+//    glFormat.setVersion( 3, 2 );
+//    glFormat.setProfile( QGLFormat::CoreProfile );
+    glFormat.setSampleBuffers( true );
+
+    glWidget = new OculusWidget(glFormat);
+    
+    MyView view;
+    view.setViewport(glWidget);
+    view.setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
+    view.setScene(new MyScene());
+    view.show();
+    view.resize(640, 480);
+    
+//    MyOtherWidget other;
+//    other.resize(640, 480);
+//    other.show();
+    
+    
+    return app.exec();
+
+
+    
+    
+    
+//    QWidget window;
+//    window.resize(640, 480);
+//    window.setWindowTitle("Child widget");
 //    {
 //      //! [create, position and show]
-//      QPushButton *button = new QPushButton("Press me", &uiWidget);
+//      QPushButton *button = new QPushButton(
+//        QApplication::translate("childwidget", "Press me"), &window);
 //      button->move(100, 100);
 //      button->show();
 //    }
-//  }
-//
-//  virtual ~OculusWidget() {
-//  }
-//
-//private:
-//  void initializeGL() {
-//    SAY("INIT");
-//    glewExperimental = true;
-//    glewInit();
-//    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
-//
-//    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-//    GLuint unusedIds = 0;
-//    if (glDebugMessageCallback) {
-//      glDebugMessageCallback(oria::debugCallback, this);
-//      glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
-//        0, &unusedIds, true);
-//    }
-//
-//    program = oria::loadProgram(
-//      Resource::SHADERS_TEXTURED_VS, 
-//      Resource::SHADERS_TEXTURED_FS);
-//    shape = oria::loadPlane(program, 1.0f);
-//  }
-//
-//  void resizeGL(int w, int h) {
-//    glGetError();
-//    SAY("Resize %d %d", w, h);
-//    Context::Viewport(0, 0, w, h);
-//  }
-//
-//  void paintGL() {
-//    Context::Viewport(0, 0, 640, 480);
-//    Context::ClearColor(0, 0, 1, 1);
-//    Context::Clear().ColorBuffer();
-//    bindTexture(QPixmap::grabWidget(&uiWidget));
-//    oria::renderGeometry(shape, program);
-//    update();
-//  }
-//
-//  void mouseMoveEvent(QMouseEvent * event) {
-//    QGLWidget::mouseMoveEvent(event);
-//  }
-//
-//  void mousePressEvent(QMouseEvent * event) {
-//    QGLWidget::mousePressEvent(event);
-//  }
-//};
-//
-//
-//class OpenGLScene : public QGraphicsScene {
-//  void drawBackground(QPainter *painter, const QRectF &)
-//  {
-//    if (painter->paintEngine()->type()
-//      != QPaintEngine::OpenGL) {
-//      qWarning("OpenGLScene: drawBackground needs a "
-//        "QGLWidget to be set as viewport on the "
-//        "graphics view");
-//      return;
-//    }
-//  }
-//};
-//
-//
-//
-//class MyApp {
-//public:
-//  MyApp()  {
-//
-//  }
-//
-//  int run() {
-//
-//    //QWidget window;
-//    //uiWidget = &window;
-//    //window.resize(640, 480);
-//    // window.resize(size.x, size.y);
-//    //window.setWindowTitle("Child widget");
-//    //{
-//    //  //! [create, position and show]
-//    //  QPushButton *button = new QPushButton(
-//    //    QApplication::translate("childwidget", "Press me"), &window);
-//    //  button->move(100, 100);
-//    //  button->show();
-//    //}
-//    //window.show();
-//  }
-//};
-//
-//
-//RUN_OVR_APP(MyApp);
+
+//    OculusWidget glWidget(glFormat, &window);
+//    glWidget.resize(640, 480);
+//    glWidget.setFocusPolicy(Qt::NoFocus);
+//    glWidget.setAttribute(Qt::WA_ShowWithoutActivating);
+//    glWidget.show();
+
+    return app.exec();
+  }
+};
+
+RUN_APP(MyApp);
+
+#include "Example_Qt.moc"
+
+#endif
+
