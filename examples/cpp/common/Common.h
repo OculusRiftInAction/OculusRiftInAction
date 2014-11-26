@@ -112,17 +112,17 @@ public:
 #include "rendering/Vectors.h"
 
 #include "opengl/Constants.h"
-
 #include "opengl/Textures.h"
 #include "opengl/Shaders.h"
 #include "opengl/Framebuffer.h"
-
 #include "opengl/Utils.h"
 
-#include "GlfwApp.h"
 #include "Interaction.h"
-//#include "Awesomium.h"
-#include "Cegui.h"
+
+#include "GlfwUtils.h"
+#include "GlfwApp.h"
+
+#include "QtUtils.h"
 
 #if defined(OS_WIN)
 #define OVR_OS_WIN32
@@ -135,8 +135,11 @@ public:
 #include <OVR_CAPI.h>
 #include <OVR_CAPI_GL.h>
 
-#include "OvrUtils.h"
-#include "RiftApp.h"
+#include "RiftUtils.h"
+#include "RiftRenderingApp.h"
+#include "RiftGlfwApp.h"
+#include "RiftQtApp.h"
+
 
 #ifndef PI
 #define PI 3.14159265f

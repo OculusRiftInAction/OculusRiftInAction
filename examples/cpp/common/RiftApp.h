@@ -19,97 +19,18 @@
 
 #pragma once
 
-class RiftManagerApp {
-protected:
-  ovrHmd hmd;
-
-  glm::uvec2 hmdNativeResolution;
-  glm::ivec2 hmdDesktopPosition;
-
-public:
-  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
-    hmd = ovrHmd_Create(0);
-    if (nullptr == hmd) {
-      hmd = ovrHmd_CreateDebug(defaultHmdType);
-      hmdDesktopPosition = glm::ivec2(100, 100);
-    }
-    else {
-      hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
-    }
-    hmdNativeResolution = glm::ivec2(hmd->Resolution.w, hmd->Resolution.h);
-  }
-
-  virtual ~RiftManagerApp() {
-    ovrHmd_Destroy(hmd);
-    hmd = nullptr;
-  }
-};
-
-/**
-A class that takes care of the basic duties of putting an OpenGL
-window on the desktop in the correct position so that it's visible
-through the Rift.
-*/
-class RiftGlfwApp : public GlfwApp, public RiftManagerApp {
-protected:
-  GLFWmonitor * hmdMonitor;
-  const bool fullscreen;
-  bool fakeRiftMonitor{ false };
-
-public:
-  RiftGlfwApp(bool fullscreen = false) : fullscreen(fullscreen) {
-  }
-
-  virtual ~RiftGlfwApp() {
-  }
-
-  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    return ovr::createRiftRenderingWindow(hmd, outSize, outPosition);
-  }
-
-  using GlfwApp::viewport;
-  virtual void viewport(ovrEyeType eye) {
-    const glm::uvec2 & windowSize = getSize();
-    glm::ivec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
-    GlfwApp::viewport(glm::uvec2(windowSize.x / 2, windowSize.y), viewportPosition);
-  }
-    
-  int getEnabledCaps() {
-    return ovrHmd_GetEnabledCaps(hmd);
-  }
-
-  void enableCaps(int caps) {
-    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() | caps);
-  }
-
-  void toggleCaps(ovrHmdCaps cap) {
-    if (cap & getEnabledCaps()) {
-      disableCaps(cap);
-    } else {
-      enableCaps(cap);
-    }
-  }
-
-  void disableCaps(int caps) {
-    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
-  }
-};
-
 class RiftApp : public RiftGlfwApp {
-public:
-
-protected:
-  glm::mat4 player;
-  ovrTexture eyeTextures[2];
-  ovrVector3f eyeOffsets[2];
-
-private:
   ovrEyeRenderDesc eyeRenderDescs[2];
   ovrPosef eyePoses[2];
   ovrEyeType currentEye;
 
   glm::mat4 projections[2];
   FramebufferWrapper eyeFramebuffers[2];
+
+protected:
+  glm::mat4 player;
+  ovrTexture eyeTextures[2];
+  ovrVector3f eyeOffsets[2];
 
 protected:
   using RiftGlfwApp::renderStringAt;
@@ -165,32 +86,4 @@ public:
   virtual ~RiftApp();
 };
 
-template <typename Function>
-void for_each_eye(Function function) {
-  for (ovrEyeType eye = ovrEyeType::ovrEye_Left;
-      eye < ovrEyeType::ovrEye_Count;
-      eye = static_cast<ovrEyeType>(eye + 1)) {
-    function(eye);
-  }
-}
-
-// Combine some macros together to create a single macro
-// to launch a class containing a run method
-#define RUN_OVR_APP(AppClass) \
-MAIN_DECL { \
-  if (!ovr_Initialize()) { \
-      SAY_ERR("Failed to initialize the Oculus SDK"); \
-      return -1; \
-  } \
-  int result = -1; \
-  try { \
-    result = AppClass().run(); \
-  } catch (std::exception & error) { \
-    SAY_ERR(error.what()); \
-  } catch (std::string & error) { \
-    SAY_ERR(error.c_str()); \
-  } \
-  ovr_Shutdown(); \
-  return result; \
-}
 

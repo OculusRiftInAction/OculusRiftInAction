@@ -116,6 +116,26 @@ list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
 ######################################################
 #
+# Qt is a cross platform GUI framework
+#
+#set(Qt5_DIR /Users/bradd/Qt5.4.0/5.4/clang_64/lib/cmake/Qt5)
+set(Qt5_DIR /Qt/Qt5.4.0/5.4/msvc2013_opengl/lib/cmake/Qt5)
+
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt5 REQUIRED Core Gui OpenGL Widgets)
+if (Qt5_FOUND)
+    set(HAVE_QT 1)
+    list(APPEND EXAMPLE_LIBS ${Qt5Core_LIBRARIES})
+    list(APPEND EXAMPLE_LIBS ${Qt5Gui_LIBRARIES})
+    list(APPEND EXAMPLE_LIBS ${Qt5OpenGL_LIBRARIES})
+    list(APPEND EXAMPLE_LIBS ${Qt5Widgets_LIBRARIES})
+endif()
+
+
+
+######################################################
+#
 # OGLplus provides object oriented OpenGL wrappers
 #
 
@@ -140,45 +160,6 @@ set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/libraries/oglplus)
     )
 set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
 
-if (OpenCV_FOUND) 
-    include_directories(${OpenCV_INCLUDE_DIRS})
-else()
-    if((WIN32 OR APPLE))
-        include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
-        include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
-    else()
-        include_directories(${PNG_INCLUDE_DIR})
-    endif()
-endif()
-
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_AUTOMOC ON)
-set(Qt5_DIR /Users/bradd/Qt5.4.0/5.4/clang_64/lib/cmake/Qt5)
-find_package(Qt5 REQUIRED Core Gui OpenGL Widgets)
-include_directories(${Qt5Core_INCLUDE_DIRS})
-include_directories(${Qt5Gui_INCLUDE_DIRS})
-include_directories(${Qt5Widgets_INCLUDE_DIRS})
-include_directories(${Qt5OpenGL_INCLUDE_DIRS})
-list(APPEND EXAMPLE_LIBS ${Qt5Core_LIBRARIES})
-list(APPEND EXAMPLE_LIBS ${Qt5Gui_LIBRARIES})
-list(APPEND EXAMPLE_LIBS ${Qt5OpenGL_LIBRARIES})
-list(APPEND EXAMPLE_LIBS ${Qt5Widgets_LIBRARIES})
-
-
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/include)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
-include_directories(${CMAKE_BINARY_DIR}/libraries/oglplus/include)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
-
-###############################################################################
-#
-# GLM - Vector / matrix header only math library based on the syntax of GLSL
-#
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
-
 ###############################################################################
 #
 # Non-C++ resources that are shared by the examples
@@ -197,6 +178,39 @@ set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
 include_directories(resources/cpp)
 include_directories(${CMAKE_BINARY_DIR}/resources)
 list(APPEND EXAMPLE_LIBS ExampleResources)
+
+###############################################################################
+#
+# All our includes for the used libraries
+#
+
+# GLM - Vector / matrix header only math library based on the syntax of GLSL
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
+include_directories(${CMAKE_BINARY_DIR}/libraries/oglplus/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
+
+if (OpenCV_FOUND) 
+    include_directories(${OpenCV_INCLUDE_DIRS})
+else()
+    if((WIN32 OR APPLE))
+        include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
+        include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
+    else()
+        include_directories(${PNG_INCLUDE_DIR})
+    endif()
+endif()
+
+if (Qt5_FOUND)
+    include_directories(${Qt5Core_INCLUDE_DIRS})
+    include_directories(${Qt5Gui_INCLUDE_DIRS})
+    include_directories(${Qt5Widgets_INCLUDE_DIRS})
+    include_directories(${Qt5OpenGL_INCLUDE_DIRS})
+endif()
 
 ###############################################################################
 #
