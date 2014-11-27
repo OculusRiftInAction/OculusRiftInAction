@@ -1,9 +1,30 @@
 #include "Common.h"
+
+#include <QtWidgets>
+
 #include <oglplus/error/basic.hpp>
 #include <oglplus/shapes/plane.hpp>
 #include <regex>
 #include <set>
 using namespace oglplus;
+
+
+class GraphicsView : public QGraphicsView
+{
+public:
+  GraphicsView()
+  {
+    setWindowTitle(tr("3D Model Viewer"));
+  }
+  
+protected:
+  void resizeEvent(QResizeEvent *event) {
+    if (scene())
+      scene()->setSceneRect(
+                            QRect(QPoint(0, 0), event->size()));
+    QGraphicsView::resizeEvent(event);
+  }
+};
 
 #define UI_X 1280
 #define UI_Y 720
@@ -46,6 +67,23 @@ namespace shadertoy {
     const char * name;
     Preset(Resource res, const char * name) : res(res), name(name) {};
   };
+  
+  
+  const char * UNIFORM_RESOLUTION = "iResolution";
+  const char * UNIFORM_GLOBALTIME = "iGlobalTime";
+  const char * UNIFORM_CHANNEL_TIME = "iChannelTime";
+  const char * UNIFORM_CHANNEL_RESOLUTION = "iChannelResolution";
+  const char * UNIFORM_MOUSE_COORDS = "iMouse";
+  const char * UNIFORM_DATE = "iDate";
+  const char * UNIFORM_SAMPLE_RATE = "iSampleRate";
+  const char * UNIFORM_POSITION = "iPos";
+  const char * UNIFORM_CHANNELS[4] = {
+    "iChannel0",
+    "iChannel1",
+    "iChannel2",
+    "iChannel3",
+  };
+
 
   Preset PRESETS[] {
     Preset(Resource::SHADERTOY_SHADERS_DEFAULT_FS, "Default"),
@@ -129,269 +167,33 @@ namespace shadertoy {
     SAVE,
   };
 
-  static void setButtonImage(CEGUI::Window * pButton, const std::string & imageName) {
-    pButton->setProperty("NormalImage", imageName);
-    pButton->setProperty("PushedImage", imageName);
-    pButton->setProperty("HoverImage", imageName);
-  }
-
-  class EditUi : public ui::Wrapper {
+  class EditUi  {
   protected:
     UiState uiState{ INACTIVE };
-    static const char * WINDOW_EDIT;
-    static const char * WINDOW_CHANNELS;
-    static const char * WINDOW_LOAD;
-    static const char * WINDOW_SAVE;
 
     std::function<void(int, ChannelInputType, int)> channelFunction;
     std::function<bool(const std::string & source)> sourceFunction;
     std::function<void(Resource res)> loadPresetFunction;
 
-    struct EditWindow {
-      CEGUI::Window * pWindow;
-      EditUi & parent;
-      EditWindow(EditUi & parent) : parent(parent) {
-      }
-
-      void init(CEGUI::Window * rootWindow) {
-        using namespace CEGUI;
-        WindowManager & wmgr = WindowManager::getSingleton();
-        rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderEdit.layout"));
-        pWindow = rootWindow->getChild(WINDOW_EDIT);
-        Window * pShaderText = pWindow->getChild("ShaderText");
-        FontManager::getSingleton().createFromFile("Inconsolata-14.font");
-        pShaderText->setFont("Inconsolata-14");
-        pShaderText->setText(parent.fragmentSource);
-        Window * pStatus = pWindow->getChild("Status");
-        pStatus->setFont("Inconsolata-14");
-        pStatus->setTextParsingEnabled(true);
-
-        // Run button
-        Window * pRunButton = pWindow->getChild("ButtonRun");
-        pRunButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-          if (!parent.sourceFunction(pShaderText->getText().c_str())) {
-            //            pStatus->setText(lastError.c_str());
-            pStatus->setText("FIXME error handling");
-          }
-          else {
-            pStatus->setText("Success");
-          }
-          return true;
-        });
-
-        // Load button
-        Window * pLoadButton = pWindow->getChild("ButtonLoad");
-        pLoadButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-          parent.setUiState(LOAD);
-          return true;
-        });
-
-        // Save button
-        Window * pSaveButton = pWindow->getChild("ButtonSave");
-        pSaveButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-          parent.setUiState(SAVE);
-          return true;
-        });
-
-        // Channel buttons
-        for (int i = 0; i < MAX_CHANNELS; ++i) {
-          std::string controlName = Platform::format("ButtonC%d", i);
-          Window * pButton = pWindow->getChild(controlName);
-          pButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-            pWindow->setUserData((void*)(size_t)i);
-            parent.setUiState(CHANNEL);
-            return true;
-          });
-        }
-      }
-    };
-
-    struct ChannelWindow {
-      CEGUI::Window * pWindow;
-      EditUi & parent;
-
-      ChannelWindow(EditUi & parent) : parent(parent) { }
-
-      void setupButton(ChannelInputType type, int index) {
-        using namespace CEGUI;
-        std::string str = getChannelInputName(type, index);
-        ImageManager & im = ImageManager::getSingleton();
-        if (pWindow->isChild(str)) {
-          std::string imageName = "Image" + str;
-          Resource res = getChannelInputResource(type, index);
-          Window * pChannelButton = pWindow->getChild(str);
-          std::string file = Resources::getResourceMnemonic(res);
-          im.addFromImageFile(imageName, file, "resources");
-          setButtonImage(pChannelButton, imageName);
-          pChannelButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-            size_t channel = (size_t)pWindow->getUserData();
-            parent.channelFunction(channel, type, index);
-            parent.setUiState(EDIT);
-            return true;
-          });
-        }
-      }
-
-      void init(CEGUI::Window * rootWindow) {
-        using namespace CEGUI;
-        WindowManager & wmgr = WindowManager::getSingleton();
-        rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderChannels.layout"));
-        pWindow = rootWindow->getChild(WINDOW_CHANNELS);
-        for (int i = 0; i < MAX_TEXTURES; ++i) {
-          setupButton(ChannelInputType::TEXTURE, i);
-        }
-
-        for (int i = 0; i < MAX_CUBEMAPS; ++i) {
-          setupButton(ChannelInputType::CUBEMAP, i);
-        }
-      }
-    };
-
-    struct LoadWindow {
-      CEGUI::Window * pWindow;
-      EditUi & parent;
-      LoadWindow(EditUi & parent) : parent(parent) {
-      }
-
-      void init(CEGUI::Window * rootWindow) {
-        using namespace CEGUI;
-        WindowManager & wmgr = WindowManager::getSingleton();
-        rootWindow->addChild(wmgr.loadLayoutFromFile("ShaderLoad.layout"));
-        pWindow = rootWindow->getChild(WINDOW_LOAD);
-        ImageManager & im = ImageManager::getSingleton();
-        Listbox * lb = (Listbox*)pWindow->getChild("ListboxPresets");
-        const CEGUI::Image* sel_img = &im.get("TaharezLook/MultiListSelectionBrush");
-        for (int i = 0; Resource::NO_RESOURCE != shadertoy::PRESETS[i].res; ++i) {
-          ListboxTextItem * itm = new ListboxTextItem(shadertoy::PRESETS[i].name, i, (void*)PRESETS[i].res, false);
-          itm->setSelectionBrushImage(sel_img);
-          lb->addItem(itm);
-        }
-        lb->subscribeEvent(Listbox::EventSelectionChanged, [=](const EventArgs& e) -> bool {
-          ListboxItem * itm = lb->getFirstSelectedItem();
-          if (nullptr != itm) {
-            pWindow->setUserData(itm->getUserData());
-          }
-          else {
-            pWindow->setUserData(nullptr);
-          }
-          return true;
-        });
-
-        Window * pButtonOk = pWindow->getChild("ButtonOk");
-        pButtonOk->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-          void * selected = pWindow->getUserData();
-          if (nullptr != selected) {
-            Resource res = (Resource)(size_t)selected;
-            // FIXME, figure out a good dialog return value mechanism
-            pWindow->getParent()->getChild(WINDOW_EDIT)->getChild("ShaderText")->setText(Platform::getResourceData(res).c_str());
-            parent.loadPresetFunction(res);
-          }
-          pWindow->setUserData(nullptr);
-          parent.setUiState(EDIT);
-          return true;
-        });
-        Window * pButtonCancel = pWindow->getChild("ButtonCancel");
-        pButtonCancel->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-          pWindow->setUserData(nullptr);
-          parent.setUiState(EDIT);
-          return true;
-        });
-
-      }
-    };
-
-    EditWindow editWindow;
-    ChannelWindow channelWindow;
-    LoadWindow loadWindow;
-
   public:
     std::string fragmentSource;
 
-    EditUi() : editWindow(*this), channelWindow(*this), loadWindow(*this) {}
-
-    void init(
-      const std::string & fragmentSource, 
-      std::function<void(int, ChannelInputType, int)> channelFunction, 
-      std::function<bool(const std::string & source)> sourceFunction,
-      std::function<void(Resource res)> loadPresetFunction) {
-      this->fragmentSource = fragmentSource;
-      this->channelFunction = channelFunction;
-      this->sourceFunction = sourceFunction;
-      this->loadPresetFunction = loadPresetFunction;
-      ui::Wrapper::init(UI_SIZE);
-      withUiContext([&]{
-        using namespace CEGUI;
-        auto rootWindow = getWindow();
-        // Set up the editor window
-        editWindow.init(rootWindow);
-        editWindow.pWindow->getChild("ShaderText")->setText(fragmentSource.c_str());
-        // Set up the channel texture selection dialog
-        channelWindow.init(rootWindow);
-        // Set up the preset / user shader loading window
-        loadWindow.init(rootWindow);
-
-        setUiState(INACTIVE);
-        System::getSingleton().getDefaultGUIContext().setRootWindow(rootWindow);
-      });
-    }
-
-    CEGUI::Window * getEditWindow() {
-      return getWindow()->getChild(WINDOW_EDIT);
-    }
+    EditUi() {}
 
     bool uiVisible() {
       return uiState != INACTIVE;
     }
 
     void setUiState(UiState newState) {
-      withUiContext([&]{
-        auto rootWindow = getWindow();
-        int childCount = rootWindow->getChildCount();
-        for (int i = 0; i < childCount; ++i) {
-          rootWindow->getChildAtIdx(i)->hide();
-        }
-
-        switch (newState) {
-        case INACTIVE:
-          break;
-        case EDIT:
-          rootWindow->getChild(WINDOW_EDIT)->show();
-          break;
-        case CHANNEL:
-          rootWindow->getChild(WINDOW_CHANNELS)->show();
-          break;
-        case LOAD:
-          rootWindow->getChild(WINDOW_LOAD)->show();
-          break;
-        case SAVE:
-          break;
-        }
-        uiState = newState;
-      });
+      uiState = newState;
     }
 
     void setChannelButton(int channel, ChannelInputType type, int index) {
-      std::string imageName = "Image" + getChannelInputName(type, index);
-      std::string controlName = Platform::format("ButtonC%d", channel);
-      CEGUI::Window * pButton = getWindow()->getChild(WINDOW_EDIT)->getChild(controlName);
-      pButton->setProperty("NormalImage", imageName);
-      pButton->setProperty("PushedImage", imageName);
-      pButton->setProperty("HoverImage", imageName);
     }
 
     void clearChannelButton(int channel) {
-      std::string controlName = Platform::format("ButtonC%d", channel);
-      CEGUI::Window * pButton = getWindow()->getChild(WINDOW_EDIT)->getChild(controlName);
-      pButton->setProperty("NormalImage", "");
-      pButton->setProperty("PushedImage", "");
-      pButton->setProperty("HoverImage", "");
     }
   };
-
-  const char * EditUi::WINDOW_EDIT = "ShaderEdit";
-  const char * EditUi::WINDOW_CHANNELS = "ShaderChannels";
-  const char * EditUi::WINDOW_LOAD = "ShaderLoad";
-  const char * EditUi::WINDOW_SAVE = "ShaderSave";
 }
 
 typedef std::shared_ptr<oglplus::VertexShader> VertexShaderPtr;
@@ -450,13 +252,12 @@ struct RateCounter {
   }
 };
 
-std::set<std::string> getActiveUniforms(ProgramPtr & program) {
-  std::set<std::string> activeUniforms;
-  activeUniforms.clear();
+std::map<std::string, GLuint> getActiveUniforms(ProgramPtr & program) {
+  std::map<std::string, GLuint> activeUniforms;
   size_t uniformCount = program->ActiveUniforms().Size();
   for (int i = 0; i < uniformCount; ++i) {
     std::string name = program->ActiveUniforms().At(i).Name().c_str();
-    activeUniforms.insert(name);
+    activeUniforms[name] = program->ActiveUniforms().At(i).Index();
   }
   return activeUniforms;
 }
@@ -552,6 +353,11 @@ public:
       glfwSetInputMode(getWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
   }
+
+  virtual void initUi() {
+  }
+
+
 
   virtual void initGl() {
     PARENT_CLASS::initGl();
@@ -720,6 +526,14 @@ public:
     updateUniforms();
   }
 
+//  QApplication app(argc, argv);
+//  QWidget window;
+//  window.resize(320, 240);
+//  window.show();
+//  window.setWindowTitle(
+//                        QApplication::translate("toplevel", "Top-level widget"));
+//  return app.exec();
+
   void updateUniforms() {
     using namespace shadertoy;
     std::set<std::string> activeUniforms = getActiveUniforms(skyboxProgram);
@@ -728,10 +542,8 @@ public:
     for (int i = 0; i < 4; ++i) {
       const char * uniformName = shadertoy::UNIFORM_CHANNELS[i];
       if (activeUniforms.count(uniformName)) {
-        int loc = glGetUniformLocation(oglplus::GetName(*skyboxProgram), uniformName);
-        glUniform1i(loc, i);
-        // setting the active texture slot for the channels
-        // Uniform<GLuint>(*cubeProgram, uniformName).Set(i);
+        skyboxProgram->ActiveUniforms();
+        Uniform<GLuint>(*skyboxProgram, uniformName).Set(i);
       }
     }
     if (activeUniforms.count(UNIFORM_RESOLUTION)) {
@@ -874,22 +686,6 @@ public:
 
   void update() {
     PARENT_CLASS::update();
-    //editUi.update([&]{
-    //  if (fps.getCount() > 50) {
-    //    float rate = fps.getRate();
-    //    if (rate < 55) {
-    //      SAY("%f %f", rate, texRes);
-    //      texRes *= 0.9f;
-    //    }
-    //    editUi.getWindow()->getChild("ShaderEdit/TextFps")->setText(Platform::format("%2.1f", rate));
-    //    editUi.getWindow()->getChild("ShaderEdit/TextRez")->setText(Platform::format("%2.1f", texRes));
-    //    float mpx = renderSize().x * renderSize().y;
-    //    mpx /= 1e6f;
-    //    editUi.getWindow()->getChild("ShaderEdit/TextMpx")->setText(Platform::format("%02.2f", mpx));
-
-    //    fps.reset();
-    //  }
-    //});
     fps.increment();
   }
 
@@ -907,11 +703,11 @@ public:
         oria::renderGeometry(skybox, skyboxProgram, uniformLambdas );
       });
       for (int i = 0; i < 4; ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
+        oglplus::DefaultTexture().Active(0);
         DefaultTexture().Bind(Texture::Target::_2D);
         DefaultTexture().Bind(Texture::Target::CubeMap);
       }
-      glActiveTexture(GL_TEXTURE0);
+      oglplus::DefaultTexture().Active(0);
     });
     viewport(textureSize());
   }
@@ -946,7 +742,7 @@ public:
       mv.withPush([&]{
         mv.translate(vec3(0, 0, -1));
         mv.postMultiply(glm::inverse(player));
-        editUi.bindTexture();
+//        editUi.bindTexture();
         oria::renderGeometry(shape, program);
       });
     }
@@ -971,7 +767,6 @@ public:
 #endif
 
 };
-
 
 
 #ifdef RIFT

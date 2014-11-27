@@ -39,7 +39,6 @@ protected:
   }
 
   virtual void onFrameEnd() {
-
   }
 
   virtual void * getRenderWindow() = 0;

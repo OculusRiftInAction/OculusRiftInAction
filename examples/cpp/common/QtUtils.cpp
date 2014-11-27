@@ -4,6 +4,10 @@
 
 //#include <QtWidgets/QGraphicsView>
 
+namespace qt {
+
+}
+
 ForwardingGraphicsView::ForwardingGraphicsView(QWidget * filterTarget) : filterTarget(filterTarget) {
   filterTarget->installEventFilter(this);
   filterTarget->setMouseTracking(true);

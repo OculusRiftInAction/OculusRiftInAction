@@ -25,13 +25,13 @@ class QRiftApplication : public QApplication, public RiftRenderingApp {
   static int argc;
   static char ** argv;
 
-  static QGLFormat & getFormat() {
-    static QGLFormat glFormat;
-    glFormat.setVersion(3, 3);
-    glFormat.setProfile(QGLFormat::CoreProfile);
-    glFormat.setSampleBuffers(true);
-    return glFormat;
-  }
+//  static QGLFormat & getFormat() {
+//    static QGLFormat glFormat;
+//    glFormat.setVersion(3, 3);
+//    glFormat.setProfile(QGLFormat::CoreProfile);
+//    glFormat.setSampleBuffers(true);
+//    return glFormat;
+//  }
 
   PaintlessGlWidget widget;
 
@@ -41,14 +41,9 @@ private:
   }
 
 public:
-  QRiftApplication() : QApplication(argc, argv), widget(getFormat()) {
+  QRiftApplication() : QApplication(argc, argv) {
     // Move to RiftUtils static method
     bool directHmdMode = false;
-    widget.move(hmdDesktopPosition.x, hmdDesktopPosition.y);
-    widget.resize(hmdNativeResolution.x, hmdNativeResolution.y);
-    bool db = widget.doubleBuffer();
-    Stacks::modelview().top() = glm::lookAt(vec3(0, OVR_DEFAULT_EYE_HEIGHT, 1), vec3(0, OVR_DEFAULT_EYE_HEIGHT, 0), Vectors::UP);
-
     // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
     ON_WINDOWS([&]{
       directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
@@ -61,6 +56,8 @@ public:
       widget.setWindowFlags(Qt::FramelessWindowHint);
     }
     widget.show();
+    widget.move(hmdDesktopPosition.x, hmdDesktopPosition.y);
+    widget.resize(hmdNativeResolution.x, hmdNativeResolution.y);
 
     // If we're in direct mode, attach to the window
     if (directHmdMode) {

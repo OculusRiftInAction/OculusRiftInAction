@@ -2,9 +2,8 @@
 
 #ifdef HAVE_QT
 
-//#include <QtWidgets/QGraphicsView>
 #include <QtWidgets>
-#include <QGLWidget>
+#include <QOpenGLWidget>
 #include <QPixmap>
 
 namespace qt {
@@ -23,6 +22,7 @@ namespace qt {
   inline QPointF pointFromGlm(const vec2 & pt) {
     return QPointF(pt.x, pt.y);
   }
+  
 }
 /**
  * Forwards mouse and keyboard input from the specified widget to the
@@ -43,18 +43,47 @@ protected:
 };
 
 
-class PaintlessGlWidget : public QGLWidget {
+class PaintlessGlWidget : public QOpenGLWidget {
 protected:
   bool event(QEvent * e) {
     if (QEvent::Paint == e->type()) {
       return true;
     }
-    return QGLWidget::event(e);
+    return QOpenGLWidget::event(e);
   }
 
 public:
-  explicit PaintlessGlWidget(const QGLFormat& format) : QGLWidget(format) {
-    setAutoBufferSwap(false);
+  explicit PaintlessGlWidget() : QOpenGLWidget() {
+  }
+};
+
+
+class DelegatingGlWidget : public PaintlessGlWidget {
+  typedef std::function<void()> Callback;
+  typedef std::function<void(int, int)> ResizeCallback;
+
+
+  Callback paintCallback;
+  Callback initCallback;
+  ResizeCallback resizeCallback;
+
+protected:
+  void initializeGL() {
+    initCallback();
+  }
+
+  void resizeGL(int w, int h) {
+    resizeCallback(w, h);
+  }
+
+  void paintGL() {
+    paintCallback();
+    update();
+  }
+
+public:
+  explicit DelegatingGlWidget(Callback paint, Callback init = []{}, ResizeCallback resize = [](int, int){}) :
+    PaintlessGlWidget(), paintCallback(paint), initCallback(init), resizeCallback(resize) {
   }
 };
 
