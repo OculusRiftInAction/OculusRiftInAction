@@ -8,7 +8,7 @@
 using namespace oglplus;
 
 class MyClass : public QObject {
-    Q_OBJECT
+  Q_OBJECT
 
 public slots:
   void cppSlot(const QString &msg) {
@@ -16,83 +16,62 @@ public slots:
   }
 };
 
-Resource resourceFromQmlId(const QString & id) {
-  static QRegExp re("(cube|tex)/(\\d+)");
-  static const QString CUBE("cube");
-  static const QString TEX("tex");
-  if (!re.exactMatch(id)) {
-    return NO_RESOURCE;
-  }
-  QString type = re.cap(1);
-  int index = re.cap(2).toInt();
-  qDebug() << "Type " << type << " Index " << index;
-  if (CUBE == type) {
-    return shadertoy::CUBEMAPS[index];
-  } else if (TEX == type) {
-    return shadertoy::TEXTURES[index];
-  }
-  return NO_RESOURCE;
-}
-
-QImage loadImageResource(Resource res) {
-  std::vector<uint8_t> data = Platform::getResourceByteVector(res);
-  QImage image;
-  image.loadFromData(data.data(), data.size());
-  return image;
-}
-
-class MyImageProvider : public QQuickImageProvider {
-public:
-  MyImageProvider() : QQuickImageProvider(QQmlImageProviderBase::Image) {}
-
-  virtual QImage requestImage(const QString & id, QSize * size, const QSize & requestedSize) {
-    qDebug() << "Id: " << id;
-    Resource res = resourceFromQmlId(id);
-    if (NO_RESOURCE == res) {
-      qWarning() << "Unable to find resource for image ID " << id;
-      return QQuickImageProvider::requestImage(id, size, requestedSize);
-    }
-    return loadImageResource(res);
-  }
-};
-
 
 #include "Example_Qt.moc"
 
-
-int main(int argc, char ** argv) {
-  QApplication app(argc, argv);
-  const char * FILE ="/Users/bradd/git/OculusRiftInAction/resources/shadertoy/ChannelSelect.qml";
-  
-  MyImageProvider imgProvider;
-  
-  QQuickWidget qw;
-  qw.engine()->addImageProvider("res", &imgProvider);
-  qw.setSource(QUrl::fromLocalFile(FILE));
-  QObject * item = qw.rootObject();
-  auto res = item->findChildren<QObject>();
-  for (int i = 0; i < res.count(); ++i) {
-    const QObject & o = res.at(i);
-    if (QString(o.metaObject()->className()) == QString("QQuickImage")) {
-      qDebug() << o.objectName() << " ";
-    }
+class TestEdit : public QPlainTextEdit{
+public:
+  void keyPressEvent(QKeyEvent * event) {
+    QPlainTextEdit::keyPressEvent(event);
   }
-  MyClass myClass;
-  QObject::connect(item, SIGNAL(qmlSignal(QString)),
-                   &myClass, SLOT(cppSlot(QString)));
 
+  virtual void focusInEvent(QFocusEvent * event) {
+    QPlainTextEdit::focusInEvent(event);
+  }
 
-//  QGraphicsScene gs;
-//  gs.addWidget(&qw);
-//  
-//  QGraphicsView gv;
-//  gv.resize(1280, 720);
+};
 
+MAIN_DECL{
+  int i = 1;
+  QApplication app(i, &lpCmdLine);
+  QGraphicsView view;
+  QGraphicsScene scene;
+  view.setViewport(new QWidget());
 
-//  QObject *rect = view.->findChild<QObject*>("tex00");
-  qw.show();
-  return app.exec();
+  QWidget dialog;
+  dialog.setLayout(new QVBoxLayout());
+  TestEdit edit;
+  dialog.layout()->addWidget(&edit);
+  scene.addWidget(&dialog);
+  view.setScene(&scene);
+  view.show();
+  app.exec();
 }
+//  qw.setSource(QUrl::fromLocalFile("C:/Users/bdavis/Git/OculusRiftExamples/resources/shadertoy/ChannelSelect.qml"));
+//  QObject * item = qw.rootObject();
+//  auto res = item->findChildren<QObject>();
+//  for (int i = 0; i < res.count(); ++i) {
+//    const QObject & o = res.at(i);
+//    if (QString(o.metaObject()->className()) == QString("QQuickImage")) {
+//      qDebug() << o.objectName() << " ";
+//    }
+//  }
+//  MyClass myClass;
+//  QObject::connect(item, SIGNAL(qmlSignal(QString)),
+//                   &myClass, SLOT(cppSlot(QString)));
+//
+//
+////  QGraphicsScene gs;
+////  gs.addWidget(&qw);
+////  
+////  QGraphicsView gv;
+////  gv.resize(1280, 720);
+//
+//
+////  QObject *rect = view.->findChild<QObject*>("tex00");
+//  qw.show();
+//  return app.exec();
+//}
 
 
 //  QDialog * dialog = new QDialog(0, Qt::CustomizeWindowHint | Qt::WindowTitleHint);
@@ -115,61 +94,6 @@ int main(int argc, char ** argv) {
 //  view.resize(1280, 720);
 //  view.setScene(&scene);
 //  view.show();
-
-
-
-//// Set up the channel selection window
-//{
-//  ImageManager & im = CEGUI::ImageManager::getSingleton();
-//  for (int i = 0; i < 17; ++i) {
-//    std::string str = Platform::format("Tex%02d", i);
-//    if (pShaderChannels->isChild(str)) {
-//      std::string imageName = "Image" + str;
-//      Resource res = TEXTURES[i];
-//      Window * pChannelButton = pShaderChannels->getChild(str);
-//      std::string file = Resources::getResourcePath(res);
-//      im.addFromImageFile(imageName, file, "resources");
-//      pChannelButton->setProperty("NormalImage", imageName);
-//      pChannelButton->setProperty("PushedImage", imageName);
-//      pChannelButton->setProperty("HoverImage", imageName);
-//      pChannelButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-//        size_t channel = (size_t)pShaderChannels->getUserData();
-//        std::string controlName = Platform::format("ButtonC%d", channel);
-//        Window * pButton = pShaderEditor->getChild(controlName);
-//        pButton->setProperty("NormalImage", imageName);
-//        pButton->setProperty("PushedImage", imageName);
-//        pButton->setProperty("HoverImage", imageName);
-//        setChannelInput(channel, TEXTURE, res);
-//        setUiState(EDIT);
-//        return true;
-//      });
-//    }
-//  }
-//  for (int i = 0; i < 6; ++i) {
-//    std::string str = Platform::format("Cube%02d", i);
-//    if (pShaderChannels->isChild(str)) {
-//      std::string imageName = "Image" + str;
-//      Resource res = CUBEMAPS[i];
-//      Window * pChannelButton = pShaderChannels->getChild(str);
-//      std::string file = Resources::getResourcePath(res);
-//      im.addFromImageFile(imageName, file, "resources");
-//      pChannelButton->setProperty("NormalImage", imageName);
-//      pChannelButton->setProperty("PushedImage", imageName);
-//      pChannelButton->setProperty("HoverImage", imageName);
-//      pChannelButton->subscribeEvent(PushButton::EventClicked, [=](const EventArgs& e) -> bool {
-//        size_t channel = (size_t)pShaderChannels->getUserData();
-//        std::string controlName = Platform::format("ButtonC%d", channel);
-//        Window * pButton = pShaderEditor->getChild(controlName);
-//        pButton->setProperty("NormalImage", imageName);
-//        pButton->setProperty("PushedImage", imageName);
-//        pButton->setProperty("HoverImage", imageName);
-//        setChannelInput(channel, CUBEMAP, res);
-//        setUiState(EDIT);
-//        return true;
-//      });
-//    }
-//  }
-//}
 
 
 //class QRiftApplication2 : public QApplication, public RiftRenderingApp {
@@ -216,7 +140,7 @@ int main(int argc, char ** argv) {
 //  virtual ~QRiftApplication2() {
 //  }
 //};
-//
+
 //int QRiftApplication2::argc = 0;
 //char ** QRiftApplication2::argv = nullptr;
 //

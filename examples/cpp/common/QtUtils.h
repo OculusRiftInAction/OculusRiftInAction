@@ -31,19 +31,23 @@ namespace qt {
  * click reflected on the scene displayed in this view.
  */
 class ForwardingGraphicsView : public QGraphicsView {
-  QWidget * filterTarget;
+  QWidget * filterTarget{ nullptr };
 
 public:
-  ForwardingGraphicsView(QWidget * filterTarget);
+  ForwardingGraphicsView(QWidget * filterTarget = nullptr);
+
+  void install(QWidget * filterTarget);
+  void remove(QWidget * filterTarget);
 
 protected:
   void forwardMouseEvent(QMouseEvent * event);
+  void forwardKeyEvent(QKeyEvent * event);
   void resizeEvent(QResizeEvent *event);
   bool eventFilter(QObject *object, QEvent *event);
 };
 
 
-class PaintlessGlWidget : public QOpenGLWidget {
+class PaintlessOpenGLWidget : public QOpenGLWidget {
 protected:
   bool event(QEvent * e) {
     if (QEvent::Paint == e->type()) {
@@ -53,12 +57,12 @@ protected:
   }
 
 public:
-  explicit PaintlessGlWidget() : QOpenGLWidget() {
+  explicit PaintlessOpenGLWidget() : QOpenGLWidget() {
   }
 };
 
 
-class DelegatingGlWidget : public PaintlessGlWidget {
+class DelegatingOpengGLWindow : public PaintlessOpenGLWidget {
   typedef std::function<void()> Callback;
   typedef std::function<void(int, int)> ResizeCallback;
 
@@ -82,10 +86,34 @@ protected:
   }
 
 public:
-  explicit DelegatingGlWidget(Callback paint, Callback init = []{}, ResizeCallback resize = [](int, int){}) :
-    PaintlessGlWidget(), paintCallback(paint), initCallback(init), resizeCallback(resize) {
+  explicit DelegatingOpengGLWindow(
+    Callback paint, Callback init = []{}, ResizeCallback resize = [](int, int){}) :
+    PaintlessOpenGLWidget(), paintCallback(paint), initCallback(init), resizeCallback(resize) {
   }
 };
+
+#ifdef OS_WIN
+#define QT_APP_WITH_ARGS(AppClass) \
+  int argc = 1; \
+  char ** argv = &lpCmdLine;  \
+  AppClass app(argc, argv);
+#else
+#define QT_APP_WITH_ARGS(AppClass) AppClass app(argc, argv);
+#endif
+
+#define RUN_QT_APP(AppClass) \
+MAIN_DECL { \
+  try { \
+    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "."); \
+    QT_APP_WITH_ARGS(AppClass); \
+    return app.exec(); \
+  } catch (std::exception & error) { \
+    SAY_ERR(error.what()); \
+  } catch (const std::string & error) { \
+    SAY_ERR(error.c_str()); \
+  } \
+  return -1; \
+}
 
 #endif
 

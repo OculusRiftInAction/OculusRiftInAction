@@ -118,26 +118,22 @@ list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 #
 # Qt is a cross platform GUI framework
 #
-if(WIN32)
-set(Qt5_DIR /Qt/Qt5.4.0/5.4/msvc2013_opengl/lib/cmake/Qt5)
-elseif(APPLE)
-set(Qt5_DIR /Users/bradd/Qt5.4.0/5.4/clang_64/lib/cmake/Qt5)
-else()
-endif()
-
-
+set(Qt5_DIR $ENV{QT5_ROOT}/lib/cmake/Qt5)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
-find_package(Qt5 REQUIRED Core Declarative Gui OpenGL QuickWidgets Widgets)
-if (Qt5_FOUND)
-    set(HAVE_QT 1)
-    list(APPEND EXAMPLE_LIBS ${Qt5Core_LIBRARIES})
-    list(APPEND EXAMPLE_LIBS ${Qt5Gui_LIBRARIES})
-    list(APPEND EXAMPLE_LIBS ${Qt5OpenGL_LIBRARIES})
-    list(APPEND EXAMPLE_LIBS ${Qt5QuickWidgets_LIBRARIES})
-    list(APPEND EXAMPLE_LIBS ${Qt5Widgets_LIBRARIES})
-endif()
+set(CMAKE_AUTORCC ON)
+
+#find_package(Qt5 REQUIRED Core Gui OpenGL QuickWidgets Widgets)
+
+set(HAVE_QT 1)
+foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL)
+    find_package(${lib} REQUIRED)
+    include_directories(${${lib}_INCLUDE_DIRS})
+    list(APPEND EXAMPLE_LIBS ${${lib}_LIBRARIES})
+    add_definitions(${${lib}_DEFINITIONS})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${lib}_EXECUTABLE_COMPILE_FLAGS}")
+endforeach(lib)
 
 
 
@@ -167,6 +163,10 @@ set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/libraries/oglplus)
     )
 set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
 
+#add_definitions(-DOGLPLUS_USE_BOOST_CONFIG)
+#add_definitions(-DOGLPLUS_NO_SITE_CONFIG)
+
+
 ###############################################################################
 #
 # Non-C++ resources that are shared by the examples
@@ -182,6 +182,7 @@ set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
 #
 add_subdirectory(resources)
 set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
+set_target_properties(ExampleResourcesQt PROPERTIES FOLDER "Examples/Shared")
 include_directories(resources/cpp)
 include_directories(${CMAKE_BINARY_DIR}/resources)
 list(APPEND EXAMPLE_LIBS ExampleResources)
@@ -191,13 +192,18 @@ list(APPEND EXAMPLE_LIBS ExampleResources)
 # All our includes for the used libraries
 #
 
+include_directories(${CMAKE_SOURCE_DIR}/libraries/boost)
+
 # GLM - Vector / matrix header only math library based on the syntax of GLSL
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
+
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
+
 include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/include)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
 include_directories(${CMAKE_BINARY_DIR}/libraries/oglplus/include)
+
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
 

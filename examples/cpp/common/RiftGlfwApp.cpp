@@ -88,9 +88,10 @@ void RiftApp::initGl() {
   // re-rendered to the screen with distortion
   glm::uvec2 frameBufferSize = ovr::toGlm(eyeTextures[0].Header.TextureSize);
   for_each_eye([&](ovrEyeType eye) {
-    eyeFramebuffers[eye].init(frameBufferSize);
+    eyeFramebuffers[eye] = FramebufferWrapperPtr(new FramebufferWrapper());
+    eyeFramebuffers[eye]->init(frameBufferSize);
     ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId = 
-        oglplus::GetName(*eyeFramebuffers[eye].color);
+        oglplus::GetName(eyeFramebuffers[eye]->color);
   });
 }
 
@@ -147,7 +148,7 @@ void RiftApp::draw() {
       }
 
       // Render the scene to an offscreen buffer
-      eyeFramebuffers[eye].Bind();
+      eyeFramebuffers[eye]->Bind();
       renderScene();
     });
   }

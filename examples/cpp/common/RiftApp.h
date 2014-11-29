@@ -25,7 +25,7 @@ class RiftApp : public RiftGlfwApp {
   ovrEyeType currentEye;
 
   glm::mat4 projections[2];
-  FramebufferWrapper eyeFramebuffers[2];
+  FramebufferWrapperPtr eyeFramebuffers[2];
 
 protected:
   glm::mat4 player;

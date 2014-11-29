@@ -1,20 +1,19 @@
 #include "Common.h"
 
-namespace Rift {
-  
-  
+namespace ovr {
+
   GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition) {
     GLFWwindow * window = nullptr;
     bool directHmdMode = false;
-    
+
     outPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
     outSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
-    
+
     // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
-    ON_WINDOWS([&]{
+    ON_WINDOWS([&] {
       directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
     });
-    
+
     // In direct HMD mode, we always use the native resolution, because the
     // user has no control over it.
     // In legacy mode, we should be using the current resolution of the Rift
@@ -26,15 +25,15 @@ namespace Rift {
         outSize = glm::uvec2(mode->width, mode->height);
       }
     }
-    
+
     // On linux it's recommended to leave the screen in it's default portrait orientation.
     // The SDK currently allows no mechanism to test if this is the case.  I could query
     // GLFW for the current resolution of the Rift, but that sounds too much like actual
     // work.
-    ON_LINUX([&]{
+    ON_LINUX([&] {
       std::swap(outSize.x, outSize.y);
     });
-    
+
     if (directHmdMode) {
       // In direct mode, try to put the output window on a secondary screen
       // (for easier debugging, assuming your dev environment is on the primary)
@@ -48,7 +47,7 @@ namespace Rift {
       glfwWindowHint(GLFW_DECORATED, 0);
       window = glfw::createWindow(outSize, outPosition);
     }
-    
+
     // If we're in direct mode, attach to the window
     if (directHmdMode) {
       void * nativeWindowHandle = glfw::getNativeWindowHandle(window);
@@ -56,33 +55,38 @@ namespace Rift {
         ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
       }
     }
-    
+
     return window;
   }
 
-  
 #ifdef HAVE_QT 
-  
+
   void setupQWidget(ovrHmd hmd, QWidget & widget) {
     bool directHmdMode = false;
-    
+
     // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
-    ON_WINDOWS([&]{
+    ON_WINDOWS([&] {
       directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
     });
-    
-    if (directHmdMode) {
-      widget.move(0, -1080);
-    }
-    else {
+
+#ifdef BRAD_DEBUG
+    widget.setWindowFlags(Qt::FramelessWindowHint);
+#endif
+    if (!directHmdMode) {
       widget.setWindowFlags(Qt::FramelessWindowHint);
     }
     widget.show();
-    // widget.move(hmdDesktopPosition.x, hmdDesktopPosition.y);
-    // widget.resize(hmdNativeResolution.x, hmdNativeResolution.y);
-    widget.move(1920, 100);
-    widget.resize(1280, 800);
-    
+    if (!directHmdMode) {
+      widget.move(hmd->WindowsPos.x, hmd->WindowsPos.y);
+    } else {
+#ifdef BRAD_DEBUG
+      widget.move(0, -1080);
+#else
+      widget.move(0, 0);
+#endif
+    }
+    widget.resize(hmd->Resolution.w, hmd->Resolution.h);
+
     // If we're in direct mode, attach to the window
     if (directHmdMode) {
       void * nativeWindowHandle = (void*)(size_t)widget.effectiveWinId();
@@ -93,6 +97,4 @@ namespace Rift {
   }
 
 #endif
-  
 }
-

@@ -81,7 +81,7 @@ public:
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.Multisample = 1;
-    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
+    cfg.OGL.Header.RTSize = ovr::fromGlm(getSize());
 
     // FIXME Doesn't work as expected in OpenGL
     //if (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop)) {

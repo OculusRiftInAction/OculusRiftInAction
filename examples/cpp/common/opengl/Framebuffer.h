@@ -19,15 +19,13 @@
 
 #pragma once
 
-typedef std::shared_ptr<oglplus::Framebuffer> FramebufferPtr;
-typedef std::shared_ptr<oglplus::Renderbuffer> RenderbufferPtr;
 
 // A wrapper for constructing and using a
 struct FramebufferWrapper {
-  glm::uvec2       size;
-  FramebufferPtr   fbo;
-  TexturePtr       color;
-  RenderbufferPtr  depth;
+  glm::uvec2              size;
+  oglplus::Framebuffer    fbo;
+  oglplus::Texture        color;
+  oglplus::Renderbuffer   depth;
 
   FramebufferWrapper() {
   }
@@ -39,46 +37,31 @@ struct FramebufferWrapper {
   void init(const glm::uvec2 & size) {
     using namespace oglplus;
     this->size = size;
-    color = TexturePtr(new Texture());
-    depth = RenderbufferPtr(new Renderbuffer());
-    fbo = FramebufferPtr(new Framebuffer());
-    Platform::addShutdownHook([&]{
-      color.reset();
-      depth.reset();
-      fbo.reset();
-    });
-
-
-    Context::Bound(Texture::Target::_2D, *color)
+    Context::Bound(Texture::Target::_2D, color)
       .MinFilter(TextureMinFilter::Linear)
       .MagFilter(TextureMagFilter::Linear)
       .WrapS(TextureWrap::ClampToEdge)
       .WrapT(TextureWrap::ClampToEdge)
       .Image2D(
-      0, PixelDataInternalFormat::RGBA8,
-      size.x, size.y,
-      0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
+        0, PixelDataInternalFormat::RGBA8,
+        size.x, size.y,
+        0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
       );
 
-    Context::Bound(Renderbuffer::Target::Renderbuffer, *depth)
+    Context::Bound(Renderbuffer::Target::Renderbuffer, depth)
       .Storage(
           PixelDataInternalFormat::DepthComponent,
           size.x, size.y);
 
     Bound([&]{
-      fbo->AttachTexture(Framebuffer::Target::Draw, FramebufferAttachment::Color, *color, 0);
-      fbo->AttachRenderbuffer(Framebuffer::Target::Draw, FramebufferAttachment::Depth, *depth);
-      fbo->Complete(Framebuffer::Target::Draw);
+      fbo.AttachTexture(Framebuffer::Target::Draw, FramebufferAttachment::Color, color, 0);
+      fbo.AttachRenderbuffer(Framebuffer::Target::Draw, FramebufferAttachment::Depth, depth);
+      fbo.Complete(Framebuffer::Target::Draw);
     });
-    //Context::Bound(Framebuffer::Target::Draw, *fbo)
-    //  .AttachTexture(FramebufferAttachment::Color, *color, 0)
-    //  .AttachRenderbuffer(FramebufferAttachment::Depth, *depth)
-    //  .Complete();
-    //DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
   }
 
   void Bind(oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {
-    fbo->Bind(target);
+    fbo.Bind(target);
     Viewport(); 
   }
 
@@ -92,10 +75,11 @@ struct FramebufferWrapper {
 
   template <typename F> 
   void Bound(F f, oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {
-    GLint oldBinding;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldBinding);
+    oglplus::FramebufferName oldFbo = oglplus::Framebuffer::Binding(target);
     Bind(target);
     f();
-    glBindFramebuffer(GL_FRAMEBUFFER, oldBinding);
+    oglplus::Framebuffer::Bind(target, oldFbo);
   }
 };
+
+typedef std::shared_ptr<FramebufferWrapper> FramebufferWrapperPtr;

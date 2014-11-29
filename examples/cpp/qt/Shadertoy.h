@@ -21,6 +21,21 @@ namespace shadertoy {
   };
 
 
+  const char * SHADER_HEADER = "#version 330\n"
+    "uniform vec3      iResolution;           // viewport resolution (in pixels)\n"
+    "uniform float     iGlobalTime;           // shader playback time (in seconds)\n"
+    "uniform float     iChannelTime[4];       // channel playback time (in seconds)\n"
+    "uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)\n"
+    "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\n"
+    "uniform vec4      iDate;                 // (year, month, day, time in seconds)\n"
+    "uniform float     iSampleRate;           // sound sample rate (i.e., 44100)\n"
+    "uniform vec3      iPos; // Head position\n"
+    "in vec3 iDir; // Direction from viewer\n"
+    "out vec4 FragColor;\n";
+
+  const char * LINE_NUMBER_HEADER =
+    "#line 1\n";
+
   struct Preset {
     const Resource res;
     const char * name;
@@ -62,6 +77,7 @@ namespace shadertoy {
     Resource::SHADERTOY_TEXTURES_TEX10_PNG,
     Resource::SHADERTOY_TEXTURES_TEX11_PNG,
     Resource::SHADERTOY_TEXTURES_TEX12_PNG,
+    NO_RESOURCE,
     Resource::SHADERTOY_TEXTURES_TEX14_PNG,
     Resource::SHADERTOY_TEXTURES_TEX15_PNG,
     Resource::SHADERTOY_TEXTURES_TEX16_PNG,
@@ -92,10 +108,19 @@ namespace shadertoy {
   }
 
   static Resource getChannelInputResource(ChannelInputType type, int index) {
+    if (index < 0) {
+      return NO_RESOURCE;
+    }
     switch (type) {
     case ChannelInputType::TEXTURE:
+      if (index >= MAX_TEXTURES) {
+        return NO_RESOURCE;
+      }
       return TEXTURES[index];
     case ChannelInputType::CUBEMAP:
+      if (index >= MAX_CUBEMAPS) {
+        return NO_RESOURCE;
+      }
       return CUBEMAPS[index];
     default:
       return NO_RESOURCE;

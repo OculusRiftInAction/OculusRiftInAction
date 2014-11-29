@@ -64,6 +64,7 @@ namespace oria {
       compileProgram(result,
         Platform::getResourceData(vs),
         Platform::getResourceData(fs));
+//      programs[key] = result;
       return result;
     }
     return programs[key];

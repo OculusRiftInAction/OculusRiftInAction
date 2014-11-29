@@ -19,179 +19,87 @@
 
 #pragma once
 
-#ifdef HAVE_QT
+#include <QtOpenGL/QGLWidget>
 
-class QRiftApplication : public QApplication, public RiftRenderingApp {
-  static int argc;
-  static char ** argv;
+class QRiftWidget : public QGLWidget, public RiftRenderingApp {
+  void paintGL() {
+    if (isRenderingConfigured()) {
+      draw();
+      update();
+    }
+  }
 
-//  static QGLFormat & getFormat() {
-//    static QGLFormat glFormat;
-//    glFormat.setVersion(3, 3);
-//    glFormat.setProfile(QGLFormat::CoreProfile);
-//    glFormat.setSampleBuffers(true);
-//    return glFormat;
-//  }
+  virtual void * getRenderWindow() {
+    return (void*)effectiveWinId();
+  }
+public:
+  static QGLFormat & getFormat() {
+    static QGLFormat glFormat;
+    glFormat.setVersion(3, 3);
+    glFormat.setProfile(QGLFormat::CoreProfile);
+    glFormat.setSampleBuffers(true);
+    return glFormat;
+  }
 
-  PaintlessGlWidget widget;
+  explicit QRiftWidget(QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0) 
+    : QGLWidget(parent, shareWidget, f) { 
+    initWidget();
+  }
+
+  explicit QRiftWidget(QGLContext *context, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0)
+    : QGLWidget(context, parent, shareWidget, f) {
+    initWidget();
+  }
+
+  explicit QRiftWidget(const QGLFormat& format, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0)
+    : QGLWidget(format, parent, shareWidget, f) {
+    initWidget();
+  }
+
+  void setupRiftRendering() {
+    makeCurrent();
+    initGl();
+    update();
+  }
 
 private:
-  virtual void * getRenderWindow() {
-    return (void*)widget.effectiveWinId();
+  void initWidget() {
+    setAutoBufferSwap(false);
+    ovr::setupQWidget(hmd, *this);
   }
+
+};
+
+
+template <typename T>
+class QRiftApplication : public QApplication {
+  static int argc;
+  static char ** argv;
+  std::shared_ptr<T> widget;
 
 public:
-  QRiftApplication() : QApplication(argc, argv) {
-    // Move to RiftUtils static method
-    bool directHmdMode = false;
-    // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
-    ON_WINDOWS([&]{
-      directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
-    });
-
-    if (directHmdMode) {
-      widget.move(0, -1080);
-    }
-    else {
-      widget.setWindowFlags(Qt::FramelessWindowHint);
-    }
-    widget.show();
-    widget.move(hmdDesktopPosition.x, hmdDesktopPosition.y);
-    widget.resize(hmdNativeResolution.x, hmdNativeResolution.y);
-
-    // If we're in direct mode, attach to the window
-    if (directHmdMode) {
-      void * nativeWindowHandle = (void*)(size_t)widget.effectiveWinId();
-      if (nullptr != nativeWindowHandle) {
-        ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
-      }
-    }
-  }
-
-
-  virtual int run() {
-    QCoreApplication* app = QCoreApplication::instance();
-    widget.makeCurrent();
-    initGl();
-    while (QCoreApplication::instance())
-    {
-      // Process the Qt message pump to run the standard window controls
-      if (app->hasPendingEvents())
-        app->processEvents();
-
-      // This will render a frame on every loop. This is similar to the way 
-      // that OVR_Platform operates.
-      widget.makeCurrent();
-      draw();
-    }
-    return 0;
+  QRiftApplication(int argc, char ** argv) : QApplication(argc, argv) {
+    ovr_Initialize();
+    widget = std::shared_ptr<T>(new T());
+    widget->setupRiftRendering();
   }
 
   virtual ~QRiftApplication() {
+    widget.reset();
+    try {
+      Platform::runShutdownHooks();
+    } catch (...) {
+
+    }
+    try {
+      ovr_Shutdown();
+    } catch (...) {
+
+    }
   }
 };
 
 
-/**
-A class that takes care of the basic duties of putting an OpenGL
-window on the desktop in the correct position so that it's visible
-through the Rift.
-*/
-#if 0
-class RiftWidget : public QGLWidget, public RiftManagerApp {
-protected:
-  GLFWmonitor * hmdMonitor;
-  const bool fullscreen;
-  bool fakeRiftMonitor{ false };
 
-public:
-  RiftWidget(bool fullscreen = false) : fullscreen(fullscreen) {
-  }
-
-  virtual ~RiftWidget() {
-  }
-
-  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    return ovr::createRiftRenderingWindow(hmd, outSize, outPosition);
-  }
-
-  using GlfwApp::viewport;
-  virtual void viewport(ovrEyeType eye) {
-    const glm::uvec2 & windowSize = getSize();
-    glm::ivec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
-    GlfwApp::viewport(glm::uvec2(windowSize.x / 2, windowSize.y), viewportPosition);
-  }
-    
-};
-
-class RiftApp : public RiftGlfwApp {
-public:
-
-protected:
-  glm::mat4 player;
-  ovrTexture eyeTextures[2];
-  ovrVector3f eyeOffsets[2];
-
-private:
-  ovrEyeRenderDesc eyeRenderDescs[2];
-  ovrPosef eyePoses[2];
-  ovrEyeType currentEye;
-
-  glm::mat4 projections[2];
-  FramebufferWrapper eyeFramebuffers[2];
-
-protected:
-  using RiftGlfwApp::renderStringAt;
-  void renderStringAt(const std::string & str, float x, float y, float size = 18.0f);
-  virtual void initGl();
-  virtual void finishFrame();
-  virtual void onKey(int key, int scancode, int action, int mods);
-  virtual void draw() final;
-  virtual void postDraw() {};
-  virtual void update();
-  virtual void renderScene() = 0;
-
-  virtual void applyEyePoseAndOffset(const glm::mat4 & eyePose, const glm::vec3 & eyeOffset);
-
-  inline ovrEyeType getCurrentEye() const {
-    return currentEye;
-  }
-
-  const ovrEyeRenderDesc & getEyeRenderDesc(ovrEyeType eye) const {
-    return eyeRenderDescs[eye];
-  }
-
-  const ovrFovPort & getFov(ovrEyeType eye) const {
-    return eyeRenderDescs[eye].Fov;
-  }
-
-  const glm::mat4 & getPerspectiveProjection(ovrEyeType eye) const {
-    return projections[eye];
-  }
-
-  const ovrPosef & getEyePose(ovrEyeType eye) const {
-    return eyePoses[eye];
-  }
-
-  const ovrPosef & getEyePose() const {
-    return getEyePose(getCurrentEye());
-  }
-
-  const ovrFovPort & getFov() const {
-    return getFov(getCurrentEye());
-  }
-
-  const ovrEyeRenderDesc & getEyeRenderDesc() const {
-    return getEyeRenderDesc(getCurrentEye());
-  }
-
-  const glm::mat4 & getPerspectiveProjection() const {
-    return getPerspectiveProjection(getCurrentEye());
-  }
-
-public:
-  RiftApp(bool fullscreen = false);
-  virtual ~RiftApp();
-};
-#endif
-#endif
+#define RUN_QT_RIFT_WIDGET(WidgetClass) \
+  RUN_QT_APP(QRiftApplication<WidgetClass>)

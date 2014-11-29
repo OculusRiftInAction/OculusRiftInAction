@@ -35,6 +35,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <boost/config.hpp>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -56,7 +58,12 @@ inline float aspect(const glm::vec2 & v) {
   return (float)v.x / (float)v.y;
 }
 
+#ifdef HAVE_QT
 #include <GL/glew.h>
+#else
+#include <GL/glew.h>
+#endif
+
 #include <GLFW/glfw3.h>
 // For some interaction with the Oculus SDK we'll need the native 
 // window handle

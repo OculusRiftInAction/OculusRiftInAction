@@ -30,11 +30,12 @@ private:
   ovrPosef eyePoses[2];
   ovrEyeType currentEye;
   glm::mat4 projections[2];
-  FramebufferWrapper eyeFramebuffers[2];
-  unsigned int frameCount = 0;
-
+  FramebufferWrapperPtr eyeFramebuffers[2];
+  unsigned int frameCount{ 0 };
+  bool renderingConfigured{ false };
 
 protected:
+
   virtual void onFrameStart() {
   }
 
@@ -47,7 +48,7 @@ protected:
     glewExperimental = true;
     glewInit();
     glGetError();
-    oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+    //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
 
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -71,6 +72,7 @@ protected:
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
     assert(configResult);
+    renderingConfigured = configResult;
 
     for_each_eye([&](ovrEyeType eye){
       const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
@@ -83,40 +85,11 @@ protected:
     // re-rendered to the screen with distortion
     glm::uvec2 frameBufferSize = ovr::toGlm(eyeTextures[0].Header.TextureSize);
     for_each_eye([&](ovrEyeType eye) {
-      eyeFramebuffers[eye].init(frameBufferSize);
+      eyeFramebuffers[eye] = FramebufferWrapperPtr(new FramebufferWrapper());
+      eyeFramebuffers[eye]->init(frameBufferSize);
       ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
-        oglplus::GetName(*eyeFramebuffers[eye].color);
+        oglplus::GetName(eyeFramebuffers[eye]->color);
     });
-  }
-
-  virtual void draw() {
-    ++frameCount;
-    onFrameStart();
-    ovrHmd_BeginFrame(hmd, frameCount);
-    MatrixStack & mv = Stacks::modelview();
-    MatrixStack & pr = Stacks::projection();
-
-    ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, eyePoses, nullptr);
-    for (int i = 0; i < 2; ++i) {
-      ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
-      Stacks::withPush(pr, mv, [&]{
-        // Set up the per-eye projection matrix
-        pr.top() = projections[eye];
-
-        // Set up the per-eye modelview matrix
-        // Apply the head pose
-        glm::mat4 eyePose = ovr::toGlm(eyePoses[eye]);
-        mv.preMultiply(glm::inverse(eyePose));
-
-        // Render the scene to an offscreen buffer
-        eyeFramebuffers[eye].Bind();
-        renderScene();
-      });
-    }
-    // Restore the default framebuffer
-    //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-    ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
-    onFrameEnd();
   }
 
   virtual void renderScene() = 0;
@@ -179,6 +152,41 @@ public:
   virtual ~RiftRenderingApp() {
 
   }
+
+  bool isRenderingConfigured() {
+    return renderingConfigured;
+  }
+
+  virtual void draw() {
+    ++frameCount;
+    onFrameStart();
+    ovrHmd_BeginFrame(hmd, frameCount);
+    MatrixStack & mv = Stacks::modelview();
+    MatrixStack & pr = Stacks::projection();
+
+    ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, eyePoses, nullptr);
+    for (int i = 0; i < 2; ++i) {
+      ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
+      Stacks::withPush(pr, mv, [&] {
+        // Set up the per-eye projection matrix
+        pr.top() = projections[eye];
+
+        // Set up the per-eye modelview matrix
+        // Apply the head pose
+        glm::mat4 eyePose = ovr::toGlm(eyePoses[eye]);
+        mv.preMultiply(glm::inverse(eyePose));
+
+        // Render the scene to an offscreen buffer
+        eyeFramebuffers[eye]->Bind();
+        renderScene();
+      });
+    }
+    // Restore the default framebuffer
+    //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+    ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
+    onFrameEnd();
+  }
+
 };
 
 

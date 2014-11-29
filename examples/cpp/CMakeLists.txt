@@ -42,11 +42,17 @@ function(make_example FILE PROJECT_FOLDER)
         add_executable(${EXECUTABLE} ${SOURCE_FILES} )
     endif()
 
-    target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS})
+    message(${EXECUTABLE})
+    if (Qt5_FOUND)
+        target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS} ExampleResourcesQt)
+    else()
+        target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS})
+    endif()
     if (RIFT_DEBUG)
         set_property(TARGET ${EXECUTABLE} PROPERTY DEBUG_OUTPUT_NAME ${EXECUTABLE}_d)
     endif()
     set_target_properties(${EXECUTABLE} PROPERTIES FOLDER ${PROJECT_FOLDER})
+    
 endfunction()
 
 function(make_examples GLOB PROJECT_FOLDER)
@@ -67,8 +73,12 @@ if (EXPERIMENTAL)
     make_examples(experimental/*.cpp "Examples/Experimental")
 endif()
 
-if (Qt5_FOUND)
-    make_examples(gui/*.cpp "Examples")
+if (HAVE_QT)
+    set(CMAKE_INCLUDE_CURRENT_DIR ON)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+    message("Creating Qt examples")
+    make_examples(qt/*.cpp "Examples/Qt")
 endif()
 
 
