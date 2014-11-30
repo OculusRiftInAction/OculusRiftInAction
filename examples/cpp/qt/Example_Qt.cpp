@@ -1,50 +1,42 @@
 #include "Common.h"
 #include "Shadertoy.h"
-#include <QQuickView>
-#include <QQuickItem>
-#include <QQuickImageProvider>
-#include <QtQuickWidgets/QQuickWidget>
+#include "GlslEditor.h"
 
 using namespace oglplus;
 
-class MyClass : public QObject {
-  Q_OBJECT
-
-public slots:
-  void cppSlot(const QString &msg) {
-    qDebug() << "Called the C++ slot with message:" << msg;
-  }
-};
 
 
-#include "Example_Qt.moc"
+#include <QSyntaxHighlighter>
+#include <QTextCharFormat>
 
-class TestEdit : public QPlainTextEdit{
+class FontLoader {
 public:
-  void keyPressEvent(QKeyEvent * event) {
-    QPlainTextEdit::keyPressEvent(event);
+   FontLoader() {
+    QFontDatabase::addApplicationFontFromData(qt::toByteArray(Resource::FONTS_INCONSOLATA_REGULAR_TTF));
   }
-
-  virtual void focusInEvent(QFocusEvent * event) {
-    QPlainTextEdit::focusInEvent(event);
-  }
-
 };
 
-MAIN_DECL{
+MAIN_DECL {
   int i = 1;
   QApplication app(i, &lpCmdLine);
-  QGraphicsView view;
-  QGraphicsScene scene;
-  view.setViewport(new QWidget());
+  FontLoader _fl;
 
-  QWidget dialog;
-  dialog.setLayout(new QVBoxLayout());
-  TestEdit edit;
-  dialog.layout()->addWidget(&edit);
-  scene.addWidget(&dialog);
+  QGraphicsScene scene;
+  GlslEditor editor;
+  {
+    QWidget * dialog = new QWidget();
+    dialog->setLayout(new QVBoxLayout());
+    dialog->resize(1280, 720);
+    dialog->layout()->addWidget(&editor);
+    scene.addWidget(dialog);
+  }
+
+  QGraphicsView view;
+  view.setViewport(new QWidget());
+  view.resize(1280, 720);
   view.setScene(&scene);
   view.show();
+  editor.setPlainText(qt::toString(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_FS));
   app.exec();
 }
 //  qw.setSource(QUrl::fromLocalFile("C:/Users/bdavis/Git/OculusRiftExamples/resources/shadertoy/ChannelSelect.qml"));
@@ -301,3 +293,5 @@ MAIN_DECL{
 //
 //#endif
 //
+
+#include "Example_Qt.moc"

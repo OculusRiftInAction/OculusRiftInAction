@@ -127,7 +127,7 @@ set(CMAKE_AUTORCC ON)
 #find_package(Qt5 REQUIRED Core Gui OpenGL QuickWidgets Widgets)
 
 set(HAVE_QT 1)
-foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL)
+foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
     find_package(${lib} REQUIRED)
     include_directories(${${lib}_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${${lib}_LIBRARIES})
@@ -219,11 +219,9 @@ else()
 endif()
 
 if (Qt5_FOUND)
-    include_directories(${Qt5Core_INCLUDE_DIRS})
-    include_directories(${Qt5Gui_INCLUDE_DIRS})
-    include_directories(${Qt5OpenGL_INCLUDE_DIRS})
-    include_directories(${Qt5QuickWidgets_INCLUDE_DIRS})
-    include_directories(${Qt5Widgets_INCLUDE_DIRS})
+    foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
+        include_directories(${${lib}_INCLUDE_DIRS})
+    endforeach(lib)
 endif()
 
 ###############################################################################

@@ -1,6 +1,9 @@
 #include "Common.h"
 
 namespace ovr {
+#ifdef _DEBUG
+#define BRAD_DEBUG 1
+#endif
 
   GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition) {
     GLFWwindow * window = nullptr;

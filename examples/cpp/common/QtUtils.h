@@ -22,7 +22,24 @@ namespace qt {
   inline QPointF pointFromGlm(const vec2 & pt) {
     return QPointF(pt.x, pt.y);
   }
-  
+
+  template<typename T> 
+  T toQtType(Resource res) {
+    T result;
+    size_t size = Resources::getResourceSize(res);
+    result.resize(size);
+    Resources::getResourceData(res, result.data());
+    return result;
+  }
+
+  inline QByteArray toByteArray(Resource res) {
+    return toQtType<QByteArray>(res);
+  }
+
+  inline QString toString(Resource res) {
+    QByteArray data = toByteArray(res);
+    return QString::fromUtf8(data.data(), data.size());
+  }
 }
 /**
  * Forwards mouse and keyboard input from the specified widget to the
