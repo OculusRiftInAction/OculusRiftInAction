@@ -30,19 +30,20 @@ public:
           if (texRes < 0.95f) {
             texRes = std::min(texRes * ROOT_2, 1.0f);
           }
-          break;
+          return;
+
         case GLFW_KEY_END:
           if (texRes > 0.05f) {
             texRes *= INV_ROOT_2;
           }
-          break;
+          return;
+
         case GLFW_KEY_R:
           resetCamera();
-          break;
+          return;
         }
-      } else {
-        RiftApp::onKey(key, scancode, action, mods);
-      }
+      } 
+      RiftApp::onKey(key, scancode, action, mods);
   }
 
   void resetCamera() {
