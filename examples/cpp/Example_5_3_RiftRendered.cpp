@@ -2,7 +2,7 @@
 
 
 class CubeScene_Rift: public RiftGlfwApp {
-  FramebufferWrapper  eyeFramebuffers[2];
+  FramebufferWrapperPtr  eyeFramebuffers[2];
   ovrTexture eyeTextures[2];
   ovrVector3f eyeOffsets[2];
   glm::mat4 eyeProjections[2];
@@ -21,7 +21,7 @@ public:
     ovrRenderAPIConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.Header.API = ovrRenderAPI_OpenGL;
-    cfg.Header.BackBufferSize = ovr::fromGlm(getSize());
+    cfg.Header.RTSize = ovr::fromGlm(getSize());
     cfg.Header.Multisample = 1;
 
     int distortionCaps = 
@@ -34,7 +34,8 @@ public:
     for_each_eye([&](ovrEyeType eye){
       ovrFovPort fov = hmd->DefaultEyeFov[eye];
       ovrSizei texSize = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
-      eyeFramebuffers[eye].init(ovr::toGlm(texSize));
+      eyeFramebuffers[eye] = FramebufferWrapperPtr(new FramebufferWrapper());
+      eyeFramebuffers[eye]->init(ovr::toGlm(texSize));
 
       ovrTextureHeader & textureHeader = eyeTextures[eye].Header;
       textureHeader.API = ovrRenderAPI_OpenGL;
@@ -42,7 +43,7 @@ public:
       textureHeader.RenderViewport.Size = texSize;
       textureHeader.RenderViewport.Pos.x = 0;
       textureHeader.RenderViewport.Pos.y = 0;
-      ((ovrGLTexture&)eyeTextures[eye]).OGL.TexId = oglplus::GetName(*eyeFramebuffers[eye].color);
+      ((ovrGLTexture&)eyeTextures[eye]).OGL.TexId = oglplus::GetName(eyeFramebuffers[eye]->color);
 
       eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
 
@@ -65,7 +66,7 @@ public:
       ovrEyeType eye = hmd->EyeRenderOrder[i];
       Stacks::projection().top() = eyeProjections[eye];
 
-      eyeFramebuffers[eye].Bind();
+      eyeFramebuffers[eye]->Bind();
       oglplus::Context::Clear().DepthBuffer();
       Stacks::withPush(mv, [&]{
         mv.preMultiply(glm::translate(glm::mat4(), ovr::toGlm(eyeOffsets[eye])));

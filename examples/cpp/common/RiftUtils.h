@@ -94,11 +94,6 @@ namespace ovr {
   }
 
   GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition);
-
-#ifdef HAVE_QT
-  void setupQWidget(ovrHmd hmd, QWidget & widget);
-#endif
-  
 }
 
 // Combine some macros together to create a single macro

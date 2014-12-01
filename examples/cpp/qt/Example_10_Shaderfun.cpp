@@ -18,10 +18,7 @@
 #include <atomic>         // std::atomic
 #include <thread>
 
-#include "GlslEditor.h"
 #include "Shadertoy.h"
-// #include "Example_10_SyntaxHighlighter.h"
-
 #include "Cursor.xpm"
 
 using namespace oglplus;
@@ -44,12 +41,39 @@ static QImage loadImageResource(Resource res) {
   return image;
 }
 
+typedef std::map<Resource, QIcon> IconMap;
+
+IconMap iconCache;
+
+static void initIconCache() {
+  using namespace shadertoy;
+  for (int i = 0; i < MAX_TEXTURES; ++i) {
+    Resource res = TEXTURES[i];
+    if (NO_RESOURCE == res) {
+      continue;
+    }
+    iconCache[res] = QIcon(QPixmap::fromImage(loadImageResource(res).scaled(QSize(128, 128))));
+  }
+  for (int i = 0; i < MAX_CUBEMAPS; ++i) {
+    Resource res = CUBEMAPS[i];
+    if (NO_RESOURCE == res) {
+      continue;
+    }
+    iconCache[res] = QIcon(QPixmap::fromImage(loadImageResource(res).scaled(QSize(128, 128))));
+  }
+  iconCache[NO_RESOURCE] = QIcon();
+}
+
+
 static QToolButton * makeImageButton(Resource res = NO_RESOURCE, const QSize & size = QSize(128, 128)) {
+  if (!iconCache.size()) {
+    initIconCache();
+  }
   QToolButton  * button = new QToolButton();
   button->resize(size);
   button->setAutoFillBackground(true);
   if (res != NO_RESOURCE) {
-    button->setIcon(QIcon(QPixmap::fromImage(loadImageResource(res).scaled(size))));
+    button->setIcon(iconCache[res]);
   }
   button->setIconSize(size);
   return button;
@@ -476,7 +500,6 @@ protected:
       FragmentShaderPtr newFragmentShader(new FragmentShader());
       source.replace(QRegExp("\\bgl_FragColor\\b"), "FragColor").replace(QRegExp("\\btexture2D\\b"), "texture");
       source.insert(0, header);
-      qDebug() << source;
       newFragmentShader->Source(GLSLSource(source.toLocal8Bit().data()));
       newFragmentShader->Compile();
       ProgramPtr result(new Program());
@@ -714,9 +737,6 @@ class ShadertoyApp : public QApplication {
   QGraphicsProxyWidget * uiChannelDialog;
   QGraphicsProxyWidget * uiLoadDialog;
 
-  typedef std::map<Resource, QIcon> IconMap;
-
-  IconMap iconCache;
 
   int activeChannelIndex = 0;
 
@@ -738,24 +758,6 @@ class ShadertoyApp : public QApplication {
     }
   }
 
-  void initIconCache() {
-    using namespace shadertoy;
-    for (int i = 0; i < MAX_TEXTURES; ++i) {
-      Resource res = TEXTURES[i];
-      if (NO_RESOURCE == res) {
-        continue;
-      }
-      iconCache[res] = QIcon(QPixmap::fromImage(loadImageResource(res).scaled(QSize(128, 128))));
-    }
-    for (int i = 0; i < MAX_CUBEMAPS; ++i) {
-      Resource res = CUBEMAPS[i];
-      if (NO_RESOURCE == res) {
-        continue;
-      }
-      iconCache[res] = QIcon(QPixmap::fromImage(loadImageResource(res).scaled(QSize(128, 128))));
-    }
-    iconCache[NO_RESOURCE] = QIcon();
-  }
 
   void setupShaderEditor() {
     initIconCache();
@@ -1094,6 +1096,10 @@ private slots:
   }
 
   void uiMouseOnlyRefresh() {
+    if (!uiVisible) {
+      return;
+    }
+
     mouseRefresh();
     GLuint newTexture = uiGlWidget.bindTexture(currentWindowWithMouseImage);
     if (newTexture) {

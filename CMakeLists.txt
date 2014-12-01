@@ -54,6 +54,11 @@ list(APPEND EXAMPLE_LIBS OculusVR)
 # Non-Oculus third party dependencies 
 #
 
+###############################################################################
+#
+# GLEW - Cross platform access to OpenGL extensions and > 1.x functions 
+#
+
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
 set_target_properties(glew PROPERTIES FOLDER "3rdparty")
@@ -61,7 +66,13 @@ list(APPEND EXAMPLE_LIBS glew)
 
 # Cross platform access to shader functionality
 
+###############################################################################
+#
 # GLFW - Cross platform OpenGL window creation and input handling
+#
+# We need to set a bunch of values so we build only the library and not the 
+# install targets, documentation or examples
+#
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
@@ -70,23 +81,32 @@ add_subdirectory(libraries/glfw)
 set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 
+#
 # OpenCTM - a 3D mesh compression
+#
 add_subdirectory(libraries/OpenCTM)
 set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
-# Computer vision library with advanced image loading and manipulation 
-# functionality.  
-# OpenCV is OPTIONAL.  
-set(OpenCV_DIR "/dev/opencv-2.4.9/build")
+###############################################################################
+#
+# OpenCV is a Computer vision library with advanced image loading and 
+# manipulation functionality, including a simple API for accessing cameras  
+#
+# OpenCV is optional, but required to build the chapter 14 examples.
+#  
+# OpenCV will be found if you set an environment variable OpenCV_DIR 
+# pointing to the location of the installed OpenCVConfig.cmake file
+
 find_package(OpenCV QUIET)
+
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
 else()
     # Without OpenCV, we have to fall back on libpng
-    # which requires zlib.  For windows and apple we
+    # which requires zlib.  For windows and OSX we
     # build the library.  For Unix systems we locate 
     # the native package
     if((WIN32 OR APPLE))
@@ -114,27 +134,33 @@ endif()
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
-######################################################
+###############################################################################
 #
-# Qt is a cross platform GUI framework
+# Qt is a cross platform framework for just about everything.
 #
-set(Qt5_DIR $ENV{QT5_ROOT}/lib/cmake/Qt5)
+# Qt can be found by setting a QT5_ROOT to the root of your 
+#
+# Qt is optional, but required to build the chapter 10 examples
 
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
+# set(Qt5_DIR $ENV{QT5_ROOT}/lib/cmake/Qt5)
 
-#find_package(Qt5 REQUIRED Core Gui OpenGL QuickWidgets Widgets)
-
-set(HAVE_QT 1)
 foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
-    find_package(${lib} REQUIRED)
-    include_directories(${${lib}_INCLUDE_DIRS})
-    list(APPEND EXAMPLE_LIBS ${${lib}_LIBRARIES})
-    add_definitions(${${lib}_DEFINITIONS})
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${lib}_EXECUTABLE_COMPILE_FLAGS}")
+    find_package(${lib} QUIET)
+    if (${lib}_FOUND) 
+        include_directories(${${lib}_INCLUDE_DIRS})
+        list(APPEND EXAMPLE_LIBS ${${lib}_LIBRARIES})
+        add_definitions(${${lib}_DEFINITIONS})
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${lib}_EXECUTABLE_COMPILE_FLAGS}")
+    endif()
 endforeach(lib)
 
+if (Qt5Core_FOUND)
+    message(STATUS "Found Qt framework") 
+    set(HAVE_QT 1)
+    set(CMAKE_INCLUDE_CURRENT_DIR ON)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+endif()
 
 
 ######################################################
@@ -146,6 +172,7 @@ endforeach(lib)
 # we can't use the full oglplus CMake include, so we 
 # need to jump through some hoops to make it's 
 # compiler detection logic work here.
+
 set(SAVE_PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/libraries/oglplus)
     include(libraries/oglplus/config/Compiler.cmake)
@@ -181,8 +208,8 @@ set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
 # source location at runtime.  
 #
 add_subdirectory(resources)
+
 set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
-set_target_properties(ExampleResourcesQt PROPERTIES FOLDER "Examples/Shared")
 include_directories(resources/cpp)
 include_directories(${CMAKE_BINARY_DIR}/resources)
 list(APPEND EXAMPLE_LIBS ExampleResources)

@@ -230,10 +230,6 @@ void GlfwApp::onMouseMove(double x, double y) {}
 void GlfwApp::onMouseEnter(int entered) {}
 void GlfwApp::onScroll(double x, double y) {}
 
-void GlfwApp::viewport(const glm::ivec2 & pos, const glm::uvec2 & size) {
-  oglplus::Context::Viewport(pos.x, pos.y, size.x, size.y);
-}
-
 void GlfwApp::viewport(const glm::uvec2 & size, const glm::ivec2 & pos) {
   oglplus::Context::Viewport(pos.x, pos.y, size.x, size.y);
 }

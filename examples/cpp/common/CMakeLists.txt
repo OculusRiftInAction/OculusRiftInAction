@@ -1,5 +1,13 @@
-file(GLOB_RECURSE SOURCE_FILES *.cpp)
-file(GLOB_RECURSE HEADER_FILES *.h)
+file(GLOB SOURCE_FILES 
+    *.h *.cpp 
+    rendering/*.h rendering/*.cpp 
+    opengl/*.h opengl/*.cpp
+)
+
+if(HAVE_QT)
+    file(GLOB QT_SOURCE_FILES qt/*.h qt/*.cpp)
+    list(APPEND SOURCE_FILES ${QT_SOURCE_FILES})
+endif()
 
 configure_file(Config.h.in Config.h)
 list(APPEND HEADER_FILES ${CMAKE_CURRENT_BINARY_DIR}/Config.h )

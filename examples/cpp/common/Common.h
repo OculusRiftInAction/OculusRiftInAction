@@ -129,7 +129,6 @@ public:
 #include "GlfwUtils.h"
 #include "GlfwApp.h"
 
-#include "QtUtils.h"
 
 #if defined(OS_WIN)
 #define OVR_OS_WIN32
@@ -145,7 +144,13 @@ public:
 #include "RiftUtils.h"
 #include "RiftRenderingApp.h"
 #include "RiftGlfwApp.h"
-#include "RiftQtApp.h"
+#include "RiftApp.h"
+
+#ifdef HAVE_QT
+#include "qt/QtUtils.h"
+#include "qt/RiftQtApp.h"
+#include "qt/GlslEditor.h"
+#endif
 
 
 #ifndef PI

@@ -49,7 +49,7 @@ public:
 
     for (int i = 0; i < 2; ++i) {
       PerEyeArg & eyeArgs = eyes[i];
-      viewport(eyeArgs.viewportPosition, EYE_SIZE);
+      viewport(EYE_SIZE, ivec2(eyeArgs.viewportPosition));
       Stacks::withPush(mv, [&]{
         mv.preMultiply(eyeArgs.modelviewOffset);
         oria::renderCubeScene(OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);

@@ -1,17 +1,13 @@
 #include "Common.h"
 
-struct EyeArgs {
-  glm::mat4                 projection;
-  FramebufferWrapper        framebuffer;
-};
-
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
   bool                    debugDevice{ false };
-  EyeArgs                 perEyeArgs[2];
   ovrTexture              textures[2];
   ovrVector3f             eyeOffsets[2];
+  FramebufferWrapperPtr   eyeFramebuffers[2];
+  glm::mat4               eyeProjections[2];
 
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
   float                   ipd{ OVR_DEFAULT_IPD };
@@ -64,7 +60,6 @@ public:
 
     ovrFovPort eyeFovPorts[2];
     for_each_eye([&](ovrEyeType eye){
-      EyeArgs & eyeArgs = perEyeArgs[eye];
       ovrTextureHeader & eyeTextureHeader = textures[eye].Header;
       eyeFovPorts[eye] = hmd->DefaultEyeFov[eye];
       eyeTextureHeader.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmd->DefaultEyeFov[eye], 1.0f);
@@ -73,8 +68,9 @@ public:
       eyeTextureHeader.RenderViewport.Pos.y = 0;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
-      eyeArgs.framebuffer.init(ovr::toGlm(eyeTextureHeader.TextureSize));
-      ((ovrGLTexture&)textures[eye]).OGL.TexId = oglplus::GetName(*(eyeArgs.framebuffer.color));
+      eyeFramebuffers[eye] = FramebufferWrapperPtr(new FramebufferWrapper());
+      eyeFramebuffers[eye]->init(ovr::toGlm(eyeTextureHeader.TextureSize));
+      ((ovrGLTexture&)textures[eye]).OGL.TexId = oglplus::GetName(eyeFramebuffers[eye]->color);
     });
 
     ovrGLConfig cfg;
@@ -111,9 +107,8 @@ public:
     }
 
     for_each_eye([&](ovrEyeType eye){
-      EyeArgs & eyeArgs = perEyeArgs[eye];
       eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
-      eyeArgs.projection = ovr::toGlm(
+      eyeProjections[eye] = ovr::toGlm(
         ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01f, 1000.0f, true));
     });
   }
@@ -182,13 +177,12 @@ public:
 
     for( int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
-      EyeArgs & eyeArgs = perEyeArgs[eye];
 
       const ovrRecti & vp = textures[eye].Header.RenderViewport;
-      eyeArgs.framebuffer.Bind();
+      eyeFramebuffers[eye]->Bind();
       oglplus::Context::Viewport(vp.Pos.x, vp.Pos.y, vp.Size.w, vp.Size.h);
-      
-      Stacks::projection().top() = eyeArgs.projection;
+      Stacks::projection().top() = eyeProjections[eye];
+
       MatrixStack & mv = Stacks::modelview();
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose

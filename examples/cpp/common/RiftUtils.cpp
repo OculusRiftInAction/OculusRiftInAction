@@ -61,43 +61,4 @@ namespace ovr {
 
     return window;
   }
-
-#ifdef HAVE_QT 
-
-  void setupQWidget(ovrHmd hmd, QWidget & widget) {
-    bool directHmdMode = false;
-
-    // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
-    ON_WINDOWS([&] {
-      directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
-    });
-
-#ifdef BRAD_DEBUG
-    widget.setWindowFlags(Qt::FramelessWindowHint);
-#endif
-    if (!directHmdMode) {
-      widget.setWindowFlags(Qt::FramelessWindowHint);
-    }
-    widget.show();
-    if (!directHmdMode) {
-      widget.move(hmd->WindowsPos.x, hmd->WindowsPos.y);
-    } else {
-#ifdef BRAD_DEBUG
-      widget.move(0, -1080);
-#else
-      widget.move(0, 0);
-#endif
-    }
-    widget.resize(hmd->Resolution.w, hmd->Resolution.h);
-
-    // If we're in direct mode, attach to the window
-    if (directHmdMode) {
-      void * nativeWindowHandle = (void*)(size_t)widget.effectiveWinId();
-      if (nullptr != nativeWindowHandle) {
-        ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
-      }
-    }
-  }
-
-#endif
 }

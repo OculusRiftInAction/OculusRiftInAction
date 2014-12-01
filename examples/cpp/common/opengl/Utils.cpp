@@ -17,11 +17,12 @@
  
  ************************************************************************************/
 
+#pragma warning( disable : 4068 4244 4267 4065 4101 4244)
 #include "Common.h"
 
 #include "Font.h"
-#pragma warning( disable : 4068 4244 4267 4065 4101)
 #include <openctmpp.h>
+#pragma warning( disable : 4068 4244 4267 4065 4101 4244)
 #include <oglplus/bound/buffer.hpp>
 #include <oglplus/shapes/cube.hpp>
 #include <oglplus/images/image.hpp>
@@ -586,11 +587,11 @@ namespace oria {
     static ProgramPtr program;
     static ShapeWrapperPtr shape;
     static std::vector<Vec4f> materials = {
-        Vec4f(0.351366, 0.665379, 0.800000, 1),
-        Vec4f(0.640000, 0.179600, 0.000000, 1),
-        Vec4f(0.000000, 0.000000, 0.000000, 1),
-        Vec4f(0.171229, 0.171229, 0.171229, 1),
-        Vec4f(0.640000, 0.640000, 0.640000, 1)
+        Vec4f(0.351366f, 0.665379f, 0.800000f, 1),
+        Vec4f(0.640000f, 0.179600f, 0.000000f, 1),
+        Vec4f(0.000000f, 0.000000f, 0.000000f, 1),
+        Vec4f(0.171229f, 0.171229f, 0.171229f, 1),
+        Vec4f(0.640000f, 0.640000f, 0.640000f, 1)
     };
 
     if (!program) {

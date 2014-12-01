@@ -45,7 +45,6 @@ static Map createGlslMap() {
       for_each_node(child.childNodes(), [&](QDomNode child) {
         if (QString("context") == child.nodeName()) {
           QString contextName = child.attributes().namedItem("name").nodeValue();
-          qDebug() << "Context name: " << contextName;
           map<QString, list<QString>> & contextMap = contextMapMap[contextName];
           for_each_node(child.childNodes(), [&](QDomNode child) {
             if (QString("keyword") == child.nodeName()) {
@@ -70,13 +69,6 @@ static Map createGlslMap() {
       typeList.insert(typeList.end(), l.begin(), l.end());
     }
   });
-
-  foreach(const Pair & p, finalMap) {
-    qDebug() << p.first;
-    foreach(const QString & s, p.second) {
-      qDebug() << "\t" << s;
-    }
-  }
 
   return finalMap;
 }
@@ -233,6 +225,5 @@ GlslEditor::GlslEditor(QWidget *parent) {
    updateLineNumberAreaWidth(0);
    highlightCurrentLine();
 }
-
 
 #include "moc_GlslEditor.cpp"

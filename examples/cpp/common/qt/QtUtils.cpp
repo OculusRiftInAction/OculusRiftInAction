@@ -1,14 +1,7 @@
 #include "Common.h"
 #include "QtUtils.h"
-#ifdef HAVE_QT
 
-//#include <QtWidgets/QGraphicsView>
 #include <QDomDocument>
-
-namespace qt {
-
-}
-
 ForwardingGraphicsView::ForwardingGraphicsView(QWidget * filterTarget)  {
   if (filterTarget) {
     install(filterTarget);
@@ -171,4 +164,3 @@ static Map createGlslMap() {
   return finalMap;
 }
 
-#endif

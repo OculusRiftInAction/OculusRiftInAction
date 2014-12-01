@@ -131,4 +131,3 @@ private:
   QWidget *lineNumberArea;
   GlslHighlighter highlighter;
 };
-

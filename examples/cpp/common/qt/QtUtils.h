@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef HAVE_QT
-
 #include <QtWidgets>
 #include <QOpenGLWidget>
 #include <QPixmap>
@@ -131,6 +129,4 @@ MAIN_DECL { \
   } \
   return -1; \
 }
-
-#endif
 

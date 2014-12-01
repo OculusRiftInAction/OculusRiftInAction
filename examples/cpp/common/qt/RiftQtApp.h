@@ -65,7 +65,38 @@ public:
 private:
   void initWidget() {
     setAutoBufferSwap(false);
-    ovr::setupQWidget(hmd, *this);
+    bool directHmdMode = false;
+
+    // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
+    ON_WINDOWS([&] {
+      directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
+    });
+
+#ifdef BRAD_DEBUG
+    widget.setWindowFlags(Qt::FramelessWindowHint);
+#endif
+    if (!directHmdMode) {
+      setWindowFlags(Qt::FramelessWindowHint);
+    }
+    show();
+    if (!directHmdMode) {
+      move(hmd->WindowsPos.x, hmd->WindowsPos.y);
+    } else {
+#ifdef BRAD_DEBUG
+      move(0, -1080);
+#else
+      move(0, 0);
+#endif
+    }
+    resize(hmd->Resolution.w, hmd->Resolution.h);
+
+    // If we're in direct mode, attach to the window
+    if (directHmdMode) {
+      void * nativeWindowHandle = (void*)(size_t)effectiveWinId();
+      if (nullptr != nativeWindowHandle) {
+        ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
+      }
+    }
   }
 
 };
@@ -98,8 +129,6 @@ public:
     }
   }
 };
-
-
 
 #define RUN_QT_RIFT_WIDGET(WidgetClass) \
   RUN_QT_APP(QRiftApplication<WidgetClass>)

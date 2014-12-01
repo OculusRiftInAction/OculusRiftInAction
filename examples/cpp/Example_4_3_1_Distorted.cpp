@@ -48,7 +48,7 @@ public:
     ovrRenderAPIConfig config;
     memset(&config, 0, sizeof(config));
     config.Header.API = ovrRenderAPI_OpenGL;
-    config.Header.BackBufferSize = ovr::fromGlm(getSize());
+    config.Header.RTSize = ovr::fromGlm(getSize());
     config.Header.Multisample = 1;
 #if defined(OVR_OS_WIN32)
     ((ovrGLConfigData&)config).Window = 0;
