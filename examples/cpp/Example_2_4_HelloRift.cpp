@@ -1,32 +1,14 @@
 #include "Common.h"
-#include <OVR_CAPI_GL.h>
-
-#if defined(OVR_OS_WIN32)
-#define GLFW_EXPOSE_NATIVE_WIN32
-#define GLFW_EXPOSE_NATIVE_WGL
-#elif defined(OVR_OS_MAC)
-#define GLFW_EXPOSE_NATIVE_COCOA
-#define GLFW_EXPOSE_NATIVE_NSGL
-#elif defined(OVR_OS_LINUX)
-#define GLFW_EXPOSE_NATIVE_X11
-#define GLFW_EXPOSE_NATIVE_GLX
-#endif
-
-#include <GLFW/glfw3native.h>
-
-struct EyeArgs {
-  glm::mat4               projection;
-  glm::mat4               viewOffset;
-  gl::FrameBufferWrapper  framebuffer;
-};
 
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
-  bool                    directMode{ false };
   bool                    debugDevice{ false };
-  EyeArgs                 perEyeArgs[2];
   ovrTexture              textures[2];
+  ovrVector3f             eyeOffsets[2];
+  FramebufferWrapperPtr   eyeFramebuffers[2];
+  glm::mat4               eyeProjections[2];
+
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
   float                   ipd{ OVR_DEFAULT_IPD };
   glm::mat4               player;
@@ -40,17 +22,9 @@ public:
       hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
     }
 
-    ON_WINDOWS([&]{
-      directMode = (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop));
-    });
     ovrHmd_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_Position, 0);
-    windowPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
-    windowSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
-    ON_LINUX([&]{
-      std::swap(windowSize.x, windowSize.y);
-    });
     resetPosition();
   }
 
@@ -60,9 +34,10 @@ public:
   }
 
   virtual void resetPosition() {
-    static const glm::vec3 EYE = glm::vec3(0, eyeHeight, ipd * 5);
+    //eyeHeight = 0;
+    static const glm::vec3 EYE = glm::vec3(0, eyeHeight, ipd * 5.0f);
     static const glm::vec3 LOOKAT = glm::vec3(0, eyeHeight, 0);
-    player = glm::inverse(glm::lookAt(EYE, LOOKAT, GlUtils::UP));
+    player = glm::inverse(glm::lookAt(EYE, LOOKAT, Vectors::UP));
     ovrHmd_RecenterPose(hmd);
   }
 
@@ -76,49 +51,15 @@ public:
      */
   }
 
-  virtual void createRenderingTarget() {
-    if (directMode) {
-      // FIXME Doesn't work as expected
-      //glm::uvec2 mirrorSize = windowSize;
-      //mirrorSize /= 4;
-      //createSecondaryScreenWindow(mirrorSize);
-      createSecondaryScreenWindow(windowSize);
-    } else {
-      if (debugDevice) {
-        windowSize /= 4;
-        createSecondaryScreenWindow(windowSize);
-      } else {
-        glfwWindowHint(GLFW_DECORATED, 0);
-        createWindow(windowSize, windowPosition);
-      }
-    }
-
-    void * windowIdentifier = nullptr;
-    ON_WINDOWS([&]{
-      windowIdentifier = glfwGetWin32Window(window);
-    });
-    ON_MAC([&]{
-      windowIdentifier = glfwGetCocoaWindow(window);
-    });
-    ON_LINUX([&]{
-      windowIdentifier = (void*)glfwGetX11Window(window);
-    });
-
-    ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
-    if (directMode) {
-        ovrHmd_AttachToWindow(hmd, windowIdentifier, nullptr, nullptr);
-    } else {
-      if (!debugDevice && glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-        FAIL("Unable to create undecorated window");
-      }
-    }
+  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    return ovr::createRiftRenderingWindow(hmd, outSize, outPosition);
   }
 
   void initGl() {
     GlfwApp::initGl();
+
     ovrFovPort eyeFovPorts[2];
     for_each_eye([&](ovrEyeType eye){
-      EyeArgs & eyeArgs = perEyeArgs[eye];
       ovrTextureHeader & eyeTextureHeader = textures[eye].Header;
       eyeFovPorts[eye] = hmd->DefaultEyeFov[eye];
       eyeTextureHeader.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmd->DefaultEyeFov[eye], 1.0f);
@@ -127,25 +68,22 @@ public:
       eyeTextureHeader.RenderViewport.Pos.y = 0;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
-      eyeArgs.framebuffer.init(Rift::fromOvr(eyeTextureHeader.TextureSize));
-      ((ovrGLTexture&)textures[eye]).OGL.TexId = eyeArgs.framebuffer.color->texture;
+      eyeFramebuffers[eye] = FramebufferWrapperPtr(new FramebufferWrapper());
+      eyeFramebuffers[eye]->init(ovr::toGlm(eyeTextureHeader.TextureSize));
+      ((ovrGLTexture&)textures[eye]).OGL.TexId = oglplus::GetName(eyeFramebuffers[eye]->color);
     });
 
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize = Rift::toOvr(windowSize);
-    // FIXME Doesn't work as expected
+    cfg.OGL.Header.Multisample = 1;
+    cfg.OGL.Header.RTSize = ovr::fromGlm(getSize());
+
+    // FIXME Doesn't work as expected in OpenGL
     //if (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop)) {
     //  cfg.OGL.Header.RTSize.w /= 4;
     //  cfg.OGL.Header.RTSize.h /= 4;
     //}
-
-    cfg.OGL.Header.Multisample = 1;
-
-    ON_WINDOWS([&]{
-      cfg.OGL.Window = 0;
-    });
 
     ON_LINUX([&]{
       cfg.OGL.Disp = glfwGetX11Display();
@@ -164,13 +102,14 @@ public:
     ovrEyeRenderDesc              eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, eyeFovPorts, eyeRenderDescs);
+    if (!configResult) {
+      FAIL("Unable to configure SDK based distortion rendering");
+    }
 
     for_each_eye([&](ovrEyeType eye){
-      EyeArgs & eyeArgs = perEyeArgs[eye];
-      eyeArgs.projection = Rift::fromOvr(
-        ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01, 100, true));
-      eyeArgs.viewOffset = glm::translate(glm::mat4(),
-        Rift::fromOvr(eyeRenderDescs[eye].HmdToEyeViewOffset));
+      eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
+      eyeProjections[eye] = ovr::toGlm(
+        ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01f, 1000.0f, true));
     });
   }
 
@@ -223,53 +162,64 @@ public:
   }
 
   virtual void update() {
-    //CameraControl::instance().applyInteraction(player);
-    gl::Stacks::modelview().top() = glm::inverse(player);
+    CameraControl::instance().applyInteraction(player);
+    Stacks::modelview().top() = glm::inverse(player);
   }
 
   void draw() {
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
-    static ovrVector3f eyeOffsets[2];
-    memset(eyeOffsets, 0, sizeof(ovrVector3f) * 2);
     ++frameIndex;
     ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
 
     ovrHmd_BeginFrame(hmd, frameIndex);
     glEnable(GL_DEPTH_TEST);
+
     for( int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
-      EyeArgs & eyeArgs = perEyeArgs[eye];
-      gl::Stacks::projection().top() = eyeArgs.projection;
-      gl::MatrixStack & mv = gl::Stacks::modelview();
 
-      eyeArgs.framebuffer.activate();
+      const ovrRecti & vp = textures[eye].Header.RenderViewport;
+      eyeFramebuffers[eye]->Bind();
+      oglplus::Context::Viewport(vp.Pos.x, vp.Pos.y, vp.Size.w, vp.Size.h);
+      Stacks::projection().top() = eyeProjections[eye];
+
+      MatrixStack & mv = Stacks::modelview();
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose
-        mv.top() = eyeArgs.viewOffset * glm::inverse(Rift::fromOvr(eyePoses[eye])) * mv.top();
+        mv.top() = glm::inverse(ovr::toGlm(eyePoses[eye])) * mv.top();
         renderScene();
       });
-      eyeArgs.framebuffer.deactivate();
     };
+    oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+
     ovrHmd_EndFrame(hmd, eyePoses, textures);
   }
 
   virtual void renderScene() {
-    glClear(GL_DEPTH_BUFFER_BIT);
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    GlUtils::renderFloor();
+    oglplus::Context::Clear().DepthBuffer().ColorBuffer();
+    oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    oria::renderFloor();
 
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    mv.with_push([&]{
-      mv.translate(glm::vec3(0, 0, ipd * -5));
-      GlUtils::renderManikin();
+    // Scale the size of the cube to the distance between the eyes
+    MatrixStack & mv = Stacks::modelview();
+
+    mv.withPush([&]{
+      mv.translate(glm::vec3(0, eyeHeight, 0)).scale(glm::vec3(ipd));
+      oria::renderColorCube();
     });
 
-    mv.with_push([&]{
-      mv.translate(glm::vec3(0, eyeHeight, 0));
-      mv.scale(ipd);
-      GlUtils::drawColorCube();
+    mv.withPush([&]{
+      mv.translate(glm::vec3(0, 0, ipd * -5.0));
+
+      oglplus::Context::Disable(oglplus::Capability::CullFace);
+      oria::renderManikin();
     });
+
+    //MatrixStack & mv = Stacks::modelview();
+    //mv.with_push([&]{
+    //  mv.translate(glm::vec3(0, 0, ipd * -5));
+    //  GlUtils::renderManikin();
+    //});
   }
 };
 

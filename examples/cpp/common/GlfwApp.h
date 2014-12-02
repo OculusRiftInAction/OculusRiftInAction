@@ -18,50 +18,60 @@
  ************************************************************************************/
 
 #pragma once
-#include <GLFW/glfw3.h>
-#include <climits>
-#include <iostream>
-#include <string>
 
 class GlfwApp {
-protected:
-  gl::TimeQueryPtr query;
-  GLFWwindow *  window;
+private:
+  GLFWwindow *  window{ nullptr };
   glm::uvec2    windowSize;
   glm::ivec2    windowPosition;
-  float         windowAspect;
-  float         windowAspectInverse;
-  float         fps;
+  int           frame{ 0 };
+
+protected:
+  float         windowAspect{ 1.0f };
+  float         windowAspectInverse{ 1.0f };
+  float         fps{ 0.0 };
 
 public:
   GlfwApp();
   virtual ~GlfwApp();
-
-  virtual void createRenderingTarget() = 0;
-  virtual void initGl();
   virtual int run();
 
-  virtual void screenshot();
+protected:
+  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) = 0;
+  virtual void draw() = 0;
+
+  int getFrame() const;
+  const glm::uvec2 & getSize() const;
+  const glm::ivec2 & getPosition() const;
+  GLFWwindow * getWindow();
+
+  virtual void preCreate();
+  virtual void postCreate();
+  virtual void initGl();
+  virtual void shutdownGl();
   virtual void finishFrame();
-  virtual void createWindow(const glm::uvec2 & size, const glm::ivec2 & position = glm::ivec2(INT_MIN));
-  virtual void createWindow(int w, int h, int x = INT_MIN, int y = INT_MIN) {
-    createWindow(glm::uvec2(w, h), glm::ivec2(x, y));
-  }
-  virtual void createFullscreenWindow(const glm::uvec2 & size, GLFWmonitor * targetMonitor);
   virtual void destroyWindow();
   virtual void onKey(int key, int scancode, int action, int mods);
+  virtual void onCharacter(unsigned int code_point);
+  virtual void onScroll(double x, double y);
   virtual void onMouseButton(int button, int action, int mods);
-  virtual void draw();
+  virtual void onMouseMove(double x, double y);
+  virtual void onMouseEnter(int entered);
   virtual void update();
-  virtual void renderStringAt(const std::string & string, float x, float y) {
-    renderStringAt(string, glm::vec2(x, y));
-  }
+  virtual void viewport(const glm::uvec2 & size, const glm::ivec2 & pos = ivec2(0));
+  virtual void viewport(const glm::vec2 & size, const glm::vec2 & pos = vec2(0));
+  virtual void renderStringAt(const std::string & string, float x, float y);
   virtual void renderStringAt(const std::string & string, const glm::vec2 & position);
 
-  static GLFWmonitor * getMonitorAtPosition(const glm::ivec2 & position);
-  void createSecondaryScreenWindow(const glm::uvec2 & size);
-
 private:
-  void onCreate();
-  void preCreate();
+
+  friend void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+  friend void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+  friend void CursorEnterCallback(GLFWwindow* window, int enter);
+  friend void MouseMoveCallback(GLFWwindow* window, double x, double y);
+  friend void CharacterCallback(GLFWwindow* window, unsigned int codepoint);
+  friend void ScrollCallback(GLFWwindow * window, double x, double y);
+
+  virtual void screenshot();
 };
+

@@ -1,45 +1,57 @@
 /************************************************************************************
-
+ 
  Authors     :   Bradley Austin Davis <bdavis@saintandreas.org>
  Copyright   :   Copyright Brad Davis. All Rights reserved.
-
+ 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
-
+ 
  http://www.apache.org/licenses/LICENSE-2.0
-
+ 
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
-
+ 
  ************************************************************************************/
 
 #pragma once
 
-struct libusb_device_handle;
+struct Light {
+  vec3 position;
+  vec4 color;
 
-namespace hid {
+  Light(const vec3 & position = vec3(1), const vec4 & color = vec4(1)) {
+    this->position = position;
+    this->color = color;
+  }
+};
 
-  #pragma pack(push, 1)
-  struct FeatureReport {
-    const size_t SIZE;
-    const uint8_t REPORT_ID;
-    uint8_t reportId;
-    uint16_t commandId;
+class Lights {
+public:
+  std::vector<vec4> lightPositions;
+  std::vector<vec4> lightColors;
+  vec4 ambient;
 
-    FeatureReport(uint8_t reportId, size_t size) :
-        SIZE(size), REPORT_ID(reportId) {}
+  // Singleton class
+  Lights()
+      : ambient(glm::vec4(0.2, 0.2, 0.2, 1.0)) {
+    addLight(vec3(1, 0.5, 2.0));
+  }
 
-    uint8_t * buffer() {
-      return &reportId;
-    }
+  void addLight(const glm::vec3 & position = vec3(1),
+      const vec4 & color = glm::vec4(1)) {
+    lightPositions.push_back(glm::vec4(position, 1));
+    lightColors.push_back(color);
+  }
 
-    void read(libusb_device_handle * handle);
-    void write(libusb_device_handle * handle);
-  };
-  #pragma pack(pop)
+  void addLight(const Light & light) {
+    addLight(light.position, light.color);
+  }
 
-}
+  void setAmbient(const glm::vec4 & ambient) {
+    this->ambient = ambient;
+  }
+};

@@ -1,54 +1,70 @@
 #include "Common.h"
 
 class RiftDisplay : public GlfwApp {
-glm::uvec2 eyeSize;
-ovrHmd hmd;
+  ovrHmd hmd;
 
 public:
-RiftDisplay() {
-  hmd = ovrHmd_Create(0);
-  if (!hmd) {
-    FAIL("Unable to detect Rift display");
+
+  RiftDisplay() {
+    hmd = ovrHmd_Create(0);
+    if (!hmd) {
+      hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
+    }
+    if (!hmd) {
+      FAIL("Unable to detect Rift display");
+    }
   }
 
-  windowPosition = glm::ivec2(
+virtual GLFWwindow * createRenderingTarget(
+    glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+  GLFWwindow * window = nullptr;
+  bool extendedMode =
+      ovrHmdCap_ExtendDesktop & hmd->HmdCaps;
+
+  outPosition = glm::ivec2(
       hmd->WindowsPos.x,
       hmd->WindowsPos.y);
+  outSize = glm::uvec2(
+      hmd->Resolution.w,
+      hmd->Resolution.h);
 
-  GLFWmonitor * hmdMonitor =
-      GlfwApp::getMonitorAtPosition(windowPosition);
-  const GLFWvidmode * videoMode =
-      glfwGetVideoMode(hmdMonitor);
-  windowSize = glm::uvec2(
-      videoMode->width, videoMode->height);
-
-  eyeSize = windowSize;
-  eyeSize.x /= 2;
-}
-
-void createRenderingTarget() {
-  glfwWindowHint(GLFW_DECORATED, 0);
-  createWindow(windowSize, windowPosition);
-  if (glfwGetWindowAttrib(window, GLFW_DECORATED)) {
-    FAIL("Unable to create undecorated window");
+  if (extendedMode) {
+    GLFWmonitor * monitor =
+        glfw::getMonitorAtPosition(outPosition);
+    if (nullptr != monitor) {
+      const GLFWvidmode * mode = glfwGetVideoMode(monitor);
+      outSize = glm::uvec2(mode->width, mode->height);
+    }
+    glfwWindowHint(GLFW_DECORATED, 0);
+    window = glfw::createWindow(outSize, outPosition);
+  } else {
+    window = glfw::createSecondaryScreenWindow(outSize);
+    void * nativeWindowHandle =
+        glfw::getNativeWindowHandle(window);
+    if (nullptr != nativeWindowHandle) {
+      ovrHmd_AttachToWindow(hmd, nativeWindowHandle,
+          nullptr, nullptr);
+    }
   }
-}
 
-void initGl() {
-  GlfwApp::initGl();
-  glEnable(GL_SCISSOR_TEST);
+  return window;
 }
 
 void draw() {
-  glm::ivec2 position(0, 0);
-  gl::scissor(position, eyeSize);
-  gl::clearColor(Colors::red);
+  glm::uvec2 eyeSize = getSize();
+  eyeSize.x /= 2;
+  
+  glEnable(GL_SCISSOR_TEST);
+
+  glScissor(0, 0, eyeSize.x, eyeSize.y);
+  glClearColor(1, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  position = glm::ivec2(eyeSize.x, 0);
-  gl::scissor(position, eyeSize);
-  gl::clearColor(Colors::blue);
+  glScissor(eyeSize.x, 0, eyeSize.x, eyeSize.y);
+  glClearColor(0, 0, 1, 1);
   glClear(GL_COLOR_BUFFER_BIT);
+
+  glDisable(GL_SCISSOR_TEST);
 }
 };
 

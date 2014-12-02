@@ -42,11 +42,16 @@ function(make_example FILE PROJECT_FOLDER)
         add_executable(${EXECUTABLE} ${SOURCE_FILES} )
     endif()
 
-    target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS})
+    if (Qt5_FOUND)
+        target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS} ExampleResourcesQt)
+    else()
+        target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS})
+    endif()
     if (RIFT_DEBUG)
         set_property(TARGET ${EXECUTABLE} PROPERTY DEBUG_OUTPUT_NAME ${EXECUTABLE}_d)
     endif()
     set_target_properties(${EXECUTABLE} PROPERTIES FOLDER ${PROJECT_FOLDER})
+    
 endfunction()
 
 function(make_examples GLOB PROJECT_FOLDER)
@@ -60,12 +65,22 @@ endfunction()
 make_examples(*.cpp "Examples")
 
 if (OpenCV_FOUND)
+    message(STATUS "Creating OpenCV examples")
     make_examples(opencv/*.cpp "Examples/OpenCV")
 endif()
 
 if (EXPERIMENTAL)
     make_examples(experimental/*.cpp "Examples/Experimental")
 endif()
+
+if (HAVE_QT)
+    set(CMAKE_INCLUDE_CURRENT_DIR ON)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+    message(STATUS "Creating Qt examples")
+    make_examples(qt/*.cpp "Examples/Qt")
+endif()
+
 
 
 

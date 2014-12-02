@@ -19,6 +19,3 @@
 
 #pragma once
 
-#ifdef HAVE_OPENCV
-#endif
-

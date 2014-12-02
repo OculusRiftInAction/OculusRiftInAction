@@ -22,11 +22,13 @@
 
 #include "Common.h"
 #include "IO.h"
+#include "Font.h"
 namespace Text {
 
 // 1 point = 1pt = 1/72in (cala) = 0.3528 mm
 const float Font::DTP_TO_METERS = 0.003528f;
 const float Font::METERS_TO_DTP = 1.0f / Font::DTP_TO_METERS;
+static ProgramPtr TEXT_PROGRAM;
 
 Font::Font(void)
     : mFamily("Unknown"), mFontSize(12.0f), mLeading(0.0f), mAscent(0.0f), mDescent(
@@ -56,30 +58,13 @@ struct QuadBuilder {
   }
 };
 
-void readPngToTexture(const char * data, size_t size,
-    gl::TexturePtr & texture,
-    glm::vec2 & textureSize) {
-  glm::uvec2 imageSize;
-
-  std::vector<unsigned char> pngData;
-  pngData.resize(size);
+void readPngToTexture(const char * data, size_t size,  TexturePtr & texture, glm::vec2 & textureSize) {
+  using namespace oglplus;
+  std::vector<uint8_t> pngData(size);
   memcpy(&pngData[0], data, size);
-
-  std::vector<unsigned char> imageData;
-  GlUtils::getImageData(pngData, imageSize, imageData, false);
-
-  textureSize = glm::vec2(imageSize);
-  texture = gl::TexturePtr(new gl::Texture2d());
-  texture->bind();
-  texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-#ifdef HAVE_OPENCV
-  texture->image2d(imageSize, &imageData[0], 0, GL_RGB);
-#else
-  texture->image2d(imageSize, &imageData[0], 0, GL_RED);
-#endif
-
-  gl::Texture2d::unbind();
+  ImagePtr image = oria::loadImage(pngData);
+  textureSize = glm::vec2(image->Width(), image->Height());
+  texture = oria::load2dTextureFromPngData(pngData);
 }
 
 void Font::read(const void * data, size_t size) {
@@ -147,7 +132,6 @@ void Font::read(const void * data, size_t size) {
         GLuint index = (GLuint)vertexData.size();
         rectf bounds = getBounds(m, mFontSize);
         rectf texBounds = getTexCoords(m);
-
         QuadBuilder qb(bounds, texBounds);
         for (int i = 0; i < 4; ++i) {
           vertexData.push_back(qb.vertices[i]);
@@ -162,12 +146,47 @@ void Font::read(const void * data, size_t size) {
         indexData.push_back(index + 3);
       });
 
-  gl::VertexBufferPtr vertexBuffer(new gl::VertexBuffer(vertexData));
-  gl::IndexBufferPtr indexBuffer(new gl::IndexBuffer(indexData));
-  mGeometry = gl::GeometryPtr(
-      new gl::Geometry(vertexBuffer, indexBuffer, characters * 2,
-          gl::Geometry::Flag::HAS_TEXTURE));
-  mGeometry->buildVertexArray();
+
+  if (!TEXT_PROGRAM) {
+    TEXT_PROGRAM = oria::loadProgram(
+      Resource::SHADERS_TEXT_VS,
+      Resource::SHADERS_TEXT_FS);
+
+    Platform::addShutdownHook([&]{
+      TEXT_PROGRAM.reset();
+    });
+  }
+
+  using namespace oglplus;
+  mVao = VertexArrayPtr(new VertexArray());
+  mVao->Bind();
+  BufferPtr vertexBuffer;
+  BufferPtr indexBuffer;
+  Platform::addShutdownHook([&]{
+    mVao.reset();
+    mTexture.reset();
+  });
+
+  vertexBuffer = BufferPtr(new Buffer());
+  vertexBuffer->Bind(Buffer::Target::Array);
+  Buffer::Data(Buffer::Target::Array, vertexData);
+
+  indexBuffer = BufferPtr(new Buffer());
+  indexBuffer->Bind(Buffer::Target::ElementArray);
+  Buffer::Data(Buffer::Target::ElementArray, indexData);
+
+  GLsizei stride = (GLsizei)sizeof(TextureVertex);
+  void* offset = (void*)offsetof(TextureVertex, tex);
+
+  VertexArrayAttrib(oria::Layout::Attribute::Position)
+    .Pointer(3, DataType::Float, false, stride, 0)
+    .Enable();
+
+  VertexArrayAttrib(oria::Layout::Attribute::TexCoord0)
+    .Pointer(2, DataType::Float, false, stride, (void*)offset)
+    .Enable();
+
+  NoVertexArray().Bind();
 }
 
 Font::Metrics Font::getMetrics(uint16_t charcode) const {
@@ -192,7 +211,11 @@ rectf Font::getBounds(const Metrics &m, float fontSize) const {
 }
 
 rectf Font::getTexCoords(const Metrics &m) const {
-  return rectf(m.ul / mTextureSize, m.lr / mTextureSize);
+  vec2 ul = m.ul; 
+  vec2 lr = m.lr;
+  ul.y = -ul.y;
+  lr.y = -lr.y;
+  return rectf(ul / mTextureSize, lr / mTextureSize);
 }
 
 float Font::getAdvance(uint16_t charcode, float fontSize) const {
@@ -263,80 +286,76 @@ void Font::renderString(
     maxWidth /= scale;
   }
 
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+  MatrixStack & mv = Stacks::modelview();
   size_t mvDepth = mv.size();
 
-  glm::vec4 aspectTest = gl::Stacks::projection().top() * glm::vec4(1, 1, 0, 1);
+  glm::vec4 aspectTest = Stacks::projection().top() * glm::vec4(1, 1, 0, 1);
   float aspect = std::abs(aspectTest.x / aspectTest.y);
-  mv.push().translate(cursor).translate(glm::vec2(0, scale * -mAscent));
-
-  // scale the modelview from into font units
-  mv.scale(scale);
-  gl::ProgramPtr program = GlUtils::getProgram(
-      Resource::SHADERS_TEXT_VS,
-      Resource::SHADERS_TEXT_FS);
-
-  program->use();
-  program->setUniform("Color", glm::vec4(1));
-  program->setUniform("Font", 0);
-  program->setUniform4x4f("Projection",
-      gl::Stacks::projection().top());
-
-  mTexture->bind();
-  mGeometry->bindVertexArray();
-
   std::vector<std::wstring> tokens = Tokenize(str);
 
-  // Stores how far we've moved from the start of the string, in DTP units
-  glm::vec2 advance;
-  static std::wstring SPACE = toUtf16(" ");
-  for_each(tokens.begin(), tokens.end(), [&](const std::wstring & token) {
-    float tokenWidth = measureWidth(token, fontSize) ;
-    if (wrap && 0 != advance.x && (advance.x + tokenWidth) > maxWidth) {
-      advance.x = 0;
-      advance.y -= (mAscent + mDescent);
-    }
+  using namespace oglplus;
+  TEXT_PROGRAM->Use();
+  Uniform<vec4>(*TEXT_PROGRAM, "Color").Set(vec4(1));
+  //  Uniform<int>(*program, "Font").Set(0);
+  Mat4Uniform(*TEXT_PROGRAM, "Projection").Set(Stacks::projection().top());
 
-    for_each(token.begin(), token.end(), [&](::uint16_t id) {
-      if ('\n' == id) {
-        advance.x = 0;
-        advance.y -= (mAscent + mDescent);
-        return;
-      }
+  mTexture->Bind(Texture::Target::_2D);
+  mVao->Bind();
 
-      if (!contains(id)) {
-        id = '?';
-      }
+  mv.withPush([&]{
+    // scale the modelview from into font units
+    mv.translate(cursor).translate(glm::vec2(0, scale * -mAscent)).scale(scale);
 
-      // get metrics for this character to speed up measurements
-      const Font::Metrics & m = getMetrics(id);
-
-      if (wrap && ((advance.x + m.d) > maxWidth)) {
+    // Stores how far we've moved from the start of the string, in DTP units
+    glm::vec2 advance;
+    static std::wstring SPACE = toUtf16(" ");
+    for_each(tokens.begin(), tokens.end(), [&](const std::wstring & token) {
+      float tokenWidth = measureWidth(token, fontSize);
+      if (wrap && 0 != advance.x && (advance.x + tokenWidth) > maxWidth) {
         advance.x = 0;
         advance.y -= (mAscent + mDescent);
       }
 
-      // We create an offset vec2 to hold the local offset of this character
-      // This includes compensating for the inverted Y axis of the font
-      // coordinates
-      glm::vec2 offset(advance);
-      offset.y -= m.size.y;
-      // Bind the new position
-      mv.with_push([&]{
+      for_each(token.begin(), token.end(), [&](::uint16_t id) {
+        if ('\n' == id) {
+          advance.x = 0;
+          advance.y -= (mAscent + mDescent);
+          return;
+        }
+
+        if (!contains(id)) {
+          id = '?';
+        }
+
+        // get metrics for this character to speed up measurements
+        const Font::Metrics & m = getMetrics(id);
+
+        if (wrap && ((advance.x + m.d) > maxWidth)) {
+          advance.x = 0;
+          advance.y -= (mAscent + mDescent);
+        }
+
+        // We create an offset vec2 to hold the local offset of this character
+        // This includes compensating for the inverted Y axis of the font
+        // coordinates
+        glm::vec2 offset(advance);
+        offset.y -= m.size.y;
+        // Bind the new position
+        mv.withPush([&]{
           mv.translate(offset);
-          mv.apply(program);
+          Mat4Uniform(*TEXT_PROGRAM, "ModelView").Set(mv.top());
           // Render the item
           glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(m.indexOffset * sizeof(GLuint)));
+        });
+        advance.x += m.d;//+ m.offset.x;// font->getAdvance(m, mFontSize);
       });
-      advance.x += m.d;//+ m.offset.x;// font->getAdvance(m, mFontSize);
+      advance.x += getMetrics(' ').d;
     });
-    advance.x += getMetrics(' ').d;
+
+    NoVertexArray().Bind();
+    NoProgram().Use();
   });
 
-  gl::VertexArray::unbind();
-  gl::Texture2d::unbind();
-  gl::Program::clear();
-  mv.pop();
   //cursor.x += advance * scale;
 }
 

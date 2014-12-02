@@ -19,106 +19,142 @@
 
 #pragma once
 
+#include "Config.h"
 
-#ifdef WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#if !defined(_DEBUG)
-#undef RIFT_DEBUG
-#endif
-#endif
-
-#define __STDC_FORMAT_MACROS 1
-
-#include <string>
-#include <cassert>
-#include <iostream>
-#include <sstream>
-#include <cmath>
-#include <list>
 #include <algorithm>
 #include <array>
+#include <cassert>
+#include <cinttypes>
+#include <cmath>
+#include <iostream>
+#include <list>
 #include <map>
+#include <memory>
+#include <sstream>
+#include <stack>
+#include <string>
 #include <unordered_map>
-#include <stdint.h>
-#define GLM_FORCE_RADIANS
+
+#include <boost/config.hpp>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/noise.hpp>
 #include <glm/gtc/epsilon.hpp>
 #include <glm/gtx/norm.hpp>
+
+using glm::ivec3;
+using glm::ivec2;
+using glm::uvec2;
+using glm::mat3;
+using glm::mat4;
+using glm::vec2;
+using glm::vec3;
+using glm::vec4;
+using glm::quat;
+
+inline float aspect(const glm::vec2 & v) {
+  return (float)v.x / (float)v.y;
+}
+
+#ifdef HAVE_QT
 #include <GL/glew.h>
-
-#include <OVR_CAPI.h>
-#include <Kernel/OVR_Types.h>
-#include <OVR_CAPI_GL.h>
-
-
-#if defined(OVR_OS_WIN32)
-#define ON_WINDOWS(runnable) runnable()
-#define NOT_ON_WINDOWS(runnable)
 #else
-#define ON_WINDOWS(runnable)
-#define NOT_ON_WINDOWS(runnable) runnable()
+#include <GL/glew.h>
 #endif
 
-#if defined(OVR_OS_MAC)
-#define ON_MAC(runnable) runnable()
-#define NOT_ON_MAC(runnable)
-#else
-#define ON_MAC(runnable)
-#define NOT_ON_MAC(runnable) runnable()
+#define OGLPLUS_USE_GLEW 1
+
+#pragma warning(disable : 4068)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+#pragma warning( disable : 4244 4267 4065 4101)
+#include <oglplus/config/gl.hpp>
+#include <oglplus/all.hpp>
+#include <oglplus/interop/glm.hpp>
+#include <oglplus/bound/texture.hpp>
+#include <oglplus/bound/framebuffer.hpp>
+#include <oglplus/bound/renderbuffer.hpp>
+#include <oglplus/shapes/wrapper.hpp>
+#pragma warning( default : 4244 4267 4065 4101)
+#pragma clang diagnostic pop
+
+
+#include <GLFW/glfw3.h>
+// For some interaction with the Oculus SDK we'll need the native 
+// window handle
+
+#if defined(OS_WIN)
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+#elif defined(OS_OSX)
+#define GLFW_EXPOSE_NATIVE_COCOA
+#define GLFW_EXPOSE_NATIVE_NSGL
+#elif defined(OS_LINUX)
+#define GLFW_EXPOSE_NATIVE_X11
+#define GLFW_EXPOSE_NATIVE_GLX
 #endif
+#include <GLFW/glfw3native.h>
 
-#if defined(OVR_OS_LINUX)
-#define ON_LINUX(runnable) runnable()
-#define NOT_ON_LINUX(runnable)
-#else
-#define ON_LINUX(runnable)
-#define NOT_ON_LINUX(runnable) runnable()
-#endif
-
-#include <GlDebug.h>
-#include <GlMethods.h>
-
-#include <GlBuffers.h>
-#include <GlFrameBuffer.h>
-#include <GlStacks.h>
-#include <GlQuery.h>
-#include <GlShaders.h>
-#include <GlGeometry.h>
-#include <GlLighting.h>
 
 #include <Resources.h>
 
+class Finally {
+private:
+  std::function<void()> function;
 
-template<class T>
-class circular_buffer : public std::list<T>{
-  size_t max;
 public:
-  circular_buffer(size_t max) : max(max) {
-  }
-  void push_back(const T & t) {
-    std::list<T>::push_back(t);
-    while (std::list<T>::size() > max) {
-      std::list<T>::pop_front();
-    }
+  Finally(std::function<void()> function) 
+    : function(function) { }
+
+  virtual ~Finally() {
+    function();
   }
 };
 
+#include "Platform.h"
 
-class Platform {
-public:
-    static void sleepMillis(int millis);
-    static long elapsedMillis();
-    static float elapsedSeconds();
-    static void fail(const char * file, int line, const char * message, ...);
-    static void say(std::ostream & out, const char * message, ...);
-    static std::string format(const char * formatString, ...);
-    static std::string getResourceData(Resource resource);
-    static std::string replaceAll(const std::string & in, const std::string & from, const std::string & to);
-};
+#include "rendering/Lights.h"
+#include "rendering/MatrixStack.h"
+#include "rendering/State.h"
+#include "rendering/Colors.h"
+#include "rendering/Vectors.h"
+
+#include "opengl/Constants.h"
+#include "opengl/Textures.h"
+#include "opengl/Shaders.h"
+#include "opengl/Framebuffer.h"
+#include "opengl/Utils.h"
+
+#include "Interaction.h"
+
+#include "GlfwUtils.h"
+#include "GlfwApp.h"
+
+
+#if defined(OS_WIN)
+#define OVR_OS_WIN32
+#elif defined(OS_OSX)
+#define OVR_OS_MAC
+#elif defined(OS_LINUX)
+#define OVR_OS_LINUX
+#endif
+
+#include <OVR_CAPI.h>
+#include <OVR_CAPI_GL.h>
+
+#include "RiftUtils.h"
+#include "RiftRenderingApp.h"
+#include "RiftGlfwApp.h"
+#include "RiftApp.h"
+
+#ifdef HAVE_QT
+#include "qt/QtUtils.h"
+#include "qt/RiftQtApp.h"
+#include "qt/GlslEditor.h"
+#endif
+
 
 #ifndef PI
 #define PI 3.14159265f
@@ -140,17 +176,6 @@ public:
 #define DEGREES_TO_RADIANS (PI / 180.0f)
 #endif
 
-// Windows has a non-standard main function prototype
-#ifdef WIN32
-    #define MAIN_DECL int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-#else
-    #define MAIN_DECL int main(int argc, char ** argv)
-#endif
-
-#define FAIL(...) Platform::fail(__FILE__, __LINE__, __VA_ARGS__)
-#define SAY(...) Platform::say(std::cout, __VA_ARGS__)
-#define SAY_ERR(...) Platform::say(std::cerr, __VA_ARGS__)
-
 // Combine some macros together to create a single macro
 // to run an example app
 #define RUN_APP(AppClass) \
@@ -165,16 +190,3 @@ public:
         return -1; \
     }
 
-#include "Config.h"
-
-#include "Font.h"
-#include "Files.h"
-
-#include "GlMesh.h"
-#include "GlUtils.h"
-#include "GlfwApp.h"
-
-#include "Interaction.h"
-
-#include "Rift.h"
-#include "OpenCV.h"

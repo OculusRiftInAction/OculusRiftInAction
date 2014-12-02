@@ -68,7 +68,7 @@ public:
   }
 
   glm::quat getCurrentOrientation() {
-    return Rift::fromOvr(ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds()).HeadPose.ThePose.Orientation);
+    return ovr::toGlm(ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds()).HeadPose.ThePose.Orientation);
   }
 
   void setReferenceOrientation() {
@@ -91,7 +91,7 @@ public:
     }
 #endif
 
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
 
     if (GLFW_PRESS == action) switch (key) {
     case GLFW_KEY_SPACE:
@@ -177,7 +177,7 @@ public:
 
     case DONE:
       CameraControl::instance().applyInteraction(player);
-      gl::MatrixStack & mv = gl::Stacks::modelview();
+      MatrixStack & mv = Stacks::modelview();
       mv.top() = glm::inverse(player);
       break;
     }
@@ -193,8 +193,8 @@ public:
   }
 
   virtual void renderCalibration() {
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    gl::MatrixStack & pr = gl::Stacks::projection();
+    MatrixStack & mv = Stacks::modelview();
+    MatrixStack & pr = Stacks::projection();
     std::string text;
     switch (step) {
     case INTRO:
@@ -248,7 +248,7 @@ public:
   }
 
   void applyEyePoseAndOffset(const glm::mat4 & eyePose, const glm::vec3 & eyeOffset) {
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     if (enableCorrection) {
       mv.preMultiply(getStrabismusCorrection());
     }
@@ -275,7 +275,7 @@ public:
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
     GlUtils::renderCubeScene(ipd, eyeHeight);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     mv.with_push([&]{
       mv.translate(glm::vec3(0, 0, ipd * -5));
       GlUtils::renderManikin();

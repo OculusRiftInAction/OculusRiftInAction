@@ -12,7 +12,7 @@ Resource SCENE_IMAGES_DK2[2] = {
 
 class DistortedExample : public RiftGlfwApp {
 protected:
-  gl::Texture2dPtr sceneTextures[2];
+  TexturePtr sceneTextures[2];
   ovrTexture eyeTextures[2];
 
 public:
@@ -27,8 +27,7 @@ public:
 
     for_each_eye([&](ovrEyeType eye){
       glm::uvec2 textureSize;
-      GlUtils::getImageAsTexture(sceneTextures[eye],
-        sceneImages[eye], textureSize);
+      sceneTextures[eye] = oria::load2dTexture(sceneImages[eye], textureSize);
 
       memset(eyeTextures + eye, 0,
         sizeof(eyeTextures[eye]));
@@ -36,20 +35,20 @@ public:
       ovrTextureHeader & eyeTextureHeader =
         eyeTextures[eye].Header;
 
-      eyeTextureHeader.TextureSize = Rift::toOvr(textureSize);
+      eyeTextureHeader.TextureSize = ovr::fromGlm(textureSize);
       eyeTextureHeader.RenderViewport.Size =
         eyeTextureHeader.TextureSize;
 
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
       ((ovrGLTextureData&)eyeTextures[eye]).TexId =
-        sceneTextures[eye]->texture;
+        oglplus::GetName(*sceneTextures[eye]);
     });
 
     ovrRenderAPIConfig config;
     memset(&config, 0, sizeof(config));
     config.Header.API = ovrRenderAPI_OpenGL;
-    config.Header.RTSize = Rift::toOvr(windowSize);
+    config.Header.RTSize = ovr::fromGlm(getSize());
     config.Header.Multisample = 1;
 #if defined(OVR_OS_WIN32)
     ((ovrGLConfigData&)config).Window = 0;
@@ -68,18 +67,20 @@ public:
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
     }
-    ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
   }
 
   virtual void finishFrame() {
   }
 
   void draw() {
-    static int frameIndex = 0;
-    static ovrPosef poses[2];
-    glClear(GL_COLOR_BUFFER_BIT);
-    ovrHmd_BeginFrame(hmd, frameIndex++);
-    ovrHmd_EndFrame(hmd, poses, eyeTextures);
+    // Bug in SDK prevents direct mode from activating unless I call this
+    static ovrPosef eyePoses[2];
+    {
+      static ovrVector3f eyeOffsets[2];
+      ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
+    }
+    ovrHmd_BeginFrame(hmd, getFrame());
+    ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
   }
 };
 

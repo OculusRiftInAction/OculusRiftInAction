@@ -2,26 +2,24 @@
 #include <thread>
 #include <mutex>
 
-struct PerEyeArgs {
-  glm::mat4 projection;
-};
-
 class AsyncTimewarpExample : public RiftGlfwApp {
   float ipd{ OVR_DEFAULT_IPD };
   float eyeHeight{ OVR_DEFAULT_PLAYER_HEIGHT };
   glm::mat4 player;
-  int perEyeDelay = 0;
-
-  PerEyeArgs perEyeArgs[2];
+  
   ovrTexture eyeTextures[2];
   ovrPosef eyePoses[2];
   ovrVector3f hmdToEyeOffsets[2];
+  glm::mat4 eyeProjections[2];
 
-  int frameIndex{ 0 };
-
-  // Offscreen rendering targets.  two for each eye.
-  // One is used for rendering while the other is used for distortion
-  gl::FrameBufferWrapper frameBuffers[2][2];
+  int perEyeDelay = 0;
+  // Offscreen rendering targets: two for each eye.
+  // One is used for rendering (writing) while the other 
+  // is  used for distortion (reading)
+  FramebufferWrapper  eyeFramebuffers[2][2];
+  // Keep track of the index of the buffer currently being written to for each eye
+  unsigned int writeFramebuffersIndex{ 0 };
+  unsigned int distortionFrameIndex{ 0 };
 
   std::unique_ptr<std::thread> threadPtr;
   std::mutex ovrLock;
@@ -40,7 +38,7 @@ public:
     int trackingCaps = 0
       | ovrTrackingCap_Orientation
       | ovrTrackingCap_Position
-      | ovrTrackingCap_MagYawCorrection;
+      ;
 
     if (!ovrHmd_ConfigureTracking(hmd, trackingCaps, 0)) {
       SAY_ERR("Could not attach to sensor device");
@@ -57,11 +55,6 @@ public:
     RiftGlfwApp::initGl();
 
     memset(eyeTextures, 0, 2 * sizeof(ovrGLTexture));
-    float eyeHeight = 1.5f;
-    player = glm::inverse(glm::lookAt(
-      glm::vec3(0, eyeHeight, 4),
-      glm::vec3(0, eyeHeight, 0),
-      glm::vec3(0, 1, 0)));
 
     for_each_eye([&](ovrEyeType eye){
       ovrSizei eyeTextureSize = 
@@ -75,7 +68,7 @@ public:
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize = Rift::toOvr(windowSize);
+    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
     cfg.OGL.Header.Multisample = 1;
 
     int distortionCaps = 0
@@ -87,30 +80,30 @@ public:
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
 
-#ifdef _DEBUG
-    ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
-#endif
-
     for_each_eye([&](ovrEyeType eye){
       const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
       ovrMatrix4f ovrPerspectiveProjection =
         ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
-      perEyeArgs[eye].projection =
-        Rift::fromOvr(ovrPerspectiveProjection);
+      eyeProjections[eye] =
+        ovr::toGlm(ovrPerspectiveProjection);
       hmdToEyeOffsets[eye] = erd.HmdToEyeViewOffset;
     });
 
     //////////////////////////////////////////////////////
     // Initialize OpenGL settings and variables
     glfwWindowHint(GLFW_VISIBLE, 0);
-    renderWindow = glfwCreateWindow(100, 100, "Offscreen", nullptr, window);
+    renderWindow = glfwCreateWindow(100, 100, "Offscreen", nullptr, getWindow());
     glfwMakeContextCurrent(renderWindow);
-    glEnable(GL_BLEND);
+    // Some bug in the SDK causes the render window to trigger a 
+    // framebuffer error when it's made active, so clear that out
+    GLenum err = glGetError();
+    oglplus::Context::Enable(oglplus::Capability::Blend);
+
     for_each_eye([&](ovrEyeType eye){
       glm::uvec2 frameBufferSize =
-        Rift::fromOvr(eyeTextures[0].Header.TextureSize);
+        ovr::toGlm(eyeTextures[eye].Header.TextureSize);
       for (int i = 0; i < 2; ++i) {
-        frameBuffers[eye][i].init(frameBufferSize);
+        eyeFramebuffers[eye][i].init(frameBufferSize);
       }
     });
 
@@ -127,7 +120,7 @@ public:
     player = glm::inverse(glm::lookAt(
       glm::vec3(0, eyeHeight, 0.3f),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
-      GlUtils::Y_AXIS));           // Camera up axis
+      Vectors::UP));           // Camera up axis
     ovrHmd_RecenterPose(hmd);
   }
 
@@ -145,10 +138,6 @@ public:
 
     if (action == GLFW_PRESS) {
       switch (key) {
-      case GLFW_KEY_ESCAPE:
-        glfwSetWindowShouldClose(window, 1);
-        return;
-
       case GLFW_KEY_R:
         resetCamera();
         return;
@@ -172,75 +161,71 @@ public:
 
 
   void distortionThread() {
-    ovrLock.lock();
+    Platform::setThreadPriority(Platform::HIGH);
     // Make the shared context current
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(getWindow());
+
     // Each thread requires it's own glewInit call.
     glewInit();
     while (running) {
-      ++frameIndex;
-      ovrFrameTiming frameTime = ovrHmd_BeginFrame(hmd, frameIndex);
-      ovrLock.unlock();
+      ++distortionFrameIndex;
+      ovrFrameTiming frameTime = ovrHmd_BeginFrame(hmd, distortionFrameIndex);
 
+      // The Endframe call will block until right before the v-sync.  So we
+      // give the render thread as much time as possible to update the frame
+      // before starting the EndFrame call
       if (0 != frameTime.TimewarpPointSeconds) {
-        ovr_WaitTillTime(frameTime.TimewarpPointSeconds - 0.002);
+        ovr_WaitTillTime(frameTime.TimewarpPointSeconds - 0.003);
       }
 
       ovrLock.lock();
       ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
+      ovrLock.unlock();
     }
-    ovrLock.unlock();
   }
 
   void draw() {
-    // Synchronization to determine when a given eye's render commands have completed
-    // The index of the current rendering target framebuffer.  
-    static int renderBuffers[2]{0, 0};
     // The pose for each rendered framebuffer
-    static ovrPosef renderPoses[2];
-    ovrHmd_GetEyePoses(hmd, frameIndex, hmdToEyeOffsets, renderPoses, nullptr);
+    ovrPosef renderPoses[2];
+    ovrHmd_GetEyePoses(hmd, distortionFrameIndex, hmdToEyeOffsets, renderPoses, nullptr);
 
     for (int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
-      const PerEyeArgs & eyeArgs = perEyeArgs[eye];
-      gl::MatrixStack & mv = gl::Stacks::modelview();
-      gl::Stacks::projection().top() = eyeArgs.projection;
-      gl::Stacks::with_push(mv, [&]{
+      MatrixStack & mv = Stacks::modelview();
+      Stacks::projection().top() = eyeProjections[eye];
+      Stacks::withPush(mv, [&]{
         // Apply the head pose
-        glm::mat4 m = Rift::fromOvr(renderPoses[eye]);
+        glm::mat4 m = ovr::toGlm(renderPoses[eye]);
         mv.preMultiply(glm::inverse(m));
-        int renderBufferIndex = renderBuffers[eye];
-        gl::FrameBufferWrapper & frameBuffer = 
-          frameBuffers[eye][renderBufferIndex];
+        FramebufferWrapper & frameBuffer = 
+          eyeFramebuffers[eye][writeFramebuffersIndex];
         // Render the scene to an offscreen buffer
-        frameBuffer.activate();
+        frameBuffer.Bind();
         renderScene();
-        frameBuffer.deactivate();
       });
     } // for each eye
 
     // Ensure all scene rendering commands have been completed
     glFinish();
 
-    {
-      std::unique_lock<std::mutex> locker(ovrLock);
-      for_each_eye([&](ovrEyeType eye) {
-        int renderBufferIndex = renderBuffers[eye];
-        renderBuffers[eye] = renderBufferIndex ? 0 : 1;
-        ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
-          frameBuffers[eye][renderBufferIndex].color->texture;
-        eyePoses[eye] = renderPoses[eye];
-      });
-    }
+    ovrLock.lock();
+    for_each_eye([&](ovrEyeType eye) {
+      int renderBufferIndex = writeFramebuffersIndex;
+      ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
+        oglplus::GetName(*eyeFramebuffers[eye][renderBufferIndex].color);
+      eyePoses[eye] = renderPoses[eye];
+    });
+    writeFramebuffersIndex = writeFramebuffersIndex ? 0 : 1;
+    ovrLock.unlock();
   }
 
   void renderScene() {
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
-      GlUtils::renderCubeScene(ipd, eyeHeight);
+      oria::renderCubeScene(ipd, eyeHeight);
     });
 
     std::string maxfps = perEyeDelay ? 

@@ -19,7 +19,9 @@ public:
   }
 
   virtual void onKey(int key, int scancode, int action, int mods) {
-    if (!CameraControl::instance().onKey(key, scancode, action, mods)) {
+//    if (CameraControl::instance().onKey(key, scancode, action, mods)) {
+//      return;
+//    }
       static const float ROOT_2 = sqrt(2.0f);
       static const float INV_ROOT_2 = 1.0f / ROOT_2;
       if (action == GLFW_PRESS) {
@@ -28,27 +30,27 @@ public:
           if (texRes < 0.95f) {
             texRes = std::min(texRes * ROOT_2, 1.0f);
           }
-          break;
+          return;
+
         case GLFW_KEY_END:
           if (texRes > 0.05f) {
             texRes *= INV_ROOT_2;
           }
-          break;
+          return;
+
         case GLFW_KEY_R:
           resetCamera();
-          break;
+          return;
         }
-      } else {
-        RiftApp::onKey(key, scancode, action, mods);
-      }
-    }
+      } 
+      RiftApp::onKey(key, scancode, action, mods);
   }
 
   void resetCamera() {
     player = glm::inverse(glm::lookAt(
       glm::vec3(0, eyeHeight, 0.4),  // Position of the camera
       glm::vec3(0, eyeHeight, 0),  // Where the camera is looking
-      GlUtils::Y_AXIS));           // Camera up axis
+      Vectors::Y_AXIS));           // Camera up axis
     ovrHmd_RecenterPose(hmd);
   }
 
@@ -66,10 +68,10 @@ public:
 
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
-      GlUtils::renderCubeScene(ipd, eyeHeight);
+      oria::renderCubeScene(ipd, eyeHeight);
     });
 
     std::string message = Platform::format(

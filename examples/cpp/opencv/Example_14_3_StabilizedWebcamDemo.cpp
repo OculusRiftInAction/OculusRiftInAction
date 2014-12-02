@@ -78,8 +78,9 @@ class WebcamApp : public RiftApp {
 
 protected:
 
-  gl::Texture2dPtr texture;
-  gl::GeometryPtr videoGeometry;
+  TexturePtr texture;
+  ProgramPtr program;
+  ShapeWrapperPtr videoGeometry;
   WebcamHandler captureHandler;
   CaptureData captureData;
 
@@ -94,40 +95,45 @@ public:
 
   void initGl() {
     RiftApp::initGl();
-
-    texture = GlUtils::initTexture();
+    using namespace oglplus;
+    texture = TexturePtr(new Texture());
+    Context::Bound(TextureTarget::_2D, *texture)
+      .MagFilter(TextureMagFilter::Linear)
+      .MinFilter(TextureMinFilter::Linear);
+    program = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
     float aspectRatio = captureHandler.startCapture();
-    videoGeometry = GlUtils::getQuadGeometry(aspectRatio);
+    videoGeometry = oria::loadPlane(program, aspectRatio);
   }
 
   virtual void update() {
     if (captureHandler.get(captureData)) {
-      texture->bind();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-          captureData.image.cols, captureData.image.rows,
-          0, GL_BGR, GL_UNSIGNED_BYTE,
-          captureData.image.data);
-      texture->unbind();
+      using namespace oglplus;
+      Context::Bound(TextureTarget::_2D, *texture)
+        .Image2D(0, PixelDataInternalFormat::RGBA8,
+        captureData.image.cols, captureData.image.rows, 0,
+        PixelDataFormat::BGR, PixelDataType::UnsignedByte,
+        captureData.image.data);
     }
   }
 
   virtual void renderScene() {
     glClear(GL_DEPTH_BUFFER_BIT);
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    
-    mv.with_push([&]{
-      glm::quat eyePose = Rift::fromOvr(getEyePose().Orientation);
-      glm::quat webcamPose = Rift::fromOvr(captureData.pose.Orientation);
+    oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    MatrixStack & mv = Stacks::modelview();
+
+    mv.withPush([&] {
+      glm::quat eyePose = ovr::toGlm(getEyePose().Orientation);
+      glm::quat webcamPose = ovr::toGlm(captureData.pose.Orientation);
       glm::mat4 webcamDelta = glm::mat4_cast(glm::inverse(eyePose) * webcamPose);
 
       mv.identity();
       mv.preMultiply(webcamDelta);
 
-      mv.translate(glm::vec3(0, 0, -2.75));
-      texture->bind();
-      GlUtils::renderGeometry(videoGeometry);
-      texture->unbind();
+      mv.translate(glm::vec3(0, 0, -2));
+      using namespace oglplus;
+      texture->Bind(TextureTarget::_2D);
+      oria::renderGeometry(videoGeometry, program);
+      oglplus::DefaultTexture().Bind(TextureTarget::_2D);
     });
   }
 };

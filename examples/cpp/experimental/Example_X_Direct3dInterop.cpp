@@ -238,8 +238,10 @@ public:
     glfwDestroyWindow(window);
   }
 
-  virtual void createRenderingTarget() {
-    createWindow(glm::uvec2(320, 180), glm::ivec2(100, 100));
+  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    outSize = uvec2(320, 180);
+    outPosition = ivec2(100, 100);
+    return glfw::createWindow(outSize, outPosition);
   }
 };
 
@@ -301,7 +303,7 @@ public:
     for_each_eye([&](ovrEyeType eye){
       EyeArgs & eyeArgs = perEyeArgs[eye];
       ovrTextureHeader & eyeTextureHeader = textures[eye].Header;
-      eyeArgs.framebuffer.init(Rift::fromOvr(eyeTextureHeader.TextureSize));
+      eyeArgs.framebuffer.init(ovr::toGlm(eyeTextureHeader.TextureSize));
     });
     success = wglDXUnlockObjectsNV(gl_handleD3D, 2, gl_handles);
     if (!success) {
@@ -330,7 +332,7 @@ public:
 
     for_each_eye([&](ovrEyeType eye){
       EyeArgs & eyeArgs = perEyeArgs[eye];
-      eyeArgs.projection = Rift::fromOvr(
+      eyeArgs.projection = ovr::toGlm(
         ovrMatrix4f_Projection(hmd->DefaultEyeFov[eye], 0.01, 100, true));
       hmdToEyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
     });
@@ -415,7 +417,7 @@ public:
 
   virtual void update() {
     CameraControl::instance().applyInteraction(player);
-    gl::Stacks::modelview().top() = glm::inverse(player);
+    Stacks::modelview().top() = glm::inverse(player);
   }
 
 
@@ -423,7 +425,7 @@ public:
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
     ++frameIndex;
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     ovrHmd_GetEyePoses(hmd, frameIndex, hmdToEyeOffsets, eyePoses, nullptr);
     ovrHmd_BeginFrame(hmd, frameIndex);
     glEnable(GL_DEPTH_TEST);
@@ -433,13 +435,13 @@ public:
     for (int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
       EyeArgs & eyeArgs = perEyeArgs[eye];
-      gl::Stacks::projection().top() = eyeArgs.projection;
-      gl::Stacks::projection().scale(glm::vec3(1, -1, 1));
+      Stacks::projection().top() = eyeArgs.projection;
+      Stacks::projection().scale(glm::vec3(1, -1, 1));
 
       eyeArgs.framebuffer.activate();
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose
-        mv.preMultiply(glm::inverse(Rift::fromOvr(eyePoses[eye])));
+        mv.preMultiply(glm::inverse(ovr::toGlm(eyePoses[eye])));
         renderScene();
       });
       eyeArgs.framebuffer.deactivate();
@@ -456,7 +458,7 @@ public:
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     GlUtils::renderFloor();
 
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     mv.with_push([&]{
       mv.translate(glm::vec3(0, 0, ipd * -5));
       GlUtils::renderManikin();

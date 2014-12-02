@@ -50,7 +50,7 @@ public:
     const ovrEyeRenderDesc & erd = getEyeRenderDesc();
     ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
     ovrVector2f scale; scale.x = scaleFactor; scale.y = scaleFactor;
-    return Rift::fromOvr(ovrMatrix4f_OrthoSubProjection(ovrPerspectiveProjection, scale, 100.8f, erd.HmdToEyeViewOffset.x));
+    return ovr::toGlm(ovrMatrix4f_OrthoSubProjection(ovrPerspectiveProjection, scale, 100.8f, erd.HmdToEyeViewOffset.x));
   }
 
 #define QUAD_SIZE (1)
@@ -60,10 +60,10 @@ public:
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    gl::MatrixStack & pr = gl::Stacks::projection();
+    MatrixStack & mv = Stacks::modelview();
+    MatrixStack & pr = Stacks::projection();
     glUseProgram(0);
-    gl::Stacks::withPush([&]{
+    Stacks::withPush([&]{
       pr.top() = getOrthographic();
       pr.top()[1][1] = -pr.top()[1][1];
       //float tr = pr.top()[3].x;
@@ -94,7 +94,7 @@ public:
       mv.postMultiply(glm::inverse(player));
       GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
       GlUtils::renderFloor();
-      gl::Stacks::with_push(mv, [&]{
+      Stacks::with_push(mv, [&]{
         mv.translate(glm::vec3(0, eyeHeight, 0)).scale(ipd);
         GlUtils::drawColorCube(true);
       });

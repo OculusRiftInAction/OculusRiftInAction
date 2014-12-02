@@ -27,8 +27,6 @@
 #include <string>
 #include <cstdint>
 #include "Types.h"
-#include "GlTexture.h"
-#include "GlGeometry.h"
 
 namespace Text {
 
@@ -40,19 +38,10 @@ public:
 public:
   // stores the font metrics for a single character
   struct Metrics {
-//    rectf imageCoords;
     glm::vec2 ul;
     glm::vec2 lr;
-//    float x1;  // x - top left of character in texture
-//    float y1;  // y - top left of character in texture
-//    float x2;  // x - bottom right of character in texture
-//    float y2;  // y - bottom right of character in texture
     glm::vec2 size;
-//    float w;  // w - width of character
-//    float h;  // h - height of character
     glm::vec2 offset;
-//    float dx;  // xoffset - adjusts character positioning
-//    float dy;  // yoffset - adjusts character positioning
     float d;  // xadvance - adjusts character positioning
     size_t indexOffset;
   };
@@ -154,8 +143,8 @@ public:
   float mDescent;
   float mSpaceWidth;
 
-  gl::Texture2dPtr mTexture;
-  gl::GeometryPtr mGeometry;
+  TexturePtr mTexture;
+  VertexArrayPtr mVao;
   glm::vec2 mTextureSize;
 
   MetricsData mMetrics;

@@ -19,18 +19,6 @@
 
 #pragma once
 
-// Win32 is a special case, since CMake creates a project with both 
-// debug and relase targets
-#ifdef WIN32
-  #ifdef _DEBUG
-    #define RIFT_DEBUG 1
-  #else
-    #undef RIFT_DEBUG
-  #endif
-#else
-#cmakedefine RIFT_DEBUG @RIFT_DEBUG@
-#endif
-
 // OpenCV computer image processing libraries
 #cmakedefine HAVE_OPENCV @HAVE_OPENCV@
 
@@ -43,3 +31,46 @@
 // 3D mouse support
 #cmakedefine HAVE_SPNAV @HAVE_SPNAV@
 
+#cmakedefine HAVE_LEAP @HAVE_LEAP@
+
+#cmakedefine HAVE_QT @HAVE_QT@
+
+#define PROJECT_DIR "@PROJECT_SOURCE_DIR@"
+
+
+#if (defined(WIN64) || defined(WIN32))
+#define OS_WIN
+#elif (defined(__APPLE__))
+#define OS_OSX
+#else
+#define OS_LINUX
+#endif
+
+// Windows has a non-standard main function prototype
+#ifdef OS_WIN
+#define MAIN_DECL int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+#else
+#define MAIN_DECL int main(int argc, char ** argv)
+#endif
+
+#if defined(OS_WIN)
+#define ON_WINDOWS(runnable) runnable()
+#define ON_MAC(runnable)
+#define ON_LINUX(runnable)
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN 
+#include <Windows.h>
+#undef NOMINMAX
+#elif defined(OS_OSX)
+#define ON_WINDOWS(runnable) 
+#define ON_MAC(runnable) runnable()
+#define ON_LINUX(runnable)
+#elif defined(OS_LINUX)
+#define ON_WINDOWS(runnable) 
+#define ON_MAC(runnable) 
+#define ON_LINUX(runnable) runnable()
+#endif
+
+
+#define __STDC_FORMAT_MACROS 1
+#define GLM_FORCE_RADIANS

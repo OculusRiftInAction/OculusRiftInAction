@@ -1,33 +1,36 @@
 /************************************************************************************
-
+ 
  Authors     :   Bradley Austin Davis <bdavis@saintandreas.org>
  Copyright   :   Copyright Brad Davis. All Rights reserved.
-
+ 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
-
+ 
  http://www.apache.org/licenses/LICENSE-2.0
-
+ 
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
-
+ 
  ************************************************************************************/
 
 #include "Common.h"
 
-#ifdef WIN32
+#ifdef OS_WIN
+#pragma warning (disable : 4996)
 #include <Windows.h>
+#define snprintf _snprintf
 #else
 #include <sys/time.h>
 #include <unistd.h>
+#include <pthread.h>
 #endif
 
 void Platform::sleepMillis(int millis) {
-#ifdef WIN32
+#ifdef OS_WIN
   Sleep(millis);
 #else
   usleep(millis * 1000);
@@ -35,7 +38,7 @@ void Platform::sleepMillis(int millis) {
 }
 
 long Platform::elapsedMillis() {
-#ifdef WIN32
+#ifdef OS_WIN
   static long start = GetTickCount();
   return GetTickCount() - start;
 #else
@@ -65,7 +68,7 @@ void Platform::fail(const char * file, int line, const char * message, ...) {
   std::string error(ERROR_BUFFER2);
   std::cerr << error << std::endl;
   // If you got here, something's pretty wrong
-#ifdef WIN32
+#ifdef OS_WIN
   if (NULL == GetConsoleWindow()) {
     MessageBoxA(NULL, ERROR_BUFFER2, "Message", IDOK | MB_ICONERROR);
   }
@@ -81,7 +84,7 @@ void Platform::say(std::ostream & out, const char * message, ...) {
   va_start(arg, message);
   vsnprintf(SAY_BUFFER, BUFFER_SIZE, message, arg);
   va_end(arg);
-#ifdef WIN32
+#ifdef OS_WIN
   OutputDebugStringA(SAY_BUFFER);
   OutputDebugStringA("\n");
 #endif
@@ -96,6 +99,19 @@ std::string Platform::getResourceData(Resource resource) {
   delete[] data;
   return dataStr;
 }
+
+std::vector<uint8_t> Platform::getResourceByteVector(Resource resource) {
+  size_t size = Resources::getResourceSize(resource);
+  std::vector<uint8_t> data; 
+  data.resize(size);
+  Resources::getResourceData(resource, &data[0]);
+  return data;
+}
+
+std::stringstream Platform::getResourceStream(Resource resource) {
+  return std::stringstream(Platform::getResourceData(resource));
+}
+
 
 std::string Platform::format(const char * fmt_str, ...) {
     int final_n, n = (int)strlen(fmt_str) * 2; /* reserve 2 times as much as the length of the fmt_str */
@@ -128,3 +144,52 @@ std::string Platform::replaceAll(const std::string & in, const std::string & fro
   return str;
 }
 
+
+typedef std::vector<std::function<void()>> VecLambda;
+VecLambda & getShutdownHooks() {
+  static VecLambda hooks;
+  return hooks;
+}
+
+void Platform::addShutdownHook(std::function<void()> f) {
+  getShutdownHooks().push_back(f);
+}
+
+void Platform::runShutdownHooks() {
+  VecLambda & hooks = getShutdownHooks();
+  std::for_each(hooks.begin(), hooks.end(), [&](std::function<void()> f){
+    f();
+  });
+}
+
+void Platform::setThreadPriority(ThreadPriority priority) {
+#ifdef OS_WIN
+  int win32priority;
+  switch (priority) {
+  case LOW:
+    win32priority = THREAD_PRIORITY_LOWEST;
+    break;
+  case MEDIUM:
+    win32priority = THREAD_PRIORITY_NORMAL;
+    break;
+  case HIGH:
+    win32priority = THREAD_PRIORITY_HIGHEST;
+    break;
+  }
+  SetThreadPriority(GetCurrentThread(), win32priority);
+#else 
+  sched_param params;
+  switch (priority) {
+  case LOW:
+    params.sched_priority = sched_get_priority_min(SCHED_FIFO);
+    break;
+  case MEDIUM:
+    params.sched_priority = 0;
+    break;
+  case HIGH:
+    params.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    break;
+  }
+  pthread_setschedparam(pthread_self(), SCHED_FIFO, &params);
+#endif
+}

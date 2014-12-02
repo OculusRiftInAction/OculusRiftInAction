@@ -69,8 +69,9 @@ class WebcamApp : public RiftApp {
 
 protected:
   
-  gl::Texture2dPtr texture;
-  gl::GeometryPtr videoGeometry;
+  TexturePtr texture;
+  ProgramPtr program;
+  ShapeWrapperPtr videoGeometry;
   WebcamHandler captureHandler;
 
 public:
@@ -84,36 +85,41 @@ public:
 
   void initGl() {
     RiftApp::initGl();
-
-    texture = GlUtils::initTexture();
+    using namespace oglplus;
+    texture = TexturePtr(new Texture());
+    Context::Bound(TextureTarget::_2D, *texture)
+      .MagFilter(TextureMagFilter::Linear)
+      .MinFilter(TextureMinFilter::Linear);
+    program = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
     float aspectRatio = captureHandler.startCapture();
-    videoGeometry = GlUtils::getQuadGeometry(aspectRatio);
+    videoGeometry = oria::loadPlane(program, aspectRatio);
   }
 
   virtual void update() {
     CaptureData captureData;
     if (captureHandler.get(captureData)) {
-      texture->bind();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-          captureData.image.cols, captureData.image.rows, 
-          0, GL_BGR, GL_UNSIGNED_BYTE,
+      using namespace oglplus;
+      Context::Bound(TextureTarget::_2D, *texture)
+        .Image2D(0, PixelDataInternalFormat::RGBA8, 
+          captureData.image.cols, captureData.image.rows, 0, 
+          PixelDataFormat::BGR, PixelDataType::UnsignedByte, 
           captureData.image.data);
-      texture->unbind();
     }
   }
 
   virtual void renderScene() {
+    using namespace oglplus;
     glClear(GL_DEPTH_BUFFER_BIT);
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-
-    mv.with_push([&]{
+    oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    MatrixStack & mv = Stacks::modelview();
+    mv.withPush([&]{
+      mv.identity();
       // Uncomment to position the frame always in front of you
-         mv.preMultiply(headPose);  
+       // mv.preMultiply(headPose);  
       mv.translate(glm::vec3(0, 0, -2));
-      texture->bind();
-      GlUtils::renderGeometry(videoGeometry);
-      texture->unbind();
+      texture->Bind(TextureTarget::_2D);
+      oria::renderGeometry(videoGeometry, program);
+      oglplus::DefaultTexture().Bind(TextureTarget::_2D);
     });
   }
 };

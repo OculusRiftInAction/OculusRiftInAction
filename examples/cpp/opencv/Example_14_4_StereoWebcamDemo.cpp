@@ -89,8 +89,9 @@ class WebcamApp : public RiftApp {
 
 protected:
 
-  gl::Texture2dPtr texture[2];
-  gl::GeometryPtr videoGeometry[2];
+  ProgramPtr program;
+  TexturePtr texture[2];
+  ShapeWrapperPtr videoGeometry[2];
   WebcamHandler captureHandler[2];
   CaptureData captureData[2];
 
@@ -107,44 +108,53 @@ public:
 
   void initGl() {
     RiftApp::initGl();
+    using namespace oglplus;
+
+    program = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
 
     for (int i = 0; i < 2; i++) {
-      texture[i] = GlUtils::initTexture();
-      videoGeometry[i] = GlUtils::getQuadGeometry(captureHandler[i].startCapture(hmd, CAMERA_FOR_EYE[i]));
+      texture[i] = TexturePtr(new Texture());
+      Context::Bound(TextureTarget::_2D, *texture[i])
+        .MagFilter(TextureMagFilter::Linear)
+        .MinFilter(TextureMinFilter::Linear);
+      program = oria::loadProgram(Resource::SHADERS_TEXTURED_VS, Resource::SHADERS_TEXTURED_FS);
+      float aspect = captureHandler[i].startCapture(hmd, CAMERA_FOR_EYE[i]);
+      videoGeometry[i] = oria::loadPlane(program, aspect);
     }
   }
 
   virtual void update() {
     for (int i = 0; i < 2; i++) {
       if (captureHandler[i].get(captureData[i])) {
-        texture[i]->bind();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-            captureData[i].image.cols, captureData[i].image.rows,
-            0, GL_BGR, GL_UNSIGNED_BYTE,
-            captureData[i].image.data);
-        texture[i]->unbind();
+        using namespace oglplus;
+        Context::Bound(TextureTarget::_2D, *texture[i])
+          .Image2D(0, PixelDataInternalFormat::RGBA8,
+          captureData[i].image.cols, captureData[i].image.rows, 0,
+          PixelDataFormat::BGR, PixelDataType::UnsignedByte,
+          captureData[i].image.data);
       }
     }
   }
 
   virtual void renderScene() {
+    using namespace oglplus;
     glClear(GL_DEPTH_BUFFER_BIT);
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    
-    mv.with_push([&]{
-      glm::quat eyePose = Rift::fromOvr(getEyePose().Orientation);
-      glm::quat webcamPose = Rift::fromOvr(captureData[getCurrentEye()].pose.Orientation);
+    oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    MatrixStack & mv = Stacks::modelview();
+
+    mv.withPush([&] {
+      glm::quat eyePose = ovr::toGlm(getEyePose().Orientation);
+      glm::quat webcamPose = ovr::toGlm(captureData[getCurrentEye()].pose.Orientation);
       glm::mat4 webcamDelta = glm::mat4_cast(glm::inverse(eyePose) * webcamPose);
 
       mv.identity();
       mv.preMultiply(webcamDelta);
 
       mv.translate(glm::vec3(0, 0, -2.75));
-      texture[getCurrentEye()]->bind();
-      GlUtils::renderGeometry(videoGeometry[getCurrentEye()]);
-      texture[getCurrentEye()]->unbind();
+      texture[getCurrentEye()]->Bind(TextureTarget::_2D); 
+      oria::renderGeometry(videoGeometry[getCurrentEye()], program);
     });
+    oglplus::DefaultTexture().Bind(TextureTarget::_2D);
   }
 };
 

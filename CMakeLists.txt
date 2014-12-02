@@ -45,25 +45,34 @@ endif()
 # Add debug output from the Oculus SDK
 
 # The primary SDK artifact, a static library for Oculus access 
-set(BUILD_SHARED_LIBS ON)
 add_subdirectory(libraries/OculusSDK/LibOVR)
-set(BUILD_SHARED_LIBS OFF)
 set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS OculusVR)
-
-add_definitions(-DGLEW_STATIC)
-add_subdirectory(libraries/glew)
-set_target_properties(glew PROPERTIES FOLDER "3rdparty")
-list(APPEND EXAMPLE_LIBS glew)
 
 ###############################################################################
 #
 # Non-Oculus third party dependencies 
 #
 
+###############################################################################
+#
+# GLEW - Cross platform access to OpenGL extensions and > 1.x functions 
+#
+
+add_definitions(-DGLEW_STATIC)
+add_subdirectory(libraries/glew)
+set_target_properties(glew PROPERTIES FOLDER "3rdparty")
+list(APPEND EXAMPLE_LIBS glew)
+
 # Cross platform access to shader functionality
 
+###############################################################################
+#
 # GLFW - Cross platform OpenGL window creation and input handling
+#
+# We need to set a bunch of values so we build only the library and not the 
+# install targets, documentation or examples
+#
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
@@ -72,22 +81,32 @@ add_subdirectory(libraries/glfw)
 set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 
+#
 # OpenCTM - a 3D mesh compression
+#
 add_subdirectory(libraries/OpenCTM)
 set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
-# Computer vision library with advanced image loading and manipulation 
-# functionality.  
-# OpenCV is OPTIONAL.  
-find_package( OpenCV QUIET)
+###############################################################################
+#
+# OpenCV is a Computer vision library with advanced image loading and 
+# manipulation functionality, including a simple API for accessing cameras  
+#
+# OpenCV is optional, but required to build the chapter 14 examples.
+#  
+# OpenCV will be found if you set an environment variable OpenCV_DIR 
+# pointing to the location of the installed OpenCVConfig.cmake file
+
+find_package(OpenCV QUIET)
+
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
 else()
     # Without OpenCV, we have to fall back on libpng
-    # which requires zlib.  For windows and apple we
+    # which requires zlib.  For windows and OSX we
     # build the library.  For Unix systems we locate 
     # the native package
     if((WIN32 OR APPLE))
@@ -112,42 +131,84 @@ else()
     endif()
 endif()
 
+
+set(LeapMotion_DIR "C:/dev/LeapDeveloperKit_2.1.5+22699_win/LeapSDK")
+find_package(LeapMotion QUIET)
+if (LeapMotion_FOUND)
+    SET(HAVE_LEAP 1) 
+    include_directories(${LeapMotion_INCLUDE_DIR})
+    list(APPEND EXAMPLE_LIBS ${LeapMotion_LIBRARY})
+	message(STATUS "Found Leap Motion SDK")
+endif()
+
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
+###############################################################################
+#
+# Qt is a cross platform framework for just about everything.
+#
+# Qt can be found by setting a QT5_ROOT to the root of your 
+#
+# Qt is optional, but required to build the chapter 10 examples
 
+# set(Qt5_DIR $ENV{QT5_ROOT}/lib/cmake/Qt5)
 
-if (OpenCV_FOUND) 
-    include_directories(${OpenCV_INCLUDE_DIRS})
-else()
-    if((WIN32 OR APPLE))
-        include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
-        include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
-    else()
-        include_directories(${PNG_INCLUDE_DIR})
-    endif()
+# Qt emits a ton of warnings which we're not interested in
+if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
 endif()
-include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
+   
+foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
+    find_package(${lib} QUIET)
+    if (${lib}_FOUND) 
+        include_directories(${${lib}_INCLUDE_DIRS})
+        list(APPEND EXAMPLE_LIBS ${${lib}_LIBRARIES})
+        add_definitions(${${lib}_DEFINITIONS})
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${lib}_EXECUTABLE_COMPILE_FLAGS}")
+    endif()
+endforeach(lib)
+
+if (Qt5Core_FOUND)
+    message(STATUS "Found Qt framework") 
+    set(HAVE_QT 1)
+    set(CMAKE_INCLUDE_CURRENT_DIR ON)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+endif()
 
 
-###############################################################################
+######################################################
 #
-# Common GL code, using only headers.  
+# OGLplus provides object oriented OpenGL wrappers
 #
-add_subdirectory(libraries/gl)
-set_target_properties(gl PROPERTIES FOLDER "Examples/Shared")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/gl)
 
+# oglplus uses CMake to detect compiler features, but 
+# we can't use the full oglplus CMake include, so we 
+# need to jump through some hoops to make it's 
+# compiler detection logic work here.
 
-###############################################################################
-#
-# GLM - Vector / matrix header only math library based on the syntax of GLSL
-#
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
+set(SAVE_PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
+set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/libraries/oglplus)
+    include(libraries/oglplus/config/Compiler.cmake)
+    include(libraries/oglplus/config/CPPFeature.cmake)
+    set(OGLPLUS_CONFIG_SET_LOW_PROFILE 1)
+    set(OGLPLUS_LOW_PROFILE 0)
+    set(OGLPLUS_USE_GLCOREARB_H 0) 
+    set(OGLPLUS_USE_GL3_H 0)
+    set(OGLPLUS_USE_GLEW 1)
+    set(OGLPLUS_USE_GL3W 0)
+    set(OGLPLUS_USE_BOOST_CONFIG 0)
+    configure_file(
+        ${PROJECT_SOURCE_DIR}/config/oglplus/config/site.hpp.in
+        ${PROJECT_BINARY_DIR}/libraries/oglplus/include/oglplus/config/site.hpp
+    )
+set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
 
+add_definitions(-DOGLPLUS_LOW_PROFILE=1)
+# aadd_definitions(-DOGLPLUS_USE_GLEW=1)
+# aadd_definitions(-DOGLPLUS_USE_BOOST_CONFIG=1)
+# aadd_definitions(-DOGLPLUS_NO_SITE_CONFIG=1)
 
 ###############################################################################
 #
@@ -163,6 +224,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 # source location at runtime.  
 #
 add_subdirectory(resources)
+
 set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
 include_directories(resources/cpp)
 include_directories(${CMAKE_BINARY_DIR}/resources)
@@ -170,7 +232,51 @@ list(APPEND EXAMPLE_LIBS ExampleResources)
 
 ###############################################################################
 #
+# All our includes for the used libraries
+#
+
+include_directories(${CMAKE_SOURCE_DIR}/libraries/boost)
+
+# GLM - Vector / matrix header only math library based on the syntax of GLSL
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
+
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
+
+include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
+include_directories(${CMAKE_BINARY_DIR}/libraries/oglplus/include)
+
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
+
+if (OpenCV_FOUND) 
+    include_directories(${OpenCV_INCLUDE_DIRS})
+else()
+    if((WIN32 OR APPLE))
+        include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
+        include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
+    else()
+        include_directories(${PNG_INCLUDE_DIR})
+    endif()
+endif()
+
+if (Qt5_FOUND)
+    foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
+        include_directories(${${lib}_INCLUDE_DIRS})
+    endforeach(lib)
+endif()
+
+###############################################################################
+#
 # The examples themselves
 #
 add_subdirectory(examples/cpp)
+
+if (LeapMotion_FOUND)
+    add_custom_command(TARGET ExampleResources POST_BUILD
+        COMMAND ${CMAKE_PROGRAM} -E copy ${LeapMotion_BINARY} ${CMAKE_BINARY_DIR}/output/Leap.dll
+    )
+    message(${CMAKE_PROGRAM} -E copy ${LeapMotion_BINARY} ${CMAKE_BINARY_DIR}/output/Leap.dll)
+endif()
 

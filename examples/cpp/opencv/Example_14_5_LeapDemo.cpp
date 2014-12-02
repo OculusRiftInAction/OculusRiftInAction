@@ -1,8 +1,15 @@
+#include "Config.h"
+#ifdef HAVE_LEAP
 #include <Leap.h>
+#endif
+
+#include "Common.h"
+
+#ifdef HAVE_LEAP
 #include <thread>
 #include <mutex>
 
-#include "Common.h"
+
 
 /**
  Minimal demo of using the Leap Motion controller.
@@ -57,28 +64,27 @@ public:
   }
 
   void onConnect(const Leap::Controller & controller) {
-    controller.setPolicy(Leap::Controller::PolicyFlag::POLICY_OPTIMIZE_HMD);
+    controller.setPolicyFlags(Leap::Controller::PolicyFlag::POLICY_OPTIMIZE_HMD);
   }
 
   void onFrame(const Leap::Controller & controller) {
     CaptureData frame;
 
     frame.frame = controller.frame();
-    frame.leapPose = Rift::fromOvr(ovrHmd_GetTrackingState(hmd, 0.0).HeadPose.ThePose);
+    frame.leapPose = ovr::toGlm(ovrHmd_GetTrackingState(hmd, 0.0).HeadPose.ThePose);
     set(frame);
   }
 };
 
 class LeapApp : public RiftApp {
-
   const float BALL_RADIUS = 0.05f;
 
 protected:
 
-  LeapHandler captureHandler;
-  gl::GeometryPtr cube;
-  gl::GeometryPtr sphere;
-  gl::ProgramPtr program;
+  LeapHandler     captureHandler;
+  //ShapeWrapperPtr cube;
+  ShapeWrapperPtr sphere;
+  ProgramPtr      program;
 
   CaptureData latestFrame;
   glm::vec3 ballCenter;
@@ -96,10 +102,8 @@ public:
 
   void initGl() {
     RiftApp::initGl();
-    cube = GlUtils::getColorCubeGeometry();
-    sphere = GlUtils::getSphereGeometry();
-    program = GlUtils::getProgram(Resource::SHADERS_LITCOLORED_VS, Resource::SHADERS_LITCOLORED_FS);
-
+    program = oria::loadProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
+    sphere = oria::loadSphere({"Position", "Normal"}, program);
     ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
   }
 
@@ -126,10 +130,10 @@ public:
 
   virtual void renderScene() {
     glClear(GL_DEPTH_BUFFER_BIT);
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    MatrixStack & mv = Stacks::modelview();
 
-    mv.with_push([&]{
+    mv.withPush([&]{
       mv.transform(latestFrame.leapPose);
       mv.translate(glm::vec3(0, 0, -0.070));
 
@@ -137,13 +141,13 @@ public:
       for (int iHand = 0; iHand < hands.count(); iHand++) {
         Leap::Hand hand = hands[iHand];
         if (hand.isValid()) {
-          mv.with_push([&]{
+          mv.withPush([&] {
             glm::vec3 riftCoords = leapToRiftPosition(hand.wristPosition());
 
             mv.translate(riftCoords);
             mv.transform(leapToRiftRotation(hand.basis(), hand.isLeft()));
             mv.scale(0.02);
-            GlUtils::renderGeometry(sphere, program);
+            oria::renderGeometry(sphere, program);
           });
 
           Leap::Matrix handTransform = hand.basis();
@@ -154,7 +158,7 @@ public:
             Leap::Finger finger = hand.fingers()[f];
             if (finger.isValid()) {
               for (int b = 0; b < 4; b++) {
-                mv.with_push([&]{
+                mv.withPush([&] {
                   Leap::Bone bone = finger.bone((Leap::Bone::Type) b);
                   glm::vec3 riftCoords = leapToRiftPosition(bone.center());
                   float length = bone.length() / 1000;
@@ -162,7 +166,7 @@ public:
                   mv.translate(riftCoords);
                   mv.transform(leapToRiftRotation(bone.basis(), hand.isLeft()));
                   mv.scale(glm::vec3(0.01, 0.01, length));
-                  GlUtils::renderGeometry(cube, program);
+                  oria::renderColorCube();
                 });
               }
             }
@@ -171,12 +175,12 @@ public:
       }
     });
 
-    GlUtils::draw3dLine(glm::vec3(ballCenter.x, -1000, ballCenter.z), glm::vec3(ballCenter.x, 1000, ballCenter.z));
-    GlUtils::draw3dLine(glm::vec3(-1000, ballCenter.y, ballCenter.z), glm::vec3(1000, ballCenter.y, ballCenter.z));
-    mv.with_push([&]{
+    //GlUtils::draw3dLine(glm::vec3(ballCenter.x, -1000, ballCenter.z), glm::vec3(ballCenter.x, 1000, ballCenter.z));
+    //GlUtils::draw3dLine(glm::vec3(-1000, ballCenter.y, ballCenter.z), glm::vec3(1000, ballCenter.y, ballCenter.z));
+    mv.withPush([&]{
       mv.translate(ballCenter);
       mv.scale(BALL_RADIUS);
-      GlUtils::renderGeometry(sphere, program);
+      oria::renderGeometry(sphere, program);
     });
   }
 
@@ -205,3 +209,8 @@ public:
 };
 
 RUN_OVR_APP(LeapApp);
+#else
+MAIN_DECL {
+  SAY("Leap Motion SDK required for this example");
+}
+#endif
