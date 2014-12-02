@@ -190,9 +190,10 @@ set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/libraries/oglplus)
     )
 set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
 
-#add_definitions(-DOGLPLUS_USE_BOOST_CONFIG)
-#add_definitions(-DOGLPLUS_NO_SITE_CONFIG)
-
+add_definitions(-DOGLPLUS_LOW_PROFILE=1)
+# aadd_definitions(-DOGLPLUS_USE_GLEW=1)
+# aadd_definitions(-DOGLPLUS_USE_BOOST_CONFIG=1)
+# aadd_definitions(-DOGLPLUS_NO_SITE_CONFIG=1)
 
 ###############################################################################
 #

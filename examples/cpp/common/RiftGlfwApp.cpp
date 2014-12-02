@@ -96,6 +96,7 @@ void RiftApp::initGl() {
 }
 
 void RiftApp::onKey(int key, int scancode, int action, int mods) {
+  ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
   if (GLFW_PRESS == action) switch (key) {
   case GLFW_KEY_R:
     ovrHmd_RecenterPose(hmd);
