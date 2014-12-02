@@ -12,6 +12,8 @@
 #define CAMERA_DEVICE 0
 #define CAMERA_LATENCY 0.040
 #define CAMERA_ASPECT ((float)CAMERA_WIDTH / (float)CAMERA_HEIGHT)
+#define CAMERA_HALF_FOV (CAMERA_HFOV_DEGREES / 2.0f) * DEGREES_TO_RADIANS
+#define CAMERA_SCALE (tan(CAMERA_HALF_FOV) * IMAGE_DISTANCE)
 
 template <class T>
 class CaptureHandler {
@@ -126,9 +128,10 @@ public:
       cv::convertMaps(map1, map2, distortionMap, map3, CV_32FC2);
     }
 
-    videoCapture.set(CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
-    videoCapture.set(CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
-    videoCapture.set(CV_CAP_PROP_FPS, 60);
+    using namespace cv;
+    videoCapture.set(CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
+    videoCapture.set(CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
+    videoCapture.set(CAP_PROP_FPS, 60);
   }
   
   virtual void captureLoop() {
@@ -161,9 +164,9 @@ protected:
   WebcamCaptureHandler captureHandler;
   CaptureData captureData;
 
-  gl::Texture2dPtr texture;
-  gl::GeometryPtr videoGeometry;
-  gl::ProgramPtr videoRenderProgram;
+  TexturePtr texture;
+  ShapeWrapperPtr videoGeometry;
+  ProgramPtr videoRenderProgram;
 
 public:
 
@@ -182,39 +185,38 @@ void initGl() {
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-  videoRenderProgram = GlUtils::getProgram(
+  videoRenderProgram = oria::loadProgram(
     Resource::SHADERS_TEXTURED_VS,
     Resource::SHADERS_TEXTURED_FS);
 
-  texture = gl::TexturePtr(new gl::Texture2d());
-  texture->bind();
-  texture->parameter(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  texture->parameter(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl::Texture2d::unbind();
+  using namespace oglplus;
+  texture = TexturePtr(new Texture());
+  Context::Bound(TextureTarget::_2D, *texture)
+    .MagFilter(TextureMagFilter::Linear)
+    .MinFilter(TextureMinFilter::Linear);
+  DefaultTexture().Bind(TextureTarget::_2D);
 
-  float halfFov = (CAMERA_HFOV_DEGREES / 2.0f) * 
-    DEGREES_TO_RADIANS;
-  float scale = tan(halfFov) * IMAGE_DISTANCE;
-  videoGeometry = GlUtils::getQuadGeometry(CAMERA_ASPECT, scale * 2.0f);
+  videoGeometry = oria::loadPlane(videoRenderProgram, CAMERA_ASPECT);
 }
 
 virtual void update() {
   if (captureHandler.getResult(captureData)) {
-    texture->bind();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-      captureData.image.cols, captureData.image.rows, 
-      0, GL_BGR, GL_UNSIGNED_BYTE,
-      captureData.image.data);
-    gl::Texture2d::unbind();
+    using namespace oglplus;
+    Context::Bound(TextureTarget::_2D, *texture)
+      .Image2D(0, PixelDataInternalFormat::RGBA8,
+             captureData.image.cols, captureData.image.rows, 0,
+             PixelDataFormat::BGR, PixelDataType::UnsignedByte,
+             captureData.image.data);
+    DefaultTexture().Bind(TextureTarget::_2D);
   }
 }
 
 virtual void renderScene() {
   glClear(GL_DEPTH_BUFFER_BIT);
-  GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+  oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
   MatrixStack & mv = Stacks::modelview();
 
-  mv.with_push([&]{
+  mv.withPush([&]{
     mv.identity();
 
     glm::quat eyePose = ovr::toGlm(getEyePose().Orientation);
@@ -224,9 +226,9 @@ virtual void renderScene() {
     mv.preMultiply(webcamDelta);
     mv.translate(glm::vec3(0, 0, -IMAGE_DISTANCE));
 
-    texture->bind();
-    GlUtils::renderGeometry(videoGeometry, videoRenderProgram);
-    gl::Texture2d::unbind();
+    texture->Bind(oglplus::Texture::Target::_2D);
+    oria::renderGeometry(videoGeometry, videoRenderProgram);
+    oglplus::DefaultTexture().Bind(oglplus::Texture::Target::_2D);
   });
 
   std::string message = Platform::format(
