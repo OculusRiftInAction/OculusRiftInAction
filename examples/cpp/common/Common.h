@@ -144,6 +144,7 @@ public:
 #include <OVR_CAPI.h>
 #include <OVR_CAPI_GL.h>
 
+#define BackBufferSize RTSize
 #include "RiftUtils.h"
 #include "RiftRenderingApp.h"
 #include "RiftGlfwApp.h"
@@ -154,6 +155,23 @@ public:
 #include "qt/RiftQtApp.h"
 #include "qt/GlslEditor.h"
 #endif
+
+#define OPENCV3 1
+#if OPENCV3
+#define CV_LOAD_IMAGE_COLOR cv::IMREAD_COLOR
+#define CV_BGR2RGB cv::COLOR_BGR2RGB
+#define CV_CAP_PROP_FRAME_WIDTH cv::CAP_PROP_FRAME_WIDTH
+#define CV_CAP_PROP_FRAME_HEIGHT cv::CAP_PROP_FRAME_HEIGHT
+#define CV_CAP_PROP_FPS cv::CAP_PROP_FPS
+#define CV_CALIB_FIX_PRINCIPAL_POINT cv::CALIB_FIX_PRINCIPAL_POINT
+#define CV_CALIB_FIX_PRINCIPAL_POINT cv::CALIB_FIX_PRINCIPAL_POINT
+#define CV_CALIB_ZERO_TANGENT_DIST cv::CALIB_ZERO_TANGENT_DIST
+#define CV_CALIB_FIX_ASPECT_RATIO cv::CALIB_FIX_ASPECT_RATIO
+#define CV_CALIB_CB_ADAPTIVE_THRESH cv::CALIB_CB_ADAPTIVE_THRESH
+#define CV_CALIB_CB_FAST_CHECK cv::CALIB_CB_FAST_CHECK
+#define CV_CALIB_CB_NORMALIZE_IMAGE cv::CALIB_CB_NORMALIZE_IMAGE
+#endif
+
 
 
 #ifndef PI

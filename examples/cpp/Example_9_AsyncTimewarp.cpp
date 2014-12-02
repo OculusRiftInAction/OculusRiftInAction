@@ -16,7 +16,7 @@ class AsyncTimewarpExample : public RiftGlfwApp {
   // Offscreen rendering targets: two for each eye.
   // One is used for rendering (writing) while the other 
   // is  used for distortion (reading)
-  FramebufferWrapper  eyeFramebuffers[2][2];
+  FramebufferWrapperPtr  eyeFramebuffers[2][2];
   // Keep track of the index of the buffer currently being written to for each eye
   unsigned int writeFramebuffersIndex{ 0 };
   unsigned int distortionFrameIndex{ 0 };
@@ -103,7 +103,8 @@ public:
       glm::uvec2 frameBufferSize =
         ovr::toGlm(eyeTextures[eye].Header.TextureSize);
       for (int i = 0; i < 2; ++i) {
-        eyeFramebuffers[eye][i].init(frameBufferSize);
+        eyeFramebuffers[eye][i] =  FramebufferWrapperPtr(new FramebufferWrapper());
+        eyeFramebuffers[eye][i]->init(frameBufferSize);
       }
     });
 
@@ -197,10 +198,10 @@ public:
         // Apply the head pose
         glm::mat4 m = ovr::toGlm(renderPoses[eye]);
         mv.preMultiply(glm::inverse(m));
-        FramebufferWrapper & frameBuffer = 
+        FramebufferWrapperPtr & frameBuffer =
           eyeFramebuffers[eye][writeFramebuffersIndex];
         // Render the scene to an offscreen buffer
-        frameBuffer.Bind();
+        frameBuffer->Bind();
         renderScene();
       });
     } // for each eye
@@ -212,7 +213,7 @@ public:
     for_each_eye([&](ovrEyeType eye) {
       int renderBufferIndex = writeFramebuffersIndex;
       ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
-        oglplus::GetName(*eyeFramebuffers[eye][renderBufferIndex].color);
+        oglplus::GetName(eyeFramebuffers[eye][renderBufferIndex]->color);
       eyePoses[eye] = renderPoses[eye];
     });
     writeFramebuffersIndex = writeFramebuffersIndex ? 0 : 1;

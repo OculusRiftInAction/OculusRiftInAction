@@ -754,7 +754,7 @@ protected:
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(windowSize);
+    cfg.OGL.Header.RTSize = ovr::fromGlm(windowSize);
     cfg.OGL.Header.Multisample = 0;
 
     int distortionCaps = 0
