@@ -31,3 +31,6 @@
 [submodule "libraries/oglplus"]
 	path = libraries/oglplus
 	url = git@github.com:jherico/oglplus.git
+[submodule "libraries/boostconfig"]
+	path = libraries/boostconfig
+	url = git@github.com:boostorg/config.git
