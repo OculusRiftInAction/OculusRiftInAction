@@ -25,6 +25,7 @@
 #pragma warning( disable : 4068 4244 4267 4065 4101 4244)
 #include <oglplus/bound/buffer.hpp>
 #include <oglplus/shapes/cube.hpp>
+#include <oglplus/shapes/sphere.hpp>
 #include <oglplus/images/image.hpp>
 #include <oglplus/shapes/wicker_torus.hpp>
 #include <oglplus/shapes/sky_box.hpp>
@@ -686,7 +687,8 @@ namespace oria {
   }
 
   ShapeWrapperPtr loadSphere(const std::initializer_list<const GLchar*>& names, ProgramPtr program) {
-    return nullptr;
+    using namespace oglplus;
+    return ShapeWrapperPtr(new shapes::ShapeWrapper(names, shapes::Sphere(), *program));
   }
 
 

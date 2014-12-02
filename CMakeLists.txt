@@ -131,6 +131,16 @@ else()
     endif()
 endif()
 
+
+set(LeapMotion_DIR "C:/dev/LeapDeveloperKit_2.1.5+22699_win/LeapSDK")
+find_package(LeapMotion QUIET)
+if (LeapMotion_FOUND)
+    SET(HAVE_LEAP 1) 
+    include_directories(${LeapMotion_INCLUDE_DIR})
+    list(APPEND EXAMPLE_LIBS ${LeapMotion_LIBRARY})
+	message(STATUS "Found Leap Motion SDK")
+endif()
+
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
@@ -144,6 +154,11 @@ list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
 # set(Qt5_DIR $ENV{QT5_ROOT}/lib/cmake/Qt5)
 
+# Qt emits a ton of warnings which we're not interested in
+if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
+endif()
+   
 foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
     find_package(${lib} QUIET)
     if (${lib}_FOUND) 
@@ -257,4 +272,11 @@ endif()
 # The examples themselves
 #
 add_subdirectory(examples/cpp)
+
+if (LeapMotion_FOUND)
+    add_custom_command(TARGET ExampleResources POST_BUILD
+        COMMAND ${CMAKE_PROGRAM} -E copy ${LeapMotion_BINARY} ${CMAKE_BINARY_DIR}/output/Leap.dll
+    )
+    message(${CMAKE_PROGRAM} -E copy ${LeapMotion_BINARY} ${CMAKE_BINARY_DIR}/output/Leap.dll)
+endif()
 

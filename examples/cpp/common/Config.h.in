@@ -31,7 +31,7 @@
 // 3D mouse support
 #cmakedefine HAVE_SPNAV @HAVE_SPNAV@
 
-#cmakedefine HAVE_CEGUI @HAVE_CEGUI@
+#cmakedefine HAVE_LEAP @HAVE_LEAP@
 
 #cmakedefine HAVE_QT @HAVE_QT@
 
