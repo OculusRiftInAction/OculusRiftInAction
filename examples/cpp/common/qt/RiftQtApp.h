@@ -73,7 +73,7 @@ private:
     });
 
 #ifdef BRAD_DEBUG
-    widget.setWindowFlags(Qt::FramelessWindowHint);
+    setWindowFlags(Qt::FramelessWindowHint);
 #endif
     if (!directHmdMode) {
       setWindowFlags(Qt::FramelessWindowHint);

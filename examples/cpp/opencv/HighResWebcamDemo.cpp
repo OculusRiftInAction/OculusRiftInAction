@@ -129,9 +129,9 @@ public:
     }
 
     using namespace cv;
-    videoCapture.set(CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
-    videoCapture.set(CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
-    videoCapture.set(CAP_PROP_FPS, 60);
+    videoCapture.set(CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
+    videoCapture.set(CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
+    videoCapture.set(CV_CAP_PROP_FPS, 60);
   }
   
   virtual void captureLoop() {

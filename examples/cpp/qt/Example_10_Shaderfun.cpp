@@ -1,3 +1,8 @@
+
+#ifdef _DEBUG
+#define BRAD_DEBUG 1
+#endif
+
 #include "Common.h"
 
 #include <QtOpenGL/QGLContext>
@@ -25,10 +30,6 @@ using namespace oglplus;
 
 #define UI_X 1280
 #define UI_Y 720
-
-#ifdef _DEBUG
-#define BRAD_DEBUG 1
-#endif
 
 static const float ROOT_2 = sqrt(2.0f);
 static const float INV_ROOT_2 = 1.0f / ROOT_2;
@@ -187,7 +188,8 @@ enum UiState {
 UiState activeState = INACTIVE;
 bool uiVisible{ false };
 std::string currentFragmentSource;
-
+typedef std::function<void()> Lambda;
+typedef std::list<Lambda> LambdaList;
 typedef std::atomic<GLuint> AtomicGlTexture;
 AtomicGlTexture uiTexture{ 0 };
 
@@ -247,7 +249,7 @@ class ShadertoyRiftWidget : public QRiftWidget {
   RateCounter fps;
 
   // The current fragment source
-  std::list<std::function<void()>> uniformLambdas;
+  LambdaList uniformLambdas;
 
 
   void initTextureCache() {
@@ -328,6 +330,9 @@ public:
 
   int currentPresetIndex = 0;
 
+  ovrHmd getHmd() {
+    return hmd;
+  }
 protected:
   vec2 textureSize() {
     return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
@@ -419,44 +424,6 @@ protected:
       glDeleteTextures(1, &syncPair.first);
       uiTextureTrash.pop();
     }
-  }
-
-  void keyPressEvent(QKeyEvent * event) {
-    int key = event->key();
-
-    ovrHSWDisplayState hswState;
-    ovrHmd_GetHSWDisplayState(hmd, &hswState);
-    if (hswState.Displayed) {
-      ovrHmd_DismissHSWDisplay(hmd);
-      return;
-    }
-
-    // These functions have to be done on the Rift rendering thread
-    tasks.queueTask([&, key] {
-      switch (key) {
-      case Qt::Key_F2:
-        ovrHmd_RecenterPose(hmd);
-        break;
-      case Qt::Key_F5:
-        texRes = std::max(texRes * INV_ROOT_2, 0.05f);
-        break;
-      case Qt::Key_F6:
-        texRes = std::max(texRes * 0.95f, 0.05f);
-        break;
-      case Qt::Key_F7:
-        texRes = std::min(texRes * 1.05f, 1.0f);
-        break;
-      case Qt::Key_F8:
-        texRes = std::min(texRes * ROOT_2, 1.0f);
-        break;
-      //case Qt::Key_F9:
-      //  onPreviousPreset();
-      //  break;
-      //case Qt::Key_F10:
-      //  onNextPreset();
-      //  break;
-      }
-    });
   }
 
   virtual void initGl() {
@@ -616,47 +583,11 @@ protected:
   virtual void paintEvent(QPaintEvent *) { }
 
 public slots:
-  //void onSourceChanged(QString source) {
-  //  currentFragmentSource = source.toStdString();
-  //  tasks.queueTask([&, source] {
-  //    setFragmentSource(currentFragmentSource);
-  //  });
-  //}
-
-  //void onShaderLoaded(QString source) {
-  //  currentFragmentSource = source.toStdString();
-  //  emit sourceChanged(currentFragmentSource.c_str());
-  //  tasks.queueTask([&] {
-  //    loadShader(currentFragmentSource);
-  //  });
-  //}
-
-  //void onShaderLoaded(int presetIndex) {
-  //  currentPresetIndex = presetIndex;
-  //  currentFragmentSource = Platform::getResourceData(shadertoy::PRESETS[presetIndex].res);
-  //  emit sourceChanged(currentFragmentSource.c_str());
-  //  tasks.queueTask([&] {
-  //    loadShader(currentFragmentSource);
-  //  });
-  //}
-
-  //void onNextPreset() {
-  //  int newPresetIndex = currentPresetIndex;
-  //  ++newPresetIndex;
-  //  if (newPresetIndex >= shadertoy::MAX_PRESETS) {
-  //    newPresetIndex =  0;
-  //  }
-  //  onShaderLoaded(newPresetIndex);
-  //}
-
-  //void onPreviousPreset() {
-  //  int newPresetIndex = currentPresetIndex;
-  //  --newPresetIndex;
-  //  if (newPresetIndex < 0) {
-  //    newPresetIndex = shadertoy::MAX_PRESETS - 1;
-  //  }
-  //  onShaderLoaded(newPresetIndex);
-  //}
+  void setTextureResolution(float texRes) {
+    tasks.queueTask([&, texRes] {
+      this->texRes = texRes;
+    });
+  }
 
   void setChannelTexture(int channel, shadertoy::ChannelInputType type, int index) {
     tasks.queueTask([&, channel, type, index] {
@@ -695,40 +626,11 @@ signals:
   void compileSuccess();
 };
 
-class UiToggle : public QObject {
-  Q_OBJECT
-  bool eventFilter(QObject *object, QEvent *event) {
-    if (event->type() == QEvent::KeyPress) {
-
-      QKeyEvent * ke = (QKeyEvent*)event;
-      if (Qt::Key_Q == ke->key() && Qt::ControlModifier == ke->modifiers()) {
-        QApplication::instance()->quit();
-        return true;
-      }
-      if (Qt::Key_Escape == ke->key() || Qt::Key_F1 == ke->key()) {
-        uiVisible = !uiVisible;
-        emit uiToggled(uiVisible);
-        return true;
-      }
-    }
-
-    if (event->type() == QEvent::MouseMove) {
-      emit mouseMoved();
-    }
-    return false;
-  }
-
-signals:
-  void uiToggled(bool newValue);
-  void mouseMoved();
-};
-
 class ShadertoyApp : public QApplication {
   Q_OBJECT
 
   ShadertoyRiftWidget riftRenderWidget;
   QGLWidget uiGlWidget;
-  UiToggle uiToggle;
   ForwardingGraphicsView uiView;
   QGraphicsScene uiScene;
   GlslEditor shaderTextWidget;
@@ -736,9 +638,13 @@ class ShadertoyApp : public QApplication {
   QGraphicsProxyWidget * uiEditDialog;
   QGraphicsProxyWidget * uiChannelDialog;
   QGraphicsProxyWidget * uiLoadDialog;
+  TaskQueueWrapper tasks;
 
+  QPixmap currentWindowImage;
+  QPixmap currentWindowWithMouseImage;
+  float texRes = 1.0;
 
-  int activeChannelIndex = 0;
+  int activeChannelIndex{ 0 };
 
   void setUiState(UiState state) {
     uiChannelDialog->hide();
@@ -757,7 +663,6 @@ class ShadertoyApp : public QApplication {
       break;
     }
   }
-
 
   void setupShaderEditor() {
     initIconCache();
@@ -853,6 +758,62 @@ class ShadertoyApp : public QApplication {
       shaderEditor.layout()->addWidget(pEditColumn);
     }
     uiEditDialog = uiScene.addWidget(&shaderEditor);
+  }
+
+  bool eventFilter(QObject *object, QEvent *event) {
+    if (event->type() == QEvent::KeyPress) {
+      QKeyEvent * ke = (QKeyEvent*)event;
+      int key = ke->key();
+
+      ovrHSWDisplayState hswState;
+      ovrHmd_GetHSWDisplayState(riftRenderWidget.getHmd(), &hswState);
+      if (hswState.Displayed) {
+        ovrHmd_DismissHSWDisplay(riftRenderWidget.getHmd());
+        return true;
+      }
+
+      if (Qt::Key_Q == ke->key() && Qt::ControlModifier == ke->modifiers()) {
+        QApplication::instance()->quit();
+        return true;
+      }
+
+      if (Qt::Key_Escape == ke->key() || Qt::Key_F1 == ke->key()) {
+        uiVisible = !uiVisible;
+        toggleUi(uiVisible);
+        return true;
+      }
+
+      switch (key) {
+      case Qt::Key_F2:
+        ovrHmd_RecenterPose(riftRenderWidget.getHmd());
+        return true;
+      case Qt::Key_F4:
+        emit shaderSourceChanged(shaderTextWidget.toPlainText());
+        return true;
+      case Qt::Key_F5:
+        texRes = std::max(texRes * INV_ROOT_2, 0.05f);
+        emit textureResolutionChanged(texRes);
+        return true;
+      case Qt::Key_F6:
+        texRes = std::max(texRes * 0.95f, 0.05f);
+        emit textureResolutionChanged(texRes);
+        return true;
+      case Qt::Key_F7:
+        texRes = std::min(texRes * 1.05f, 1.0f);
+        emit textureResolutionChanged(texRes);
+        return true;
+      case Qt::Key_F8:
+        texRes = std::min(texRes * ROOT_2, 1.0f);
+        emit textureResolutionChanged(texRes);
+        return true;
+      }
+    }
+
+
+    if (event->type() == QEvent::MouseMove) {
+      uiMouseOnlyRefresh();
+    }
+    return false;
   }
 
   void setupChannelSelector() {
@@ -964,8 +925,6 @@ class ShadertoyApp : public QApplication {
     uiLoadDialog->hide();
   }
 
-  TaskQueueWrapper tasks;
-
   void loadPreset(shadertoy::Preset & preset) {
     QString shaderString = qt::toString(preset.res);
 
@@ -1008,24 +967,18 @@ public:
     timer(this) { 
 
     // UI toggle needs to intercept keyboard events before anything else.
-    connect(&uiToggle, SIGNAL(uiToggled(bool)), this, SLOT(toggleUi(bool)));
-    connect(&uiToggle, SIGNAL(mouseMoved()), this, SLOT(uiMouseOnlyRefresh()));
-//    connect(this, SIGNAL(sourceChanged(QString)), &riftRenderWidget, SLOT(onSourceChanged(QString)));
-//    connect(this, SIGNAL(shaderLoaded(QString)), &riftRenderWidget, SLOT(onShaderLoaded(QString)));
-    riftRenderWidget.installEventFilter(&uiToggle);
+    riftRenderWidget.installEventFilter(this);
 
     // Cross connect the UI and the rendering system so that when a channel texture is changed in one
     // we reflect it in the other
-
     connect(this, &ShadertoyApp::channelTextureChanged, &riftRenderWidget, &ShadertoyRiftWidget::setChannelTexture);
     connect(this, &ShadertoyApp::shaderSourceChanged, &riftRenderWidget, &ShadertoyRiftWidget::setShaderSource);
     connect(this, &ShadertoyApp::shaderPresetLoaded, &riftRenderWidget, &ShadertoyRiftWidget::setShaderAndChannels);
-//    connect(&riftRenderWidget, &ShadertoyRiftWidget::channelTextureChanged, this, &ShadertoyApp::onChannelTextureChanged, Qt::DirectConnection);
-//    connect(&riftRenderWidget, &ShadertoyRiftWidget::channelTextureChanged, this, &ShadertoyApp::onChannelTextureChanged, Qt::DirectConnection);
-//    connect(this, &ShadertoyApp::setChannelTexture, &riftRenderWidget, &ShadertoyRiftWidget::setChannelTexture);
+    connect(this, &ShadertoyApp::textureResolutionChanged, &riftRenderWidget, &ShadertoyRiftWidget::setTextureResolution);
 
     riftRenderWidget.show();
     riftRenderWidget.startRenderThread();
+
     // We need mouse tracking because the GL window is a proxies mouse 
     // events for actual UI objects that respond to mouse move / hover
     riftRenderWidget.setMouseTracking(true);
@@ -1054,9 +1007,6 @@ public:
 
   virtual ~ShadertoyApp() {
   }
-
-  QPixmap currentWindowImage;
-  QPixmap currentWindowWithMouseImage;
 
 private slots:
 
@@ -1104,7 +1054,6 @@ private slots:
     GLuint newTexture = uiGlWidget.bindTexture(currentWindowWithMouseImage);
     if (newTexture) {
       // Is this needed?
-
       glBindTexture(GL_TEXTURE_2D, newTexture);
       GLenum err = glGetError();
       Texture::MagFilter(Texture::Target::_2D, TextureMagFilter::Nearest);
@@ -1137,79 +1086,26 @@ private slots:
 
 signals:
   void shaderSourceChanged(QString str);
+  void textureResolutionChanged(float texRes);
   void channelTextureChanged(int channelIndex, shadertoy::ChannelInputType, int index);
   void shaderPresetLoaded(QString source, shadertoy::ChannelInputType types[4], int indices[4]);
+  void uiToggled(bool newValue);
+  void mouseMoved();
 };
 
-#define RUN_QT_OVR_APP(AppClass) \
-MAIN_DECL { \
-  try { \
-    ovr_Initialize(); \
-    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "."); \
-    QT_APP_WITH_ARGS(AppClass); \
-    return app.exec(); \
-  } catch (std::exception & error) { \
-    SAY_ERR(error.what()); \
-  } catch (const std::string & error) { \
-    SAY_ERR(error.c_str()); \
-  } \
-  return -1; \
+MAIN_DECL { 
+  try { 
+    ovr_Initialize(); 
+    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "."); 
+    QT_APP_WITH_ARGS(ShadertoyApp);
+    return app.exec(); 
+  } catch (std::exception & error) { 
+    SAY_ERR(error.what()); 
+  } catch (const std::string & error) { 
+    SAY_ERR(error.c_str()); 
+  } 
+  return -1; 
 } 
-
-
-
-//static PreInit init;
-RUN_QT_OVR_APP(ShadertoyApp)
-
-
-//class MyImageProvider : public QQuickImageProvider {
-//public:
-//  MyImageProvider() : QQuickImageProvider(QQmlImageProviderBase::Image) {}
-//
-//  virtual QImage requestImage(const QString & id, QSize * size, const QSize & requestedSize) {
-//    qDebug() << "Id: " << id;
-//    Resource res = resourceFromQmlId(id);
-//    if (NO_RESOURCE == res) {
-//      qWarning() << "Unable to find resource for image ID " << id;
-//      return QQuickImageProvider::requestImage(id, size, requestedSize);
-//    }
-//    return loadImageResource(res);
-//  }
-//
-//  static Resource resourceFromQmlId(const QString & id) {
-//    static QRegExp re("(cube|tex)/(\\d+)");
-//    static const QString CUBE("cube");
-//    static const QString TEX("tex");
-//    if (!re.exactMatch(id)) {
-//      return NO_RESOURCE;
-//    }
-//    QString type = re.cap(1);
-//    int index = re.cap(2).toInt();
-//    qDebug() << "Type " << type << " Index " << index;
-//    if (CUBE == type) {
-//      return shadertoy::CUBEMAPS[index];
-//    } else if (TEX == type) {
-//      return shadertoy::TEXTURES[index];
-//    }
-//    return NO_RESOURCE;
-//  }
-//
-//  static QImage loadImageResource(Resource res) {
-//    std::vector<uint8_t> data = Platform::getResourceByteVector(res);
-//    QImage image;
-//    image.loadFromData(data.data(), data.size());
-//    return image;
-//  }
-//};
-
-//int newChannelData = ((int)type << 16);
-//newChannelData |= index;
-//emit channelChanged(newChannelData);
-//setUiState(EDIT);
-//riftRenderWidget.queueTask([&, type, index] {
-//  riftRenderWidget.setChannelInput(activeChannelIndex, type, index);
-//  riftRenderWidget.updateUniforms();
-//});
 
 #include "Example_10_Shaderfun.moc"
 

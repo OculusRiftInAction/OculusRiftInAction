@@ -156,7 +156,6 @@ void RiftApp::draw() {
   // Restore the default framebuffer
   oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
 
-  postDraw();
 #if 1
   ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
 #else

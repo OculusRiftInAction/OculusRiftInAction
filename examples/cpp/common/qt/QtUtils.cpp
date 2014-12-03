@@ -61,9 +61,12 @@ void ForwardingGraphicsView::forwardKeyEvent(QKeyEvent * event) {
 bool ForwardingGraphicsView::eventFilter(QObject *object, QEvent *event) {
   if (object == filterTarget) {
     switch (event->type()) {
+    case QEvent::MouseMove:
+      forwardMouseEvent((QMouseEvent *)event);
+      break;
+
     case QEvent::MouseButtonRelease:
     case QEvent::MouseButtonDblClick:
-    case QEvent::MouseMove:
     case QEvent::MouseButtonPress:
       forwardMouseEvent((QMouseEvent *)event);
       break;
