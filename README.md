@@ -1,7 +1,7 @@
 OculusRiftExamples
 ==================
 
-Example code for using the Oculus Rift
+Example code for using the Oculus Rift, written for the book [Oculus Rift in Action](http://oculusriftinaction.com)
 
 # Notes
 
