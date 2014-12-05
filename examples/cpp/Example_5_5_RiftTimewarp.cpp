@@ -25,7 +25,7 @@ public:
     ovrRenderAPIConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.Header.API = ovrRenderAPI_OpenGL;
-    cfg.Header.RTSize = ovr::fromGlm(getSize());
+    cfg.Header.BackBufferSize = ovr::fromGlm(getSize());
     cfg.Header.Multisample = 1;
 
     int distortionCaps =

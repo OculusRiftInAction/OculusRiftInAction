@@ -21,8 +21,10 @@
 
 typedef oglplus::Uniform<mat4> Mat4Uniform;
 typedef std::shared_ptr<oglplus::Program> ProgramPtr;
+typedef std::map<std::string, GLuint> UniformMap;
 
 namespace oria {
   ProgramPtr loadProgram(Resource vs, Resource fs);
   ProgramPtr loadProgram(const std::string & vsFile, const std::string & fsFile);
+  UniformMap getActiveUniforms(ProgramPtr & program);
 }

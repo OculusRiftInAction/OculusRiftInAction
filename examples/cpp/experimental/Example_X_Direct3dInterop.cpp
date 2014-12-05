@@ -313,7 +313,7 @@ public:
     ovrD3D11Config cfg;
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.D3D11.Header.API = ovrRenderAPI_D3D11;
-    cfg.D3D11.Header.RTSize = hmd->Resolution;
+    cfg.D3D11.Header.BackBufferSize = hmd->Resolution;
     cfg.D3D11.Header.Multisample = 1;
     cfg.D3D11.pDevice = Device;
     cfg.D3D11.pSwapChain = SwapChain;

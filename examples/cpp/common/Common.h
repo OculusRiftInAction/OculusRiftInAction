@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <cinttypes>
 #include <cmath>
@@ -30,9 +31,13 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <queue>
+#include <set>
 #include <sstream>
 #include <stack>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 //#include <boost/config.hpp>
@@ -114,24 +119,24 @@ public:
 };
 
 #include "Platform.h"
+#include "Utils.h"
 
 #include "rendering/Lights.h"
 #include "rendering/MatrixStack.h"
 #include "rendering/State.h"
 #include "rendering/Colors.h"
 #include "rendering/Vectors.h"
+#include "rendering/Interaction.h"
 
 #include "opengl/Constants.h"
 #include "opengl/Textures.h"
 #include "opengl/Shaders.h"
 #include "opengl/Framebuffer.h"
-#include "opengl/Utils.h"
+#include "opengl/GlUtils.h"
 
-#include "Interaction.h"
 
-#include "GlfwUtils.h"
-#include "GlfwApp.h"
-
+#include "glfw/GlfwUtils.h"
+#include "glfw/GlfwApp.h"
 
 #if defined(OS_WIN)
 #define OVR_OS_WIN32
@@ -144,11 +149,10 @@ public:
 #include <OVR_CAPI.h>
 #include <OVR_CAPI_GL.h>
 
-#define BackBufferSize RTSize
-#include "RiftUtils.h"
-#include "RiftRenderingApp.h"
-#include "RiftGlfwApp.h"
-#include "RiftApp.h"
+#include "ovr/OvrUtils.h"
+#include "ovr/RiftRenderingApp.h"
+#include "ovr/RiftGlfwApp.h"
+#include "ovr/RiftApp.h"
 
 #ifdef HAVE_QT
 #include "qt/QtUtils.h"

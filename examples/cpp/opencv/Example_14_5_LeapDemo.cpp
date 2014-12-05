@@ -146,7 +146,7 @@ public:
 
             mv.translate(riftCoords);
             mv.transform(leapToRiftRotation(hand.basis(), hand.isLeft()));
-            mv.scale(0.02);
+            mv.scale(0.02f);
             oria::renderGeometry(sphere, program);
           });
 

@@ -1,4 +1,3 @@
-
 #ifdef _DEBUG
 #define BRAD_DEBUG 1
 #endif
@@ -14,17 +13,7 @@
 #include <QQuickImageProvider>
 #include <QtQuickWidgets/QQuickWidget>
 
-#include <oglplus/error/basic.hpp>
-#include <oglplus/shapes/plane.hpp>
-#include <regex>
-#include <queue>
-#include <mutex>
-#include <set>
-#include <atomic>         // std::atomic
-#include <thread>
-
 #include "Shadertoy.h"
-#include "Cursor.xpm"
 
 using namespace oglplus;
 
@@ -34,13 +23,6 @@ using namespace oglplus;
 static const float ROOT_2 = sqrt(2.0f);
 static const float INV_ROOT_2 = 1.0f / ROOT_2;
 static uvec2 UI_SIZE(UI_X, UI_Y);
-
-static QImage loadImageResource(Resource res) {
-  std::vector<uint8_t> data = Platform::getResourceByteVector(res);
-  QImage image;
-  image.loadFromData(data.data(), data.size());
-  return image;
-}
 
 typedef std::map<Resource, QIcon> IconMap;
 
@@ -53,14 +35,14 @@ static void initIconCache() {
     if (NO_RESOURCE == res) {
       continue;
     }
-    iconCache[res] = QIcon(QPixmap::fromImage(loadImageResource(res).scaled(QSize(128, 128))));
+    iconCache[res] = QIcon(QPixmap::fromImage(oria::qt::loadImageResource(res).scaled(QSize(128, 128))));
   }
   for (int i = 0; i < MAX_CUBEMAPS; ++i) {
     Resource res = CUBEMAPS[i];
     if (NO_RESOURCE == res) {
       continue;
     }
-    iconCache[res] = QIcon(QPixmap::fromImage(loadImageResource(res).scaled(QSize(128, 128))));
+    iconCache[res] = QIcon(QPixmap::fromImage(oria::qt::loadImageResource(res).scaled(QSize(128, 128))));
   }
   iconCache[NO_RESOURCE] = QIcon();
 }
@@ -79,6 +61,7 @@ static QToolButton * makeImageButton(Resource res = NO_RESOURCE, const QSize & s
   button->setIconSize(size);
   return button;
 }
+
 
 void viewport(const uvec2 & size) {
   oglplus::Context::Viewport(0, 0, size.x, size.y);
@@ -104,71 +87,6 @@ std::vector<std::string> splitLines(const std::string & str) {
   return result;
 }
 
-struct RateCounter {
-  unsigned int count{ 0 };
-  float start{ -1 };
-
-  void reset() {
-    count = 0;
-    start = -1;
-  }
-
-  unsigned int getCount() const {
-    return count;
-  }
-
-  void increment() {
-    if (start < 0) {
-      start = Platform::elapsedSeconds();
-    } else {
-      ++count;
-    }
-  }
-
-  float getRate() const {
-    float elapsed = Platform::elapsedSeconds() - start;
-    return (float)count / elapsed;
-  }
-};
-
-std::map<std::string, GLuint> getActiveUniforms(ProgramPtr & program) {
-  std::map<std::string, GLuint> activeUniforms;
-  size_t uniformCount = program->ActiveUniforms().Size();
-  for (size_t i = 0; i < uniformCount; ++i) {
-    std::string name = program->ActiveUniforms().At(i).Name().c_str();
-    activeUniforms[name] = program->ActiveUniforms().At(i).Index();
-  }
-  return activeUniforms;
-}
-
-class TaskQueueWrapper {
-  typedef std::mutex Mutex;
-  typedef std::unique_lock<Mutex> Locker;
-  typedef std::function<void()> Functor;
-  typedef std::queue<Functor> TaskQueue;
-
-  TaskQueue queue;
-  Mutex mutex;
-
-public:
-  void drainTaskQueue() {
-    TaskQueue copy;
-    {
-      Locker lock(mutex);
-      std::swap(copy, queue);
-    }
-    while (!copy.empty()) {
-      copy.front()();
-      copy.pop();
-    }
-  }
-
-  void queueTask(Functor task) {
-    Locker locker(mutex);
-    queue.push(task);
-  }
-
-};
 
 struct Channel {
   TexturePtr texture;
@@ -438,7 +356,7 @@ protected:
       Resource::SHADERS_TEXTURED_FS);
     plane = oria::loadPlane(planeProgram, 1.0);
 
-    setShaderSourceInternal(qt::toString(Resource::SHADERTOY_SHADERS_DEFAULT_FS));
+    setShaderSourceInternal(oria::qt::toString(Resource::SHADERTOY_SHADERS_DEFAULT_FS));
     assert(skyboxProgram);
 
     skybox = oria::loadSkybox(skyboxProgram);
@@ -451,7 +369,7 @@ protected:
     try {
       if (!vertexShader) {
         vertexShader = VertexShaderPtr(new VertexShader());
-        vertexShader->Source(Platform::getResourceData(Resource::SHADERTOY_SHADERS_DEFAULT_VS));
+        vertexShader->Source(Platform::getResourceString(Resource::SHADERTOY_SHADERS_DEFAULT_VS));
         vertexShader->Compile();
       }
 
@@ -533,7 +451,7 @@ protected:
 
   void updateUniforms() {
     using namespace shadertoy;
-    std::map<std::string, GLuint> activeUniforms = getActiveUniforms(skyboxProgram);
+    std::map<std::string, GLuint> activeUniforms = oria::getActiveUniforms(skyboxProgram);
     skyboxProgram->Bind();
     //    UNIFORM_DATE;
     for (int i = 0; i < 4; ++i) {
@@ -881,7 +799,6 @@ class ShadertoyApp : public QApplication {
         Resource res = shadertoy::CUBEMAPS[i];
         QToolButton  * button = makeImageButton(res);
         connect(button, &QToolButton::clicked, this, [&, i, button] {
-          SAY("Emitting CHANNEL TEXTURE SET %d %d %d", activeChannelIndex, shadertoy::ChannelInputType::TEXTURE, i);
           emit channelTextureChanged(activeChannelIndex, shadertoy::ChannelInputType::CUBEMAP, i);
           setUiState(EDIT);
         });
@@ -926,7 +843,7 @@ class ShadertoyApp : public QApplication {
   }
 
   void loadPreset(shadertoy::Preset & preset) {
-    QString shaderString = qt::toString(preset.res);
+    QString shaderString = oria::qt::toString(preset.res);
 
     shaderTextWidget.setPlainText(shaderString);
 
@@ -995,7 +912,7 @@ public:
     setupLoad();
 
     shaderTextWidget.setFocus();
-    shaderTextWidget.setPlainText(qt::toString(SHADERTOY_SHADERS_DEFAULT_FS));
+    shaderTextWidget.setPlainText(oria::qt::toString(SHADERTOY_SHADERS_DEFAULT_FS));
     foreach(QGraphicsItem *item, uiScene.items()) {
       item->setFlag(QGraphicsItem::ItemIsMovable);
       item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
@@ -1027,11 +944,25 @@ private slots:
     }
   }
 
+  static QPixmap loadXpm(Resource res) {
+    QString cursorXpmStr = oria::qt::toString(res);
+    QStringList list = cursorXpmStr.split(QRegExp("\\n|\\r\\n|\\r"));
+    std::vector<QByteArray> bv;
+    std::vector<const char*> v;
+    foreach(QString line, list) {
+      bv.push_back(line.toLocal8Bit());
+      v.push_back(*bv.rbegin());
+    }
+    QPixmap result = QPixmap(&v[0]);
+    return result;
+  }
+
   void mouseRefresh() {
     QCursor cursor = riftRenderWidget.cursor();
     QPoint position = cursor.pos();
     // Fetching the cursor pixmap isn't working... 
-    static QPixmap cursorPm = QPixmap(Normal); //cursor.pixmap();
+    static QPixmap cursorPm = loadXpm(Resource::MISC_CURSOR_XPM);
+
     QPointF relative = riftRenderWidget.mapFromGlobal(position);
     relative.rx() /= riftRenderWidget.size().width();
     relative.ry() /= riftRenderWidget.size().height();
@@ -1106,6 +1037,16 @@ MAIN_DECL {
   } 
   return -1; 
 } 
+
+//#include "Cursor.xpm"
+//MAIN_DECL{
+//  using namespace std;
+//  ofstream out("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\misc\\Cursor.xpm", std::ios::binary);
+//  for (int i = 0; i < 68; ++i) {
+//    out << std::string(Normal[i]) << std::endl;
+//  }
+//  out.close();
+//}
 
 #include "Example_10_Shaderfun.moc"
 

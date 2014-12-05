@@ -62,8 +62,8 @@ namespace oria {
     if (!programs.count(key)) {
       ProgramPtr result;
       compileProgram(result,
-        Platform::getResourceData(vs),
-        Platform::getResourceData(fs));
+        Platform::getResourceString(vs),
+        Platform::getResourceString(fs));
 //      programs[key] = result;
       return result;
     }
@@ -76,6 +76,16 @@ namespace oria {
       Files::read(vsFile),
       Files::read(fsFile));
     return result;
+  }
+
+  UniformMap getActiveUniforms(ProgramPtr & program) {
+    UniformMap activeUniforms;
+    size_t uniformCount = program->ActiveUniforms().Size();
+    for (size_t i = 0; i < uniformCount; ++i) {
+      std::string name = program->ActiveUniforms().At(i).Name();
+      activeUniforms[name] = program->ActiveUniforms().At(i).Index();
+    }
+    return activeUniforms;
   }
 
 }

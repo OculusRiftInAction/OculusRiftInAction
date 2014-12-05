@@ -80,7 +80,7 @@ public:
       .MagFilter(TextureMagFilter::Linear)
       .MinFilter(TextureMinFilter::Linear);
 
-    if (parseExifData(Platform::getResourceData(Resource::MISC_PANO_20140620_160351_EXIV), fullPanoSize, croppedImageSize, croppedImagePos)) {
+    if (parseExifData(Platform::getResourceString(Resource::MISC_PANO_20140620_160351_EXIV), fullPanoSize, croppedImageSize, croppedImagePos)) {
 
       // EXIF data parsed succesfully
       uchar *embedded = (uchar*)malloc(fullPanoSize.x * fullPanoSize.y * 3);
