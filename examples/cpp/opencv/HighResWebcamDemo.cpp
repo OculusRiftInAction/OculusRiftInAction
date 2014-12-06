@@ -128,7 +128,6 @@ public:
       cv::convertMaps(map1, map2, distortionMap, map3, CV_32FC2);
     }
 
-    using namespace cv;
     videoCapture.set(CV_CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH);
     videoCapture.set(CV_CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
     videoCapture.set(CV_CAP_PROP_FPS, 60);
