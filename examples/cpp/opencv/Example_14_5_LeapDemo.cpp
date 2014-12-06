@@ -124,8 +124,8 @@ public:
     glm::vec3 riftCoords = leapToRiftPosition(finger.tipPosition());
     riftCoords = glm::vec3(latestFrame.leapPose * glm::vec4(riftCoords, 1));
     if (glm::length(riftCoords - ballCenter) <= BALL_RADIUS) {
-      ballCenter.y += (riftCoords.y - ballCenter.y) / 4;
       ballCenter.x += (riftCoords.x - ballCenter.x) / 4;
+      ballCenter.y += (riftCoords.y - ballCenter.y) / 4;
     }
   }
 
