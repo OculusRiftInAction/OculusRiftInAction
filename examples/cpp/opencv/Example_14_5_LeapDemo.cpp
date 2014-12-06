@@ -112,19 +112,21 @@ public:
       Leap::HandList hands = latestFrame.frame.hands();
       for (int iHand = 0; iHand < hands.count(); iHand++) {
         Leap::Hand hand = hands[iHand];
-        if (hand.isValid()) {
-          Leap::Finger finger = hand.fingers()[1];  // Index only
-          if (finger.isExtended()) {
-            glm::vec3 riftCoords = leapToRiftPosition(finger.tipPosition());
-            riftCoords = riftCoords + glm::vec3(0, 0, -0.070);
-            riftCoords = glm::vec3(latestFrame.leapPose * glm::vec4(riftCoords, 1));
-            if (glm::length(riftCoords - ballCenter) <= BALL_RADIUS) {
-              ballCenter.y += (riftCoords.y - ballCenter.y) / 4;
-              ballCenter.x += (riftCoords.x - ballCenter.x) / 4;
-            }
-          }
+        Leap::Finger finger = hand.fingers()[1];  // Index only
+        if (hand.isValid() && finger.isExtended()) {
+          moveBall(finger);
         }
       }
+    }
+  }
+
+  void moveBall(Leap::Finger finger) {
+    glm::vec3 riftCoords = leapToRiftPosition(finger.tipPosition());
+    riftCoords = riftCoords + glm::vec3(0, 0, -0.070);
+    riftCoords = glm::vec3(latestFrame.leapPose * glm::vec4(riftCoords, 1));
+    if (glm::length(riftCoords - ballCenter) <= BALL_RADIUS) {
+      ballCenter.y += (riftCoords.y - ballCenter.y) / 4;
+      ballCenter.x += (riftCoords.x - ballCenter.x) / 4;
     }
   }
 
@@ -152,7 +154,7 @@ public:
   }
 
   void drawHand(const Leap::Hand & hand) {
-    drawSphere(leapToRiftPosition(hand.wristPosition()), 0.02);
+    drawSphere(leapToRiftPosition(hand.wristPosition()), 0.02f);
     for (int f = 0; f < hand.fingers().count(); f++) {
       Leap::Finger finger = hand.fingers()[f];
       if (finger.isValid()) {
