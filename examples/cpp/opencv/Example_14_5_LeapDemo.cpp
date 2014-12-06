@@ -122,7 +122,6 @@ public:
 
   void moveBall(Leap::Finger finger) {
     glm::vec3 riftCoords = leapToRiftPosition(finger.tipPosition());
-    riftCoords = riftCoords + glm::vec3(0, 0, -0.070);
     riftCoords = glm::vec3(latestFrame.leapPose * glm::vec4(riftCoords, 1));
     if (glm::length(riftCoords - ballCenter) <= BALL_RADIUS) {
       ballCenter.y += (riftCoords.y - ballCenter.y) / 4;
@@ -137,7 +136,6 @@ public:
 
     mv.withPush([&]{
       mv.transform(latestFrame.leapPose);
-      mv.translate(glm::vec3(0, 0, -0.070));
 
       Leap::HandList hands = latestFrame.frame.hands();
       for (int iHand = 0; iHand < hands.count(); iHand++) {
@@ -200,7 +198,7 @@ public:
   }
 
   glm::vec3 leapToRiftPosition(Leap::Vector & vec) {
-    return leapToRift(vec) / 1000.0f;
+    return leapToRift(vec) / 1000.0f + glm::vec3(0, 0, -0.070);
   }
 };
 
