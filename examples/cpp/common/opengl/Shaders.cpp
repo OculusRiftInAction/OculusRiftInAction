@@ -64,7 +64,16 @@ namespace oria {
       compileProgram(result,
         Platform::getResourceString(vs),
         Platform::getResourceString(fs));
-//      programs[key] = result;
+      // FIXME
+      // Caching shaders is problematic, since it requires you to set ALL 
+      // uniforms any time you use the shader, because you don't know if you're 
+      // sharing the shader instance with something else in the program which 
+      // is using the same shader for a different purpose, and with different 
+      // uniforms.
+      // Need to decide if it's better policy to cache shaders and expect full uniform 
+      // initialization every time we use them or to prevent shader caching.  
+      // For now it's disabled.  
+      // programs[key] = result;
       return result;
     }
     return programs[key];
