@@ -77,12 +77,12 @@ public:
 };
 
 class LeapApp : public RiftApp {
+
   const float BALL_RADIUS = 0.05f;
 
 protected:
 
   LeapHandler     captureHandler;
-  //ShapeWrapperPtr cube;
   ShapeWrapperPtr sphere;
   ProgramPtr      program;
 
@@ -111,19 +111,20 @@ public:
       Leap::HandList hands = latestFrame.frame.hands();
       for (int iHand = 0; iHand < hands.count(); iHand++) {
         Leap::Hand hand = hands[iHand];
-        if (hand.isValid()) {
-          Leap::Finger finger = hand.fingers()[1];  // Index only
-          if (finger.isExtended()) {
-            glm::vec3 riftCoords = leapToRiftPosition(finger.tipPosition());
-            riftCoords = riftCoords + glm::vec3(0, 0, -0.070);
-            riftCoords = glm::vec3(latestFrame.leapPose * glm::vec4(riftCoords, 1));
-            if (glm::length(riftCoords - ballCenter) <= BALL_RADIUS) {
-              ballCenter.y += (riftCoords.y - ballCenter.y) / 4;
-              ballCenter.x += (riftCoords.x - ballCenter.x) / 4;
-            }
-          }
+        Leap::Finger finger = hand.fingers()[1];  // Index only
+        if (hand.isValid() && finger.isExtended()) {
+          moveBall(finger);
         }
       }
+    }
+  }
+
+  void moveBall(Leap::Finger finger) {
+    glm::vec3 riftCoords = leapToRiftPosition(finger.tipPosition());
+    riftCoords = glm::vec3(latestFrame.leapPose * glm::vec4(riftCoords, 1));
+    if (glm::length(riftCoords - ballCenter) <= BALL_RADIUS) {
+      ballCenter.x += (riftCoords.x - ballCenter.x) / 4;
+      ballCenter.y += (riftCoords.y - ballCenter.y) / 4;
     }
   }
 
@@ -134,76 +135,69 @@ public:
 
     mv.withPush([&]{
       mv.transform(latestFrame.leapPose);
-      mv.translate(glm::vec3(0, 0, -0.070));
 
       Leap::HandList hands = latestFrame.frame.hands();
       for (int iHand = 0; iHand < hands.count(); iHand++) {
         Leap::Hand hand = hands[iHand];
         if (hand.isValid()) {
-          mv.withPush([&] {
-            glm::vec3 riftCoords = leapToRiftPosition(hand.wristPosition());
-
-            mv.translate(riftCoords);
-            mv.transform(leapToRiftRotation(hand.basis(), hand.isLeft()));
-            mv.scale(0.02f);
-            oria::renderGeometry(sphere, program);
-          });
-
-          Leap::Matrix handTransform = hand.basis();
-          handTransform.origin = hand.palmPosition();
-          handTransform = handTransform.rigidInverse();
-
-          for (int f = 0; f < hand.fingers().count(); f++) {
-            Leap::Finger finger = hand.fingers()[f];
-            if (finger.isValid()) {
-              for (int b = 0; b < 4; b++) {
-                mv.withPush([&] {
-                  Leap::Bone bone = finger.bone((Leap::Bone::Type) b);
-                  glm::vec3 riftCoords = leapToRiftPosition(bone.center());
-                  float length = bone.length() / 1000;
-
-                  mv.translate(riftCoords);
-                  mv.transform(leapToRiftRotation(bone.basis(), hand.isLeft()));
-                  mv.scale(glm::vec3(0.01, 0.01, length));
-                  oria::renderColorCube();
-                });
-              }
-            }
-          }
+          drawHand(hand);
         }
       }
     });
 
     //GlUtils::draw3dLine(glm::vec3(ballCenter.x, -1000, ballCenter.z), glm::vec3(ballCenter.x, 1000, ballCenter.z));
     //GlUtils::draw3dLine(glm::vec3(-1000, ballCenter.y, ballCenter.z), glm::vec3(1000, ballCenter.y, ballCenter.z));
+    drawSphere(ballCenter, BALL_RADIUS);
+  }
+
+  void drawHand(const Leap::Hand & hand) {
+    drawSphere(leapToRiftPosition(hand.wristPosition()), 0.02f);
+    for (int f = 0; f < hand.fingers().count(); f++) {
+      Leap::Finger finger = hand.fingers()[f];
+      if (finger.isValid()) {
+        drawFinger(finger, hand.isLeft());
+      }
+    }
+  }
+
+  void drawFinger(const Leap::Finger & finger, bool isLeft) {
+    MatrixStack & mv = Stacks::modelview();
+    for (int b = 0; b < 4; b++) {
+      mv.withPush([&] {
+        Leap::Bone bone = finger.bone((Leap::Bone::Type) b);
+        glm::vec3 riftCoords = leapToRiftPosition(bone.center());
+        float length = bone.length() / 1000;
+
+        mv.translate(riftCoords);
+        mv.transform(leapBasisToRiftBasis(bone.basis(), isLeft));
+        mv.scale(glm::vec3(0.01, 0.01, length));
+        oria::renderColorCube();
+      });
+    }
+  }
+
+  void drawSphere(glm::vec3 & pos, float radius) {
+    MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
-      mv.translate(ballCenter);
-      mv.scale(BALL_RADIUS);
+      mv.translate(pos);
+      mv.scale(radius);
       oria::renderGeometry(sphere, program);
     });
   }
 
-  glm::mat4 leapToRiftRotation(Leap::Matrix & mat, bool isLeft) {
-    glm::vec3 x = glm::normalize(leapToRiftDirection(mat.transformDirection(Leap::Vector(isLeft ? -1 : 1, 0, 0))));
-    glm::vec3 y = glm::normalize(leapToRiftDirection(mat.transformDirection(Leap::Vector(0, 1, 0))));
-    glm::vec3 z = glm::normalize(leapToRiftDirection(mat.transformDirection(Leap::Vector(0, 0, 1))));
-    return glm::mat4x4(
-      x.x, x.y, x.z, 0,
-      y.x, y.y, y.z, 0,
-      z.x, z.y, z.z, 0,
-      0, 0, 0, 1);
+  glm::mat4 leapBasisToRiftBasis(Leap::Matrix & mat, bool isLeft) {
+    glm::vec3 x = leapToRift(mat.transformDirection(Leap::Vector(isLeft ? -1 : 1, 0, 0)));
+    glm::vec3 y = leapToRift(mat.transformDirection(Leap::Vector(0, 1, 0)));
+    glm::vec3 z = leapToRift(mat.transformDirection(Leap::Vector(0, 0, 1)));
+    return glm::mat4x4(glm::mat3x3(x, y, z));
   }
 
-  glm::vec3 leapToRiftDirection(Leap::Vector & vec) {
-    static glm::mat3 pivotFromHorizontalToVertical(
-      1.0,  0.0, 0.0,
-      0.0,  0.0, 1.0,
-      0.0, -1.0, 0.0);
-    return pivotFromHorizontalToVertical * glm::vec3(-vec.x, -vec.y, vec.z);
+  glm::vec3 leapToRift(Leap::Vector & vec) {
+    return glm::vec3(-vec.x, -vec.z, -vec.y);
   }
 
   glm::vec3 leapToRiftPosition(Leap::Vector & vec) {
-    return glm::vec3(-vec.x / 1000.0, -vec.z / 1000.0, -vec.y / 1000.0);
+    return leapToRift(vec) / 1000.0f + glm::vec3(0, 0, -0.070);
   }
 };
 
