@@ -18,7 +18,6 @@
  ************************************************************************************/
 
 #include "Common.h"
-#include "Files.h"
 
 namespace oria {
 
@@ -82,8 +81,8 @@ namespace oria {
   ProgramPtr loadProgram(const std::string & vsFile, const std::string & fsFile) {
     ProgramPtr result;
     compileProgram(result,
-      Files::read(vsFile),
-      Files::read(fsFile));
+      oria::readFile(vsFile),
+      oria::readFile(fsFile));
     return result;
   }
 

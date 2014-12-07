@@ -1,5 +1,9 @@
 #pragma once
 
+namespace oria {
+  std::string readFile(const std::string & filename);
+}
+
 class TaskQueueWrapper {
   typedef std::mutex Mutex;
   typedef std::unique_lock<Mutex> Locker;

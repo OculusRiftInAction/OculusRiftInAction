@@ -85,9 +85,9 @@ inline float aspect(const glm::vec2 & v) {
 
 
 #include <GLFW/glfw3.h>
-// For some interaction with the Oculus SDK we'll need the native 
-// window handle
-
+// For some interaction with the Oculus SDK we'll need the native window 
+// handle from GLFW.  To get it we need to define a couple of macros 
+// (that depend on OS) and include an additional header 
 #if defined(OS_WIN)
 #define GLFW_EXPOSE_NATIVE_WIN32
 #define GLFW_EXPOSE_NATIVE_WGL

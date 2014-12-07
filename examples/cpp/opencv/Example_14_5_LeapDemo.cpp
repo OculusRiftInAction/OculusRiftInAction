@@ -104,7 +104,6 @@ public:
     RiftApp::initGl();
     program = oria::loadProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
     sphere = oria::loadSphere({"Position", "Normal"}, program);
-    ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
   }
 
   virtual void update() {

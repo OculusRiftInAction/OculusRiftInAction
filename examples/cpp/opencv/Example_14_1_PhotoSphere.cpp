@@ -144,7 +144,7 @@ public:
     // Extract XMP data from image, write to temp file
     std::string command = pathToExiv2 + " " + exiv2Params + " " + pathToImage + " > " + tempFile;
     system(command.c_str());
-    std::string exifData = Platform::readFile(tempFile);
+    std::string exifData = oria::readFile(tempFile);
     if (parseExifData(exifData, fullPanoSize, croppedImageSize, croppedImagePos)) {
       remove(tempFile.c_str());
       return true;
