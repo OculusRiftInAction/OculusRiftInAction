@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdio.h>
 
+#if 0
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -558,3 +559,8 @@ bool runCalibrationAndSave(Settings& s, Size imageSize, Mat&  cameraMatrix, Mat&
     imagePoints, totalAvgErr);
   return ok;
 }
+#else
+MAIN_DECL {
+  return 0;
+}
+#endif

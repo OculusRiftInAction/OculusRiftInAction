@@ -13,15 +13,6 @@ void rasterise(vec3 vs[3], vv3 & out) {
 }
 
 
-uvec2 mapNdcToPixel(const vec3 & v, const uvec2 & res) {
-  vec2(v.x, v.y)
-}
-
-uvec2 mapNdcToPixel(const vec3 & v, const uvec2 & res) {
-  vec2(v.x, v.y)
-}
-
-
 struct RasterizerExample : public GlfwApp {
   ProgramPtr program;
   ShapeWrapperPtr shape;
@@ -89,11 +80,43 @@ struct RasterizerExample : public GlfwApp {
   virtual void draw() {
     Context::Clear().ColorBuffer().DepthBuffer();
     oria::renderGeometry(shape, program, { [&]{
-      glActiveTexture(GL_TEXTURE0);
+//      glActiveTexture(GL_TEXTURE0);
       tex->Bind(Texture::Target::_2D);
     } });
   }
 };
 
-RUN_APP(RasterizerExample);
+//RUN_APP(RasterizerExample);
+
+struct __declspec(align(64)) Foo {
+  int a;
+  int b;
+//  uint64_t c;
+};
+
+MAIN_DECL{
+  using namespace std;
+  SAY("%d", offsetof(Foo, a));
+  SAY("%d", offsetof(Foo, b));
+//  SAY("%d", offsetof(Foo, c));
+
+  //SAY("%d", sizeof(ovrRenderAPIType));
+  //SAY("%d", sizeof(ovrSizei));
+  //SAY("%d", sizeof(ovrRecti));
+  //SAY("%d", sizeof(uint32_t));
+  //SAY("%d", offsetof(ovrTextureHeader, API));
+  //SAY("%d", offsetof(ovrTextureHeader, TextureSize));
+  //SAY("%d", offsetof(ovrTextureHeader, RenderViewport));
+  //SAY("%d", offsetof(ovrTextureHeader, _PAD0_));
+  //ovrRenderAPIType API;
+  //ovrSizei         TextureSize;
+  //ovrRecti         RenderViewport;  // Pixel viewport in texture that holds eye image.
+  //uint32_t         _PAD0_;
+
+  //SAY("%d", sizeof(ovrTexture));
+  //SAY("%d", sizeof(ovrTextureHeader));
+  //SAY("%d", offsetof(ovrTexture, PlatformData));
+  //SAY("%d", sizeof(ovrGLTextureData));
+  //SAY("%d", offsetof(ovrGLTextureData, TexId));
+}
 

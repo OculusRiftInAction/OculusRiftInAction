@@ -20,7 +20,6 @@ namespace shadertoy {
     "iChannel3",
   };
 
-
   const char * SHADER_HEADER = "#version 330\n"
     "uniform vec3      iResolution;           // viewport resolution (in pixels)\n"
     "uniform float     iGlobalTime;           // shader playback time (in seconds)\n"

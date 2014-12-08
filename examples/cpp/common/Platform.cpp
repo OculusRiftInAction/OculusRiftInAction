@@ -91,7 +91,7 @@ void Platform::say(std::ostream & out, const char * message, ...) {
   out << std::string(SAY_BUFFER) << std::endl;
 }
 
-std::string Platform::getResourceData(Resource resource) {
+std::string Platform::getResourceString(Resource resource) {
   size_t size = Resources::getResourceSize(resource);
   char * data = new char[size];
   Resources::getResourceData(resource, data);
@@ -109,7 +109,7 @@ std::vector<uint8_t> Platform::getResourceByteVector(Resource resource) {
 }
 
 std::stringstream Platform::getResourceStream(Resource resource) {
-  return std::stringstream(Platform::getResourceData(resource));
+  return std::stringstream(Platform::getResourceString(resource));
 }
 
 

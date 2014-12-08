@@ -39,7 +39,6 @@ protected:
   virtual void finishFrame();
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw() final;
-  virtual void postDraw() {};
   virtual void update();
   virtual void renderScene() = 0;
 

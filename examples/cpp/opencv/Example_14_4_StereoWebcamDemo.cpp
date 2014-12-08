@@ -36,7 +36,7 @@ public:
       FAIL("Could not open video source from webcam %i", which);
     }
     for (int i = 0; i < 10 && !videoCapture.read(frame.image); i++) {
-      Sleep(10);
+      Platform::sleepMillis(10);
     }
     if (!videoCapture.read(frame.image)) {
       FAIL("Could not open get first frame from webcam %i", which);
@@ -45,7 +45,7 @@ public:
     captureThread = std::thread(&WebcamHandler::captureLoop, this);
 
     // Snooze for 200 ms to get past multithreading issues in OpenCV
-    Sleep(200);
+    Platform::sleepMillis(200);
     return aspectRatio;
   }
 

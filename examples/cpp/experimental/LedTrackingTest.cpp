@@ -1,4 +1,5 @@
 #include "Common.h"
+#if 0
 #include <opencv2/opencv.hpp>
 using namespace cv;
 
@@ -283,3 +284,8 @@ public:
 };
 
 RUN_APP(LedTracking);
+#else 
+MAIN_DECL {
+  return 0;
+}
+#endif

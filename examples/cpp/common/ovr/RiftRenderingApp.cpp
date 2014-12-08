@@ -10,7 +10,7 @@ void RiftRenderingApp::initGl() {
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize = ovr::fromGlm(hmdNativeResolution);
+    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(hmdNativeResolution);
     cfg.OGL.Header.Multisample = 1;
     ON_WINDOWS([&]{
       cfg.OGL.Window = (HWND)getRenderWindow();

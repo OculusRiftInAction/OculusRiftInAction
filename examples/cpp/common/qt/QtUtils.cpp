@@ -1,7 +1,27 @@
+/************************************************************************************
+
+ Authors     :   Bradley Austin Davis <bdavis@saintandreas.org>
+ Copyright   :   Copyright Brad Davis. All Rights reserved.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+
+ ************************************************************************************/
+
 #include "Common.h"
-#include "QtUtils.h"
+#include "Qt/QtUtils.h"
 
 #include <QDomDocument>
+
 ForwardingGraphicsView::ForwardingGraphicsView(QWidget * filterTarget)  {
   if (filterTarget) {
     install(filterTarget);
@@ -42,9 +62,9 @@ void ForwardingGraphicsView::resizeEvent(QResizeEvent *event) {
 
 void ForwardingGraphicsView::forwardMouseEvent(QMouseEvent * event) {
   // Translate the incoming coordinates to the target window coordinates
-  vec2 scaleFactor = qt::toGlm(size()) / qt::toGlm(filterTarget->size());
-  vec2 sourceHit = qt::toGlm(event->localPos());
-  QPointF targetHit = qt::pointFromGlm(sourceHit * scaleFactor);
+  vec2 scaleFactor = oria::qt::toGlm(size()) / oria::qt::toGlm(filterTarget->size());
+  vec2 sourceHit = oria::qt::toGlm(event->localPos());
+  QPointF targetHit = oria::qt::pointFromGlm(sourceHit * scaleFactor);
   QPointF screenHit = mapToGlobal(targetHit.toPoint());
   
   // Build a new event
@@ -61,9 +81,12 @@ void ForwardingGraphicsView::forwardKeyEvent(QKeyEvent * event) {
 bool ForwardingGraphicsView::eventFilter(QObject *object, QEvent *event) {
   if (object == filterTarget) {
     switch (event->type()) {
+    case QEvent::MouseMove:
+      forwardMouseEvent((QMouseEvent *)event);
+      break;
+
     case QEvent::MouseButtonRelease:
     case QEvent::MouseButtonDblClick:
-    case QEvent::MouseMove:
     case QEvent::MouseButtonPress:
       forwardMouseEvent((QMouseEvent *)event);
       break;
@@ -99,7 +122,6 @@ void for_each_node(const QDomNodeList & list, F f) {
   }
 }
 
-
 static Map createGlslMap() {
   using namespace std;
   Map listMap;
@@ -117,7 +139,6 @@ static Map createGlslMap() {
       for_each_node(child.childNodes(), [&](QDomNode item) {
         if (QString("item") == item.nodeName()) {
           QString nodeValue = item.firstChild().nodeValue();
-
           l.push_back(item.firstChild().nodeValue());
         }
       });

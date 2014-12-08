@@ -60,7 +60,7 @@ void RiftApp::initGl() {
   ovrGLConfig cfg;
   memset(&cfg, 0, sizeof(cfg));
   cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-  cfg.OGL.Header.RTSize = ovr::fromGlm(getSize());
+  cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
   cfg.OGL.Header.Multisample = 1;
 
   int distortionCaps =
@@ -96,7 +96,18 @@ void RiftApp::initGl() {
 }
 
 void RiftApp::onKey(int key, int scancode, int action, int mods) {
-  ovrhmd_EnableHSWDisplaySDKRender(hmd, false);
+  static bool dismissedHsw = false;
+
+  if (!dismissedHsw) {
+    ovrHSWDisplayState hswDisplayState;
+    ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
+    if (hswDisplayState.Displayed) {
+      ovrHmd_DismissHSWDisplay(hmd);
+      return;
+    } else {
+      dismissedHsw = true;
+    }
+  }
   if (GLFW_PRESS == action) switch (key) {
   case GLFW_KEY_R:
     ovrHmd_RecenterPose(hmd);
@@ -156,7 +167,6 @@ void RiftApp::draw() {
   // Restore the default framebuffer
   oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
 
-  postDraw();
 #if 1
   ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
 #else

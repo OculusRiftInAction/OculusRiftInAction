@@ -145,7 +145,7 @@ namespace oglplus {
         ) {
 
         CTMimporter importer;
-        importer.LoadData(Platform::getResourceData(resource));
+        importer.LoadData(Platform::getResourceString(resource));
         int vertexCount = importer.GetInteger(CTM_VERTEX_COUNT);
         {
           const float * ctmData = importer.GetFloatArray(CTM_VERTICES);
@@ -325,7 +325,7 @@ namespace oria {
   Text::FontPtr getFont(Resource fontName) {
     static std::map<Resource, Text::FontPtr> fonts;
     if (fonts.find(fontName) == fonts.end()) {
-      std::string fontData = Platform::getResourceData(fontName);
+      std::string fontData = Platform::getResourceString(fontName);
       Text::FontPtr result(new Text::Font());
       result->read((const void*)fontData.data(), fontData.size());
       fonts[fontName] = result;
@@ -690,7 +690,6 @@ namespace oria {
     using namespace oglplus;
     return ShapeWrapperPtr(new shapes::ShapeWrapper(names, shapes::Sphere(), *program));
   }
-
 
 }
 

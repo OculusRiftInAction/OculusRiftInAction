@@ -1,6 +1,6 @@
 #include "Common.h"
 #include "Shadertoy.h"
-#include "GlslEditor.h"
+#include "Qt/GlslEditor.h"
 
 using namespace oglplus;
 

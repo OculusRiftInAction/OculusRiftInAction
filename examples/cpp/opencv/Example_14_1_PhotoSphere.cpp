@@ -80,7 +80,7 @@ public:
       .MagFilter(TextureMagFilter::Linear)
       .MinFilter(TextureMinFilter::Linear);
 
-    if (parseExifData(Platform::getResourceData(Resource::MISC_PANO_20140620_160351_EXIV), fullPanoSize, croppedImageSize, croppedImagePos)) {
+    if (parseExifData(Platform::getResourceString(Resource::MISC_PANO_20140620_160351_EXIV), fullPanoSize, croppedImageSize, croppedImagePos)) {
 
       // EXIF data parsed succesfully
       uchar *embedded = (uchar*)malloc(fullPanoSize.x * fullPanoSize.y * 3);
@@ -144,7 +144,7 @@ public:
     // Extract XMP data from image, write to temp file
     std::string command = pathToExiv2 + " " + exiv2Params + " " + pathToImage + " > " + tempFile;
     system(command.c_str());
-    std::string exifData = Platform::readFile(tempFile);
+    std::string exifData = oria::readFile(tempFile);
     if (parseExifData(exifData, fullPanoSize, croppedImageSize, croppedImagePos)) {
       remove(tempFile.c_str());
       return true;
