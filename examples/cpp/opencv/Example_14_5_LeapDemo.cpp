@@ -181,7 +181,9 @@ public:
     mv.withPush([&]{
       mv.translate(pos);
       mv.scale(radius);
-      oria::renderGeometry(sphere, program);
+      oria::renderGeometry(sphere, program, { [&] {
+        oria::bindLights(program);
+      } });
     });
   }
 

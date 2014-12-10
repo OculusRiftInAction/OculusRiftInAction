@@ -398,8 +398,8 @@ namespace oria {
     oglplus::NoVertexArray().Bind();
   }
 
-  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::list<std::function<void()>> & list) {
-    renderGeometryWithLambdas(shape, program, list.begin(), list.end());
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::function<void()> list) {
+    renderGeometry(shape, program, { list } );
   }
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list) {
@@ -407,7 +407,8 @@ namespace oria {
   }
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program) {
-    renderGeometry(shape, program, {});
+    static const std::list<std::function<void()>> EMPTY_LIST;
+    renderGeometryWithLambdas(shape, program, EMPTY_LIST.begin(), EMPTY_LIST.end());
   }
 
 
@@ -523,9 +524,9 @@ namespace oria {
     MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.scale(vec3(SIZE));
-      renderGeometry(shape, program, { [&]{
+      renderGeometry(shape, program, [&]{
         oglplus::Uniform<vec2>(*program, "UvMultiplier").Set(vec2(SIZE * 2.0f));
-      } });
+      });
     });
 
     DefaultTexture().Bind(TextureTarget::_2D);
@@ -555,9 +556,9 @@ namespace oria {
     }
 
 
-    renderGeometry(shape, program, { [&]{
+    renderGeometry(shape, program, [&]{
       bindLights(program);
-    } });
+    });
   }
 
   void renderRift() {
@@ -577,9 +578,9 @@ namespace oria {
     auto & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.rotate(-HALF_PI - 0.22f, Vectors::X_AXIS).scale(0.5f);
-      renderGeometry(shape, program, { [&]{
+      renderGeometry(shape, program, [&] {
         oria::bindLights(program);
-      } });
+      });
     });
   }
 
@@ -610,10 +611,10 @@ namespace oria {
 
     auto & mv = Stacks::modelview();
     mv.withPush([&]{
-      renderGeometry(shape, program, { [&]{
+      renderGeometry(shape, program, [&]{
         Uniform<float>(*program, "ForceAlpha").Set(alpha);
         oria::bindLights(program);
-      } });
+      });
     });
 
   }

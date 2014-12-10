@@ -52,6 +52,12 @@ public:
   }
 
   virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    /*
+    * In the Direct3D examples in the Oculus SDK, they make the point that the
+    * onscreen window size does not need to match the Rift resolution.  However
+    * This doesn't currently work in OpenGL, so we have to create the window at
+    * the full resolution of the BackBufferSize
+    */
     return ovr::createRiftRenderingWindow(hmd, outSize, outPosition);
   }
 
@@ -77,17 +83,17 @@ public:
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.Multisample = 1;
+    /*
+    * In the Direct3D examples in the Oculus SDK, they make the point that the
+    * onscreen window size does not need to match the Rift resolution.  However
+    * This doesn't currently work in OpenGL, so we have to create the window at
+    * the full resolution of the Rift and ensure that we use the same
+    * size here when setting the BackBufferSize
+    */
     cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
-
-    // FIXME Doesn't work as expected in OpenGL
-    //if (0 == (ovrHmd_GetEnabledCaps(hmd) & ovrHmdCap_ExtendDesktop)) {
-    //  cfg.OGL.Header.BackBufferSize.w /= 4;
-    //  cfg.OGL.Header.BackBufferSize.h /= 4;
-    //}
 
     ON_LINUX([&]{
       cfg.OGL.Disp = glfwGetX11Display();
-      cfg.OGL.Win = glfwGetX11Window(window);
     });
 
     int distortionCaps =
