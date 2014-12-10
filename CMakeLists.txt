@@ -104,7 +104,9 @@ if (OpenCV_FOUND)
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
+    message(STATUS "Found OpenCV")
 else()
+    message(STATUS "No OpenCV found")
     # Without OpenCV, we have to fall back on libpng
     # which requires zlib.  For windows and OSX we
     # build the library.  For Unix systems we locate 
@@ -152,29 +154,27 @@ list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 #
 # Qt is optional, but required to build the chapter 10 examples
 
-# set(Qt5_DIR $ENV{QT5_ROOT}/lib/cmake/Qt5)
+set(QT_COMPONENTS Core Widgets Gui QuickWidgets OpenGL Xml)
 
 # Qt emits a ton of warnings which we're not interested in
 if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
     set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
 endif()
-   
-foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
-    find_package(${lib} QUIET)
-    if (${lib}_FOUND) 
-        include_directories(${${lib}_INCLUDE_DIRS})
-        list(APPEND EXAMPLE_LIBS ${${lib}_LIBRARIES})
-        add_definitions(${${lib}_DEFINITIONS})
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${lib}_EXECUTABLE_COMPILE_FLAGS}")
-    endif()
-endforeach(lib)
 
-if (Qt5Core_FOUND)
-    message(STATUS "Found Qt framework") 
+find_package(Qt5 REQUIRED ${QT_COMPONENTS})
+if (Qt5_FOUND)
+    message(STATUS "Found QT")
     set(HAVE_QT 1)
     set(CMAKE_INCLUDE_CURRENT_DIR ON)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
+	foreach(qtc ${QT_COMPONENTS})
+    	list(APPEND EXAMPLE_LIBS ${Qt5${qtc}_LIBRARIES})
+        add_definitions(${Qt5${qtc}_DEFINITIONS})
+        include_directories(${Qt5${qtc}_INCLUDE_DIRS})
+	endforeach()
+else()
+    message(STATUS "Qt framework not found") 
 endif()
 
 
@@ -262,9 +262,9 @@ else()
 endif()
 
 if (Qt5_FOUND)
-    foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
-        include_directories(${${lib}_INCLUDE_DIRS})
-    endforeach(lib)
+	foreach(qtc ${QT_COMPONENTS})
+        include_directories(${Qt5${qtc}_INCLUDE_DIRS})
+	endforeach()
 endif()
 
 ###############################################################################
