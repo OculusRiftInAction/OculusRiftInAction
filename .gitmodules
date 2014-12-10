@@ -13,9 +13,6 @@
 [submodule "libraries/zlib"]
 	path = libraries/zlib
 	url = https://github.com/jherico/zlib.git
-[submodule "libraries/gl"]
-	path = libraries/gl
-	url = https://github.com/jherico/gl.git
 [submodule "resources"]
 	path = resources
 	url = https://github.com/OculusRiftInAction/OculusRiftInActionResources.git
