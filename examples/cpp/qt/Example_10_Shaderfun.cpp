@@ -194,9 +194,23 @@ class ShadertoyRiftWidget : public QRiftWidget {
   }
 
   void run() {
+    eyePerFrameMode = true;
+    context()->makeCurrent();
     glewExperimental = true;
     glewInit();
-    context()->makeCurrent();
+    
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    GLuint unusedIds = 0;
+    if (glDebugMessageCallback) {
+      glDebugMessageCallback(oria::debugCallback, this);
+      glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
+                            0, &unusedIds, true);
+    }
+    else if (glDebugMessageCallbackARB) {
+      glDebugMessageCallbackARB(oria::debugCallback, this);
+      glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
+                               0, &unusedIds, true);
+    }
     setupRiftRendering();
     initTextureCache();
 
@@ -252,6 +266,11 @@ public:
     return hmd;
   }
 protected:
+  
+  void enterEvent ( QEvent * event ) {
+    qApp->setOverrideCursor( QCursor( Qt::BlankCursor ) );
+  }
+
   vec2 textureSize() {
     return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
   }
@@ -281,7 +300,6 @@ protected:
   }
 
   void renderScene() {
-    glGetError();
     viewport(textureSize());
     Context::Disable(Capability::Blend);
     Context::Disable(Capability::ScissorTest);
@@ -385,7 +403,8 @@ protected:
       FragmentShaderPtr newFragmentShader(new FragmentShader());
       source.replace(QRegExp("\\bgl_FragColor\\b"), "FragColor").replace(QRegExp("\\btexture2D\\b"), "texture");
       source.insert(0, header);
-      newFragmentShader->Source(GLSLSource(source.toLocal8Bit().data()));
+      StrCRef src((GLchar*)source.toLocal8Bit().data());
+      newFragmentShader->Source(GLSLSource(src));
       newFragmentShader->Compile();
       ProgramPtr result(new Program());
       result->AttachShader(*vertexShader);
@@ -561,6 +580,7 @@ class ShadertoyApp : public QApplication {
   QPixmap currentWindowImage;
   QPixmap currentWindowWithMouseImage;
   float texRes = 1.0;
+  int activePresetIndex{0};
 
   int activeChannelIndex{ 0 };
 
@@ -724,6 +744,12 @@ class ShadertoyApp : public QApplication {
         texRes = std::min(texRes * ROOT_2, 1.0f);
         emit textureResolutionChanged(texRes);
         return true;
+      case Qt::Key_F9:
+        prevPreset();
+        return true;
+      case Qt::Key_F10:
+        nextPreset();
+        return true;
       }
     }
 
@@ -842,7 +868,23 @@ class ShadertoyApp : public QApplication {
     uiLoadDialog->hide();
   }
 
+  void nextPreset() {
+    int newPreset = (activePresetIndex + 1) % shadertoy::MAX_PRESETS;
+    loadPreset(shadertoy::PRESETS[newPreset]);
+  }
+  
+  void prevPreset() {
+    int newPreset = (activePresetIndex + shadertoy::MAX_PRESETS - 1) % shadertoy::MAX_PRESETS;
+    loadPreset(shadertoy::PRESETS[newPreset]);
+  }
+  
   void loadPreset(shadertoy::Preset & preset) {
+    for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
+      if (shadertoy::PRESETS[i].res == preset.res) {
+        activePresetIndex = i;
+      }
+    }
+    
     QString shaderString = oria::qt::toString(preset.res);
 
     shaderTextWidget.setPlainText(shaderString);

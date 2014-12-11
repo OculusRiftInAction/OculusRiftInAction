@@ -43,23 +43,23 @@ namespace shadertoy {
 
   Preset PRESETS[] {
     Preset(Resource::SHADERTOY_SHADERS_DEFAULT_FS, "Default"),
-    Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_FS, "Steel Cubes"),
-    Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_FS, "Infinite City"),
+//    Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_FS, "Steel Cubes"),
+//    Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_FS, "Infinite City"),
     Preset(Resource::SHADERTOY_SHADERS_4DFGZS_VOXEL_EDGES_FS, "Voxel Edges"),
 //    Preset(Resource::SHADERTOY_SHADERS_4DJGWR_ROUNDED_VOXELS_FS, "Rounded Voxels"),
     Preset(Resource::SHADERTOY_SHADERS_4SBGD1_FAST_BALLS_FS, "Fast Balls"),
-    Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_FS, "Oceanic"),
+//    Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_FS, "Oceanic"),
     Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_FS, "Elevated"),
 //    Preset(Resource::SHADERTOY_SHADERS_MSSGD1_HAND_DRAWN_SKETCH_FS, "Hand Drawn"),
     Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_FS, "Voronoi Rocks"),
     Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_FS, "Morning City"),
-    Preset(Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_FS, "Abandoned Base"),
-    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_FS, "Cubemap"),
+//    Preset(Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_FS, "Abandoned Base"),
+//    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_FS, "Cubemap"),
     Preset(Resource::SHADERTOY_SHADERS_LSS3WS_RELENTLESS_FS, "Relentless"),
     Preset(Resource::NO_RESOURCE, nullptr),
   };
 
-  const int MAX_PRESETS = 12;
+  const int MAX_PRESETS = 7;
 
 
   const Resource TEXTURES[] = {
