@@ -32,6 +32,7 @@ namespace oria {
   void bindLights(ProgramPtr & program);
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program);
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, const std::list<std::function<void()>> & list);
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list);
   void renderCube(const glm::vec3 & color = Colors::white);
   void renderColorCube();

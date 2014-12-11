@@ -17,7 +17,6 @@
  
  ************************************************************************************/
 
-#pragma warning( disable : 4068 4244 4267 4065 4101 4244)
 #include "Common.h"
 
 #include "Font.h"
@@ -400,6 +399,10 @@ namespace oria {
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::function<void()> list) {
     renderGeometry(shape, program, { list } );
+  }
+
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, const std::list<std::function<void()>> & list) {
+    renderGeometryWithLambdas(shape, program, list.begin(), list.end());
   }
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list) {
