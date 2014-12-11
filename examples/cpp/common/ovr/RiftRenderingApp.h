@@ -24,6 +24,7 @@ class RiftRenderingApp : public RiftManagerApp {
 protected:
   ovrTexture eyeTextures[2];
   ovrVector3f eyeOffsets[2];
+  bool eyePerFrameMode{false};
 
 private:
   ovrEyeRenderDesc eyeRenderDescs[2];

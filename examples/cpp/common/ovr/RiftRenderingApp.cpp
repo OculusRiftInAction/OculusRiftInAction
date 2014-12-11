@@ -82,8 +82,14 @@ void RiftRenderingApp::draw() {
   MatrixStack & pr = Stacks::projection();
 
   ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, eyePoses, nullptr);
+  static ovrEyeType lastEyeRendered = ovrEye_Count;
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
+    // Force us to alternate eyes if we aren't keeping up with the required framerate
+    if (eye == lastEyeRendered) {
+      continue;
+    }
+    lastEyeRendered = eye;
     Stacks::withPush(pr, mv, [&] {
       // Set up the per-eye projection matrix
       pr.top() = projections[eye];
@@ -97,6 +103,10 @@ void RiftRenderingApp::draw() {
       eyeFramebuffers[eye]->Bind();
       renderScene();
     });
+    
+    if (eyePerFrameMode) {
+      break;
+    }
   }
   // Restore the default framebuffer
   //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
