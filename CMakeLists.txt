@@ -143,6 +143,11 @@ if (LeapMotion_FOUND)
 	message(STATUS "Found Leap Motion SDK")
 endif()
 
+find_package(RealSense REQUIRED)
+if (RealSense_FOUND) 
+    list(APPEND EXAMPLE_LIBS ${RealSense_LIBRARY})
+endif()
+
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
@@ -237,7 +242,7 @@ list(APPEND EXAMPLE_LIBS ExampleResources)
 # All our includes for the used libraries
 #
 
-include_directories(${CMAKE_SOURCE_DIR}/libraries/boost)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/boostconfig)
 
 # GLM - Vector / matrix header only math library based on the syntax of GLSL
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
@@ -261,6 +266,10 @@ else()
     else()
         include_directories(${PNG_INCLUDE_DIR})
     endif()
+endif()
+
+if (RealSense_FOUND) 
+    include_directories(${RealSense_INCLUDE_DIR})
 endif()
 
 if (Qt5_FOUND)
