@@ -116,6 +116,9 @@ public:
   }
 };
 
+typedef std::function<void()> Lambda;
+typedef std::list<Lambda> LambdaList;
+
 #include "Platform.h"
 #include "Utils.h"
 

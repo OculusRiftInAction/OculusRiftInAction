@@ -397,15 +397,11 @@ namespace oria {
     oglplus::NoVertexArray().Bind();
   }
 
-  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::function<void()> list) {
-    renderGeometry(shape, program, { list } );
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::function<void()> lambda) {
+    renderGeometry(shape, program, LambdaList({ lambda }) );
   }
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, const std::list<std::function<void()>> & list) {
-    renderGeometryWithLambdas(shape, program, list.begin(), list.end());
-  }
-
-  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list) {
     renderGeometryWithLambdas(shape, program, list.begin(), list.end());
   }
 
@@ -642,7 +638,7 @@ namespace oria {
   }
 
 
-  void APIENTRY debugCallback(
+  void __stdcall debugCallback(
     GLenum source,
     GLenum type,
     GLuint id,

@@ -36,6 +36,8 @@ private:
   bool renderingConfigured{ false };
 
 protected:
+  virtual void initGl();
+  bool isRenderingConfigured();
 
   virtual void onFrameStart() {
   }
@@ -45,7 +47,6 @@ protected:
 
   virtual void * getRenderWindow() = 0;
 
-  virtual void initGl();
 
   virtual void renderScene() = 0;
 
@@ -85,10 +86,10 @@ protected:
     return getPerspectiveProjection(getCurrentEye());
   }
 
+
 public:
   RiftRenderingApp();
   virtual ~RiftRenderingApp();
-  bool isRenderingConfigured();
   virtual void draw();
 
 };

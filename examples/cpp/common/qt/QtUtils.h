@@ -23,6 +23,17 @@
 #include <QOpenGLWidget>
 #include <QPixmap>
 
+#include <QOpenGLContext>
+#include <QOpenGLFunctions>
+#include <QOpenGLFramebufferObject>
+#include <QOffscreenSurface>
+#include <QQmlEngine>
+#include <QQmlComponent>
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QQuickRenderControl>
+
+
 namespace oria { namespace qt {
   inline vec2 toGlm(const QSize & size) {
     return vec2(size.width(), size.height());
@@ -131,6 +142,44 @@ public:
     PaintlessOpenGLWidget(), paintCallback(paint), initCallback(init), resizeCallback(resize) {
   }
 };
+
+
+class OffscreenUiWindow : public QWindow {
+  //Q_OBJECT
+
+  QOpenGLContext *m_context{ nullptr };
+  QOffscreenSurface *m_offscreenSurface{ nullptr };
+  QQuickRenderControl *m_renderControl{ nullptr };
+  QQuickWindow *m_quickWindow{ nullptr };
+  QQuickItem *m_rootItem{ nullptr };
+  QTimer m_updateTimer;
+
+protected:
+  QOpenGLFramebufferObject *m_fbo{ nullptr };
+  QQmlEngine *m_qmlEngine{ nullptr };
+  QQmlComponent *m_qmlComponent{ nullptr };
+
+public:
+  OffscreenUiWindow(const QSize & size, QOpenGLContext * sharedContext);
+
+  virtual void setupScene();
+
+  virtual void loadSceneComponents() = 0;
+
+  void createFbo();
+
+  void destroyFbo();
+
+  void updateSizes();
+
+  void requestUpdate();
+
+  void resizeEvent(QResizeEvent *);
+
+  virtual void updateQuick();
+};
+
+
 
 #ifdef OS_WIN
 #define QT_APP_WITH_ARGS(AppClass) \
