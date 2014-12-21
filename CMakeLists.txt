@@ -156,11 +156,11 @@ endif()
 ###############################################################################
 # 3DxWare - Not currently in use
 
-find_package(3DxWare QUIET)
-if (3DxWare_FOUND) 
-    message(STATUS "3DxWare found")
-    list(APPEND EXAMPLE_LIBS ${3DxWare_LIBRARY})
-endif()
+#find_package(3DxWare QUIET)
+#if (3DxWare_FOUND) 
+#    message(STATUS "3DxWare found")
+#    list(APPEND EXAMPLE_LIBS ${3DxWare_LIBRARY})
+#endif()
 
 ###############################################################################
 # Qt - a cross platform framework for windowing and just about everything else
@@ -169,7 +169,7 @@ endif()
 #
 # Qt can be found by setting a QT5_ROOT to the root of your 
 
-set(QT_COMPONENTS Core Widgets Gui QuickWidgets OpenGL Xml)
+set(QT_COMPONENTS Core Widgets Gui QuickWidgets OpenGL Xml XmlPatterns)
 
 # Qt emits a ton of warnings which we're not interested in
 if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
