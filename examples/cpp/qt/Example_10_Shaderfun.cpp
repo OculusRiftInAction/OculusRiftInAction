@@ -304,6 +304,8 @@ protected:
       return;
     }
 
+    // FUCK, I'm running out of easily locatable keys
+    // FIXME support joystick buttons?
     switch (key) {
     case Qt::Key_Q:
       if (Qt::ControlModifier == ke->modifiers()) {
@@ -370,6 +372,7 @@ protected:
       return;
 
     case Qt::Key_F11:
+      // FIXME implement a quicksave listener
       emit saveShader();
       return;
 
@@ -809,6 +812,8 @@ class ShadertoyApp : public QApplication {
     }
   }
 
+  // FIXME add status like texture res scale, eye pos scale and ... stuff to the edit window
+  // oh yeah, 'eye per frame' mode indicator
   void setupShaderEditor() {
     QWidget & shaderEditor = *(new QWidget());
     shaderEditor.resize(UI_SIZE.x, UI_SIZE.y);
@@ -1196,14 +1201,20 @@ public:
     // Setup the desktop UI window
     setupDesktopWindow();
 
-
     // UI toggle needs to intercept keyboard events before anything else.
     riftRenderWidget.installEventFilter(this);
 
-
+    // When we get the 'recompile key' do the same thing as the 'Run' button in the shader editor
+    connect(&riftRenderWidget, &ShadertoyRiftWidget::recompileShader, this, [&]() {
+      emit shaderSourceChanged(shaderTextWidget.toPlainText());
+    });
+    // Both the rift render widget and the app need to change behaviour based on whether the UI is visible
     connect(&riftRenderWidget, &ShadertoyRiftWidget::uiVisibleChanged, this, [&](bool uiVisible) {
       toggleUi(uiVisible);
     });
+
+    // Hotkeys for next/previous shader
+    // FIXME add confirmation for when the user might lose edits.
     connect(&riftRenderWidget, &ShadertoyRiftWidget::loadNextPreset, this, [&]() {
       int newPreset = (activePresetIndex + 1) % shadertoy::MAX_PRESETS;
       loadPreset(shadertoy::PRESETS[newPreset]);
@@ -1212,8 +1223,6 @@ public:
       int newPreset = (activePresetIndex + shadertoy::MAX_PRESETS - 1) % shadertoy::MAX_PRESETS;
       loadPreset(shadertoy::PRESETS[newPreset]);
     });
-    //connect(&riftRenderWidget, &ShadertoyRiftWidget::saveShader, this, [&]() {
-    //});
     connect(&riftRenderWidget, &ShadertoyRiftWidget::shutdown, this, [&]() {
       riftRenderWidget.stop();
       QApplication::instance()->quit();
