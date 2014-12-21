@@ -49,6 +49,15 @@ public:
     withPush(projection(), modelview(), f);
   }
 
+  template <typename Function>
+  static void withIdentity(Function f) {
+    withPush(projection(), modelview(), [=] {
+      projection().identity();
+      modelview().identity();
+      f();
+    });
+  }
+
   static Lights & lights() {
     static Lights lights;
     return lights;
