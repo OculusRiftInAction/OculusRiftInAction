@@ -390,7 +390,6 @@ namespace oria {
     });
 
     shape->Use();
-    glGetError();
     shape->Draw();
 
     oglplus::NoProgram().Bind();
@@ -449,9 +448,6 @@ namespace oria {
   ShapeWrapperPtr loadSkybox(ProgramPtr program) {
     using namespace oglplus;
     ShapeWrapperPtr shape = ShapeWrapperPtr(new shapes::ShapeWrapper(List("Position").Get(), shapes::SkyBox(), *program));
-    Platform::addShutdownHook([&]{
-//      shape.reset();
-    });
     return shape;
   }
 
