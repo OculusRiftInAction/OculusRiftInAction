@@ -22,7 +22,6 @@
 #include <QtWidgets>
 #include <QOpenGLWidget>
 #include <QPixmap>
-
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QOpenGLFramebufferObject>
@@ -74,6 +73,21 @@ namespace oria { namespace qt {
     image.loadFromData(toByteArray(res));
     return image;
   }
+
+  inline QPixmap loadXpmResource(Resource res) {
+    QString cursorXpmStr = oria::qt::toString(res);
+    QStringList list = cursorXpmStr.split(QRegExp("\\n|\\r\\n|\\r"));
+    std::vector<QByteArray> bv;
+    std::vector<const char*> v;
+    foreach(QString line, list) {
+      bv.push_back(line.toLocal8Bit());
+      v.push_back(*bv.rbegin());
+    }
+    QPixmap result = QPixmap(&v[0]);
+    return result;
+  }
+
+
 } } // namespaces
 /**
  * Forwards mouse and keyboard input from the specified widget to the
@@ -179,6 +193,22 @@ public:
   virtual void updateQuick();
 };
 
+class LambdaThread : public QThread {
+  Lambda f;
+
+  void run() {
+    f();
+  }
+
+public:
+  LambdaThread() {}
+
+  template <typename F>
+  LambdaThread(F f) : f(f) {}
+
+  template <typename F>
+  void setLambda(F f) { this->f = f; }
+};
 
 
 #ifdef OS_WIN
