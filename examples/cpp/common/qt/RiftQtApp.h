@@ -20,3 +20,38 @@
 #pragma once
 
 #include <QtOpenGL/QGLWidget>
+
+class QRiftWidget : public QGLWidget, public RiftRenderingApp {
+  bool shuttingDown{ false };
+  LambdaThread renderThread;
+  TaskQueueWrapper tasks;
+
+  void paintGL();
+  virtual void * getRenderWindow();
+
+public:
+  static QGLFormat & getFormat();
+
+  explicit QRiftWidget(QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
+
+  explicit QRiftWidget(QGLContext *context, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
+
+  explicit QRiftWidget(const QGLFormat& format, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
+
+  virtual ~QRiftWidget();
+
+  void start();
+
+  // Should only be called from the primary thread
+  void stop();
+
+  void queueRenderThreadTask(Lambda task);
+
+private:
+  void initWidget();
+
+  virtual void renderLoop();
+
+protected:
+  virtual void setup();
+};
