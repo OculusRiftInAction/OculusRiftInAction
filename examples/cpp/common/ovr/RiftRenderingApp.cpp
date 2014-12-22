@@ -74,19 +74,34 @@ bool RiftRenderingApp::isRenderingConfigured() {
   return renderingConfigured;
 }
 
+static RateCounter rateCounter;
+
 void RiftRenderingApp::draw() {
   ++frameCount;
   onFrameStart();
+  rateCounter.startCounter();
   ovrHmd_BeginFrame(hmd, frameCount);
   MatrixStack & mv = Stacks::modelview();
   MatrixStack & pr = Stacks::projection();
 
   ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, eyePoses, nullptr);
+  static ovrPosef outputPoses[2];
+  static ovrEyeType lastEyeRendered = ovrEye_Count;
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
+    // Force us to alternate eyes if we aren't keeping up with the required framerate
+    if (eye == lastEyeRendered) {
+      continue;
+    }
+    // We want to ensure that we only update the pose we 
+    // send to the SDK if we actually render this eye.
+    outputPoses[eye] = eyePoses[eye];
+
+    lastEyeRendered = eye;
     Stacks::withPush(pr, mv, [&] {
       // Set up the per-eye projection matrix
       pr.top() = projections[eye];
+
 
       // Set up the per-eye modelview matrix
       // Apply the head pose
@@ -97,9 +112,36 @@ void RiftRenderingApp::draw() {
       eyeFramebuffers[eye]->Bind();
       renderScene();
     });
+    
+    if (eyePerFrameMode) {
+      break;
+    }
   }
   // Restore the default framebuffer
   //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-  ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
+  ovrHmd_EndFrame(hmd, outputPoses, eyeTextures);
   onFrameEnd();
+  rateCounter.increment();
+  if (rateCounter.elapsed() > 2.0f) {
+    float fps = rateCounter.getRate();
+    SAY("FPS: %0.2f", fps);
+    rateCounter.reset();
+  }
 }
+
+
+//int framecount = 0;
+//long start = Platform::elapsedMillis();
+//while (!glfwWindowShouldClose(window)) {
+//  glfwPollEvents();
+//  ++frame;
+//  update();
+//  draw();
+//  finishFrame();
+//  long now = Platform::elapsedMillis();
+//  ++framecount;
+//  if ((now - start) >= 2000) {
+//  }
+//}
+//
+

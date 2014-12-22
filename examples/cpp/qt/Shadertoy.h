@@ -42,25 +42,51 @@ namespace shadertoy {
   };
 
   Preset PRESETS[] {
-    Preset(Resource::SHADERTOY_SHADERS_DEFAULT_FS, "Default"),
-    Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_FS, "Steel Cubes"),
-    Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_FS, "Infinite City"),
-    Preset(Resource::SHADERTOY_SHADERS_4DFGZS_VOXEL_EDGES_FS, "Voxel Edges"),
-//    Preset(Resource::SHADERTOY_SHADERS_4DJGWR_ROUNDED_VOXELS_FS, "Rounded Voxels"),
-    Preset(Resource::SHADERTOY_SHADERS_4SBGD1_FAST_BALLS_FS, "Fast Balls"),
-    Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_FS, "Oceanic"),
-    Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_FS, "Elevated"),
-//    Preset(Resource::SHADERTOY_SHADERS_MSSGD1_HAND_DRAWN_SKETCH_FS, "Hand Drawn"),
-    Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_FS, "Voronoi Rocks"),
-    Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_FS, "Morning City"),
-    Preset(Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_FS, "Abandoned Base"),
-    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_FS, "Cubemap"),
-    Preset(Resource::SHADERTOY_SHADERS_LSS3WS_RELENTLESS_FS, "Relentless"),
+    Preset(Resource::SHADERTOY_SHADERS_DEFAULT_XML, "Default"),
+    Preset(Resource::SHADERTOY_SHADERS_LSS3WS_RELENTLESS_XML, "Relentless"),
+    Preset(Resource::SHADERTOY_SHADERS_4DFGZS_VOXEL_EDGES_XML, "Voxel Edges"),
+    Preset(Resource::SHADERTOY_SHADERS_4SBGD1_FAST_BALLS_XML, "Fast Balls"),
+    Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_XML, "Elevated"),
+    Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_XML, "Voronoi Rocks"),
+    Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_XML, "Morning City"),
+
+#ifdef OS_WIN
+    Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_XML, "Steel Cubes"),
+    Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_XML, "Infinite City"),
+    Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_XML, "Oceanic"),
+    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_XML, "Cubemap"),
+#endif
+
+#if 0
+    Preset(Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_XML, "Abandoned Base"),
+    Preset(Resource::SHADERTOY_SHADERS_4DJGWR_ROUNDED_VOXELS_XML, "Rounded Voxels"),
+    Preset(Resource::SHADERTOY_SHADERS_MSSGD1_HAND_DRAWN_SKETCH_XML, "Hand Drawn"),
+#endif
+
     Preset(Resource::NO_RESOURCE, nullptr),
   };
 
-  const int MAX_PRESETS = 12;
+  template <typename T>
+  class ResourceCounter {
+    int count{ 0 };
+  public:
 
+    ResourceCounter(T * ts, std::function<bool(const T &)> endCondition =
+      [](const T & t)->bool { return true;  }
+      ) {
+      while (!endCondition(ts[count])) {
+        ++count;
+      }
+    }
+
+    int counted() {
+      return count;
+    }
+  };
+
+  const int MAX_PRESETS = ResourceCounter<Preset>(PRESETS, [] (const Preset & p){
+    return p.res == NO_RESOURCE;
+  }).counted();
 
   const Resource TEXTURES[] = {
     Resource::SHADERTOY_TEXTURES_TEX00_JPG,

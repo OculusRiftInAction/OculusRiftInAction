@@ -51,28 +51,27 @@ list(APPEND EXAMPLE_LIBS OculusVR)
 
 ###############################################################################
 #
+#
 # Non-Oculus third party dependencies 
 #
+#
+###############################################################################
 
 ###############################################################################
-#
 # GLEW - Cross platform access to OpenGL extensions and > 1.x functions 
-#
 
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
 set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS glew)
 
-# Cross platform access to shader functionality
 
 ###############################################################################
-#
 # GLFW - Cross platform OpenGL window creation and input handling
 #
 # We need to set a bunch of values so we build only the library and not the 
 # install targets, documentation or examples
-#
+
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
@@ -81,16 +80,15 @@ add_subdirectory(libraries/glfw)
 set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 
-#
-# OpenCTM - a 3D mesh compression
-#
+###############################################################################
+# OpenCTM - a 3D mesh (de)compression library
+
 add_subdirectory(libraries/OpenCTM)
 set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 list(APPEND EXAMPLE_LIBS OpenCTM)
 
 ###############################################################################
-#
-# OpenCV is a Computer vision library with advanced image loading and 
+# OpenCV - a Computer vision library with advanced image loading and 
 # manipulation functionality, including a simple API for accessing cameras  
 #
 # OpenCV is optional, but required to build the chapter 14 examples.
@@ -101,14 +99,18 @@ list(APPEND EXAMPLE_LIBS OpenCTM)
 find_package(OpenCV QUIET)
 
 if (OpenCV_FOUND) 
+    message(STATUS "OpenCV Found")
     include_directories(${OpenCV_INCLUDE_DIRS})
     list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
     set(HAVE_OPENCV 1)
 else()
+    message(STATUS "OpenCV NOT found")
+    
     # Without OpenCV, we have to fall back on libpng
     # which requires zlib.  For windows and OSX we
     # build the library.  For Unix systems we locate 
     # the native package
+    
     if((WIN32 OR APPLE))
         # zlib
         add_subdirectory(libraries/zlib)
@@ -131,8 +133,10 @@ else()
     endif()
 endif()
 
+###############################################################################
+# Leap Motion SDK - Required for building the chapter 14 examples that use 
+# the leap motion controller
 
-set(LeapMotion_DIR "C:/dev/LeapDeveloperKit_2.1.5+22699_win/LeapSDK")
 find_package(LeapMotion QUIET)
 if (LeapMotion_FOUND)
     SET(HAVE_LEAP 1) 
@@ -141,74 +145,70 @@ if (LeapMotion_FOUND)
 	message(STATUS "Found Leap Motion SDK")
 endif()
 
-find_package(Threads)
-list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
+###############################################################################
+# Intel RealSense SDK - Not currently in use
+
+#find_package(RealSense QUIET)
+#if (RealSense_FOUND) 
+#    list(APPEND EXAMPLE_LIBS ${RealSense_LIBRARY})
+#endif()
 
 ###############################################################################
-#
-# Qt is a cross platform framework for just about everything.
-#
-# Qt can be found by setting a QT5_ROOT to the root of your 
+# 3DxWare - Not currently in use
+
+#find_package(3DxWare QUIET)
+#if (3DxWare_FOUND) 
+#    message(STATUS "3DxWare found")
+#    list(APPEND EXAMPLE_LIBS ${3DxWare_LIBRARY})
+#endif()
+
+###############################################################################
+# Qt - a cross platform framework for windowing and just about everything else
 #
 # Qt is optional, but required to build the chapter 10 examples
+#
+# Qt can be found by setting a QT5_ROOT to the root of your 
 
-# set(Qt5_DIR $ENV{QT5_ROOT}/lib/cmake/Qt5)
+set(QT_COMPONENTS Core Widgets Gui QuickWidgets OpenGL Xml XmlPatterns)
 
 # Qt emits a ton of warnings which we're not interested in
 if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
     set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
 endif()
-   
-foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
-    find_package(${lib} QUIET)
-    if (${lib}_FOUND) 
-        include_directories(${${lib}_INCLUDE_DIRS})
-        list(APPEND EXAMPLE_LIBS ${${lib}_LIBRARIES})
-        add_definitions(${${lib}_DEFINITIONS})
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${${lib}_EXECUTABLE_COMPILE_FLAGS}")
-    endif()
-endforeach(lib)
+
+
+find_package(Qt5 REQUIRED ${QT_COMPONENTS})
 
 if (Qt5Core_FOUND)
-    message(STATUS "Found Qt framework") 
+    message(STATUS "Qt Found")
     set(HAVE_QT 1)
     set(CMAKE_INCLUDE_CURRENT_DIR ON)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
+	foreach(qtc ${QT_COMPONENTS})
+    	list(APPEND EXAMPLE_LIBS ${Qt5${qtc}_LIBRARIES})
+        add_definitions(${Qt5${qtc}_DEFINITIONS})
+        include_directories(${Qt5${qtc}_INCLUDE_DIRS})
+	endforeach()
+else()
+    message(WARNING "Qt framework not found") 
 endif()
 
 
 ######################################################
-#
 # OGLplus provides object oriented OpenGL wrappers
 #
-
-# oglplus uses CMake to detect compiler features, but 
-# we can't use the full oglplus CMake include, so we 
-# need to jump through some hoops to make it's 
-# compiler detection logic work here.
-
-set(SAVE_PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR})
-set(PROJECT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/libraries/oglplus)
-    include(libraries/oglplus/config/Compiler.cmake)
-    include(libraries/oglplus/config/CPPFeature.cmake)
-    set(OGLPLUS_CONFIG_SET_LOW_PROFILE 1)
-    set(OGLPLUS_LOW_PROFILE 0)
-    set(OGLPLUS_USE_GLCOREARB_H 0) 
-    set(OGLPLUS_USE_GL3_H 0)
-    set(OGLPLUS_USE_GLEW 1)
-    set(OGLPLUS_USE_GL3W 0)
-    set(OGLPLUS_USE_BOOST_CONFIG 0)
-    configure_file(
-        ${PROJECT_SOURCE_DIR}/config/oglplus/config/site.hpp.in
-        ${PROJECT_BINARY_DIR}/libraries/oglplus/include/oglplus/config/site.hpp
-    )
-set(PROJECT_SOURCE_DIR ${SAVE_PROJECT_SOURCE_DIR})
+# It's a header only library, so all we need to do is set some defines for how 
+# we want it to act
 
 add_definitions(-DOGLPLUS_LOW_PROFILE=1)
-# aadd_definitions(-DOGLPLUS_USE_GLEW=1)
-# aadd_definitions(-DOGLPLUS_USE_BOOST_CONFIG=1)
-# aadd_definitions(-DOGLPLUS_NO_SITE_CONFIG=1)
+add_definitions(-DOGLPLUS_USE_GLEW=1)
+add_definitions(-DOGLPLUS_USE_BOOST_CONFIG=1)
+add_definitions(-DOGLPLUS_NO_SITE_CONFIG=1)
+
+
+find_package(Threads)
+list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
 ###############################################################################
 #
@@ -235,7 +235,7 @@ list(APPEND EXAMPLE_LIBS ExampleResources)
 # All our includes for the used libraries
 #
 
-include_directories(${CMAKE_SOURCE_DIR}/libraries/boost)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/boostconfig/include)
 
 # GLM - Vector / matrix header only math library based on the syntax of GLSL
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
@@ -261,10 +261,19 @@ else()
     endif()
 endif()
 
+if (RealSense_FOUND) 
+    include_directories(${RealSense_INCLUDE_DIR})
+endif()
+
+if (3DxWare_FOUND) 
+    include_directories(${3DxWare_INCLUDE_DIR})
+endif()
+
+
 if (Qt5_FOUND)
-    foreach(lib Qt5Core Qt5Widgets Qt5Gui Qt5QuickWidgets Qt5OpenGL Qt5Xml)
-        include_directories(${${lib}_INCLUDE_DIRS})
-    endforeach(lib)
+	foreach(qtc ${QT_COMPONENTS})
+        include_directories(${Qt5${qtc}_INCLUDE_DIRS})
+	endforeach()
 endif()
 
 ###############################################################################

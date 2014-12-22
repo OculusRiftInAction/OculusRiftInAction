@@ -7,8 +7,7 @@ namespace oria {
 class TaskQueueWrapper {
   typedef std::mutex Mutex;
   typedef std::unique_lock<Mutex> Locker;
-  typedef std::function<void()> Functor;
-  typedef std::queue<Functor> TaskQueue;
+  typedef std::queue<Lambda> TaskQueue;
 
   TaskQueue queue;
   Mutex mutex;
@@ -26,7 +25,7 @@ public:
     }
   }
 
-  void queueTask(Functor task) {
+  void queueTask(Lambda task) {
     Locker locker(mutex);
     queue.push(task);
   }
@@ -46,6 +45,19 @@ public:
 
   unsigned int getCount() const {
     return count;
+  }
+
+  void startCounter() {
+    if (0 == count) {
+      this->start = Platform::elapsedSeconds();
+    }
+  }
+
+  float elapsed() {
+    if (count <= 0) {
+      return 0;
+    }
+    return Platform::elapsedSeconds() - start;
   }
 
   void increment() {

@@ -57,6 +57,34 @@ public:
     });
   }
 
+
+  void onKey(int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS) {
+      static ovrHSWDisplayState hswDisplayState;
+      ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
+      if (hswDisplayState.Displayed) {
+        ovrHmd_DismissHSWDisplay(hmd);
+        return;
+      }
+    }
+
+    if (GLFW_PRESS != action) {
+      GlfwApp::onKey(key, scancode, action, mods);
+      return;
+    }
+
+    switch (key) {
+    case GLFW_KEY_R:
+      ovrHmd_RecenterPose(hmd);
+      break;
+
+    default:
+      GlfwApp::onKey(key, scancode, action, mods);
+      break;
+    }
+  }
+
+
   virtual void finishFrame() {
   }
 

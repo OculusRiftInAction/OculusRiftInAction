@@ -22,113 +22,36 @@
 #include <QtOpenGL/QGLWidget>
 
 class QRiftWidget : public QGLWidget, public RiftRenderingApp {
-  void paintGL() {
-    if (isRenderingConfigured()) {
-      draw();
-      update();
-    }
-  }
+  bool shuttingDown{ false };
+  LambdaThread renderThread;
+  TaskQueueWrapper tasks;
 
-  virtual void * getRenderWindow() {
-    return (void*)effectiveWinId();
-  }
+  void paintGL();
+  virtual void * getRenderWindow();
+
 public:
-  static QGLFormat & getFormat() {
-    static QGLFormat glFormat;
-    glFormat.setVersion(3, 3);
-    glFormat.setProfile(QGLFormat::CoreProfile);
-    glFormat.setSampleBuffers(true);
-    return glFormat;
-  }
+  static QGLFormat & getFormat();
 
-  explicit QRiftWidget(QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0) 
-    : QGLWidget(parent, shareWidget, f) { 
-    initWidget();
-  }
+  explicit QRiftWidget(QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
 
-  explicit QRiftWidget(QGLContext *context, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0)
-    : QGLWidget(context, parent, shareWidget, f) {
-    initWidget();
-  }
+  explicit QRiftWidget(QGLContext *context, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
 
-  explicit QRiftWidget(const QGLFormat& format, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0)
-    : QGLWidget(format, parent, shareWidget, f) {
-    initWidget();
-  }
+  explicit QRiftWidget(const QGLFormat& format, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
 
-  void setupRiftRendering() {
-    makeCurrent();
-    initGl();
-    update();
-  }
+  virtual ~QRiftWidget();
+
+  void start();
+
+  // Should only be called from the primary thread
+  void stop();
+
+  void queueRenderThreadTask(Lambda task);
 
 private:
-  void initWidget() {
-    setAutoBufferSwap(false);
-    bool directHmdMode = false;
+  void initWidget();
 
-    // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
-    ON_WINDOWS([&] {
-      directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
-    });
+  virtual void renderLoop();
 
-#ifdef BRAD_DEBUG
-    setWindowFlags(Qt::FramelessWindowHint);
-#endif
-    if (!directHmdMode) {
-      setWindowFlags(Qt::FramelessWindowHint);
-    }
-    show();
-    if (!directHmdMode) {
-      move(hmd->WindowsPos.x, hmd->WindowsPos.y);
-    } else {
-#ifdef BRAD_DEBUG
-      move(0, -1080);
-#else
-      move(0, 0);
-#endif
-    }
-    resize(hmd->Resolution.w, hmd->Resolution.h);
-
-    // If we're in direct mode, attach to the window
-    if (directHmdMode) {
-      void * nativeWindowHandle = (void*)(size_t)effectiveWinId();
-      if (nullptr != nativeWindowHandle) {
-        ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
-      }
-    }
-  }
-
+protected:
+  virtual void setup();
 };
-
-
-template <typename T>
-class QRiftApplication : public QApplication {
-  static int argc;
-  static char ** argv;
-  std::shared_ptr<T> widget;
-
-public:
-  QRiftApplication(int argc, char ** argv) : QApplication(argc, argv) {
-    ovr_Initialize();
-    widget = std::shared_ptr<T>(new T());
-    widget->setupRiftRendering();
-  }
-
-  virtual ~QRiftApplication() {
-    widget.reset();
-    try {
-      Platform::runShutdownHooks();
-    } catch (...) {
-
-    }
-    try {
-      ovr_Shutdown();
-    } catch (...) {
-
-    }
-  }
-};
-
-#define RUN_QT_RIFT_WIDGET(WidgetClass) \
-  RUN_QT_APP(QRiftApplication<WidgetClass>)

@@ -1,5 +1,35 @@
 #include "Common.h"
 #include <oglplus/shapes/plane.hpp>
+#include <pxcsensemanager.h>
+#include <pxccapture.h>
+#include <pxcsession.h>
+
+void CaptureAlignedColorDepthSamples(void) {
+   // Create a SenseManager instance
+   PXCSenseManager *sm=PXCSenseManager::CreateInstance();
+
+   // Select the color and depth streams
+   sm->EnableStream(PXCCapture::STREAM_TYPE_COLOR,640,480,30);
+   sm->EnableStream(PXCCapture::STREAM_TYPE_DEPTH,320,240,30);
+
+   // Initialize and Stream Samples
+   sm->Init();
+   for (;;) {
+       // This function blocks until both samples are ready
+       if (sm->AcquireFrame(true)<PXC_STATUS_NO_ERROR) break;
+
+       // retrieve the color and depth samples aligned
+       PXCCapture::Sample *sample=sm->QuerySample();
+
+       // work on the samples sample->color and sample->depth
+
+       // go fetching the next samples
+       sm->ReleaseFrame();
+   }
+
+   // Close down
+   sm->Release();
+}
 
 static const glm::uvec2 WINDOW_SIZE(1280, 800);
 static const glm::ivec2 WINDOW_POS(100, 100);
@@ -8,115 +38,65 @@ static const glm::uvec2 RASTER_RES(RES.x * 2, RES.y * 2);
 
 using namespace oglplus;
 
-typedef std::vector<vec3> vv3;
-void rasterise(vec3 vs[3], vv3 & out) {
-}
+template <class T>
+class ref_ptr : public std::shared_ptr<T> {
+public:
+  ref_ptr() { }
+  ref_ptr(T * t) : std::shared_ptr<T>(t, [](T*t){ t->Release(); }) {}
+};
 
+class RealSenseApp : public GlfwApp {
+  ref_ptr<PXCSession> session{ PXCSession::CreateInstance() };
+  ref_ptr<PXCSenseManager> sm{ session->CreateSenseManager() };
+public:
+  RealSenseApp()  {
+    PXCSession::ImplDesc desc1 = {};
+    desc1.group = PXCSession::IMPL_GROUP_SENSOR;
+    desc1.subgroup = PXCSession::IMPL_SUBGROUP_VIDEO_CAPTURE;
+    //for (int m = 0;; m++) {
+    //  PXCSession::ImplDesc desc2;
+    //  if (session->QueryImpl(&desc1, m, &desc2)<PXC_STATUS_NO_ERROR) break;
+    //  SAY("Module[%d]: %s\n", m, desc2.friendlyName);
 
-struct RasterizerExample : public GlfwApp {
-  ProgramPtr program;
-  ShapeWrapperPtr shape;
-  TexturePtr tex;
-  BufferPtr edge;
+    //  PXCCapture *capture;
+    //  session->CreateImpl<PXCCapture>(&desc2, &capture);
+    //  // print out all device information
+    //  for (int d = 0;; d++) {
+    //    PXCCapture::DeviceInfo dinfo;
+    //    if (capture->QueryDeviceInfo(d, &dinfo)<PXC_STATUS_NO_ERROR) break;
+    //    SAY("    Device[%d]: %s\n", d, dinfo.name);
+    //    auto dd = sm->QueryCaptureManager()->QueryDevice();
+    //  }
+    //  capture->Release();
+    //}
+    // Select the color and depth streams
+    auto status = sm->EnableStream(PXCCapture::STREAM_TYPE_COLOR, 640, 480, 60);
+    status = sm->EnableStream(PXCCapture::STREAM_TYPE_DEPTH, 640, 480, 60);
 
-  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    // Initialize and Stream Samples
+    sm->Init();
+  }
+
+  virtual ~RealSenseApp() {
+    sm->Release();
+  }
+
+  GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
     outSize = WINDOW_SIZE;
-    outPosition = WINDOW_POS;
-    return glfw::createWindow(outSize, outPosition);
+    return glfw::createSecondaryScreenWindow(WINDOW_SIZE);
   }
-
-  virtual void initGl() {
-    Context::ClearColor(0.1f, 0.1f, 0.1f, 1);
-
-    program = oria::loadProgram(
-      Resource::SHADERS_RASTERIZER_VS,
-      Resource::SHADERS_RASTERIZER_FS);
-    
-    shapes::Plane plane(Vec3f(1, 0, 0), Vec3f(0, 1, 0)); 
-    shape = ShapeWrapperPtr(new shapes::ShapeWrapper({ "Position", "TexCoord" }, plane, *program));
-    {
-      std::vector<GLfloat> posv;
-      plane.Positions(posv);
-      std::vector<GLfloat> edgev;
-      for (int i = 0; i < posv.size(); i += 3) {
-        float x = posv[i] * RES.x / 2;
-        edgev.push_back(x);
-        float y = posv[i + 1] * RES.y / 2;
-        edgev.push_back(y);
-      }
-      edge = BufferPtr(new Buffer());
-      edge->Bind(Buffer::Target::Array);
-      Buffer::Data(Buffer::Target::Array, edgev);
-    }
-
-    shape->Use();
-    VertexArrayAttrib(*program, 4)
-      .Setup<GLfloat>(2)
-      .Enable();
-    NoVertexArray().Bind();
-    buildTextureData();
-  }
-  
-  void buildTextureData() {
-    std::vector<uint8_t> data;
-    data.resize(RES.x * RES.y * 3);
-    memset(&data[0], 255, data.size());
-    for (size_t i = 0; i < data.size(); ++i) {
-      if (0 == i % 2) data[i] = 0;
-    }
-    
-    tex = TexturePtr(new Texture());
-    Context::Bound(Texture::Target::_2D, *tex)
-      .MinFilter(TextureMinFilter::Nearest)
-      .MagFilter(TextureMagFilter::Nearest)
-      .WrapS(TextureWrap::MirroredRepeat)
-      .WrapT(TextureWrap::MirroredRepeat)
-      .Image2D(0, PixelDataInternalFormat::RGBA, RES.x, RES.y, 0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, &data[0]);
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
-    
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, RES.X, RES.y, 0, GL_RGB, GL_UNSIGNED_BYTE, )
-  }
-
   virtual void draw() {
-    Context::Clear().ColorBuffer().DepthBuffer();
-    oria::renderGeometry(shape, program, { [&]{
-//      glActiveTexture(GL_TEXTURE0);
-      tex->Bind(Texture::Target::_2D);
-    } });
+    glClearColor(0, 1, 1, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    if (sm->AcquireFrame(true) == PXC_STATUS_NO_ERROR) {
+      PXCCapture::Sample *sample = sm->QuerySample();
+      sample->color()->
+      sm->ReleaseFrame();
+    }
   }
+
 };
 
-//RUN_APP(RasterizerExample);
-
-struct __declspec(align(64)) Foo {
-  int a;
-  int b;
-//  uint64_t c;
-};
-
-MAIN_DECL{
-  using namespace std;
-  SAY("%d", offsetof(Foo, a));
-  SAY("%d", offsetof(Foo, b));
-//  SAY("%d", offsetof(Foo, c));
-
-  //SAY("%d", sizeof(ovrRenderAPIType));
-  //SAY("%d", sizeof(ovrSizei));
-  //SAY("%d", sizeof(ovrRecti));
-  //SAY("%d", sizeof(uint32_t));
-  //SAY("%d", offsetof(ovrTextureHeader, API));
-  //SAY("%d", offsetof(ovrTextureHeader, TextureSize));
-  //SAY("%d", offsetof(ovrTextureHeader, RenderViewport));
-  //SAY("%d", offsetof(ovrTextureHeader, _PAD0_));
-  //ovrRenderAPIType API;
-  //ovrSizei         TextureSize;
-  //ovrRecti         RenderViewport;  // Pixel viewport in texture that holds eye image.
-  //uint32_t         _PAD0_;
-
-  //SAY("%d", sizeof(ovrTexture));
-  //SAY("%d", sizeof(ovrTextureHeader));
-  //SAY("%d", offsetof(ovrTexture, PlatformData));
-  //SAY("%d", sizeof(ovrGLTextureData));
-  //SAY("%d", offsetof(ovrGLTextureData, TexId));
-}
+RUN_APP(RealSenseApp);
 

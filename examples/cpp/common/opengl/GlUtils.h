@@ -24,6 +24,9 @@ typedef std::shared_ptr<oglplus::Buffer> BufferPtr;
 typedef std::shared_ptr<oglplus::VertexArray> VertexArrayPtr;
 
 namespace oria {
+  inline void viewport(const uvec2 & size) {
+    oglplus::Context::Viewport(0, 0, size.x, size.y);
+  }
 
   ShapeWrapperPtr loadShape(const std::initializer_list<const GLchar*>& names, Resource resource, ProgramPtr program);
   ShapeWrapperPtr loadSphere(const std::initializer_list<const GLchar*>& names, ProgramPtr program);
@@ -32,7 +35,8 @@ namespace oria {
   void bindLights(ProgramPtr & program);
 
   void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program);
-  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::initializer_list<std::function<void()>> list);
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, const std::list<std::function<void()>> & list);
+  void renderGeometry(ShapeWrapperPtr & shape, ProgramPtr & program, std::function<void()> lambda);
   void renderCube(const glm::vec3 & color = Colors::white);
   void renderColorCube();
   void renderSkybox(Resource firstImageResource);
@@ -51,7 +55,7 @@ namespace oria {
           Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
 
 
-  void APIENTRY debugCallback(
+  void __stdcall debugCallback(
     GLenum source,
     GLenum type,
     GLuint id,
