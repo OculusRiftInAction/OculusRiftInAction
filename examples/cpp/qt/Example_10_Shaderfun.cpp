@@ -218,12 +218,6 @@ class ShadertoyRiftWidget : public QRiftWidget {
   
   // A wrapper for passing the UI texture from the app to the widget
   AtomicGlTexture uiTexture{ 0 };
-  // After we've used a UI texture, we can't delete it while it might 
-  // still be being used for rendering.  So UI textures go into this 
-  // container along with a GL fence sync object associated with their last 
-  // use.  Once the fence is signaled, it's safe to delete them
-  TextureTrashcan uiTextureTrash;
-
   ProgramPtr uiProgram;
   ShapeWrapperPtr uiShape;
 
@@ -417,13 +411,14 @@ protected:
   }
 
   void renderScene() {
-    oria::viewport(textureSize());
     Context::Disable(Capability::Blend);
     Context::Disable(Capability::ScissorTest);
     Context::Disable(Capability::DepthTest);
     Context::Disable(Capability::CullFace);
     Context::Clear().DepthBuffer().ColorBuffer();
+
     // Render the shadertoy effect into a framebuffer
+    oria::viewport(textureSize());
     shaderFramebuffer->Bound([&] {
       oria::viewport(renderSize());
       renderSkybox();
@@ -440,17 +435,17 @@ protected:
     });
 
     if (uiVisible) {
-      static SyncPair lastUiTextureData;
+      static GLuint lastUiTexture = 0;
       GLuint currentUiTexture = uiTexture.exchange(0);
       if (0 == currentUiTexture) {
-        currentUiTexture = lastUiTextureData.first;
+        currentUiTexture = lastUiTexture;
       } else {
         // If the texture has changed, push it into the trash bin for 
         // deletion once it's finished rendering
-        if (lastUiTextureData.first) {
-          uiTextureTrash.push(lastUiTextureData);
+        if (lastUiTexture) {
+          glDeleteTextures(1, &lastUiTexture);
         }
-        lastUiTextureData.first = currentUiTexture;
+        lastUiTexture = currentUiTexture;
       }
 
       MatrixStack & mv = Stacks::modelview();
@@ -461,22 +456,8 @@ protected:
           Texture::Active(0);
           glBindTexture(GL_TEXTURE_2D, currentUiTexture);
           oria::renderGeometry(uiShape, uiProgram);
-          lastUiTextureData.second = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
         });
       }
-    }
-
-    // Clean up used textures that have completed rendering
-    while (uiTextureTrash.size()) {
-      SyncPair syncPair = uiTextureTrash.front();
-      GLsizei outLength;
-      GLint outResult;
-      glGetSynciv(syncPair.second, GL_SYNC_STATUS, 1, &outLength, &outResult);
-      if (outResult != GL_SIGNALED) {
-        break;
-      }
-      glDeleteTextures(1, &syncPair.first);
-      uiTextureTrash.pop();
     }
   }
 
@@ -727,7 +708,7 @@ class ShadertoyApp : public QApplication {
   QGLWidget uiGlWidget;
 
   QWidget desktopWindow;
-  QFont defaultLabelFont{ "Arial", 24, QFont::Bold };
+  QFont defaultFont{ "Arial", 24, QFont::Bold };
 
 
   // A custom text widget with syntax highlighting for GLSL 
@@ -882,7 +863,7 @@ class ShadertoyApp : public QApplication {
         pButtonRow->setLayout(pButtonLayout);
         {
           QPushButton * pRunButton = new QPushButton("Run");
-          pRunButton->setFont(QFont("Arial", 20, QFont::Bold));
+          pRunButton->setFont(defaultFont);
           connect(pRunButton, &QPushButton::clicked, this, [&] {
             emit shaderSourceChanged(shaderTextWidget.toPlainText());
           });
@@ -892,7 +873,7 @@ class ShadertoyApp : public QApplication {
 
         {
           QPushButton * pLoadButton = new QPushButton("Load");
-          pLoadButton->setFont(QFont("Arial", 20, QFont::Bold));
+          pLoadButton->setFont(defaultFont);
           connect(pLoadButton, &QPushButton::clicked, this, [&] {
             setUiState(LOAD);
           });
@@ -902,7 +883,7 @@ class ShadertoyApp : public QApplication {
 
         {
           QPushButton * pSaveButton = new QPushButton("Save");
-          pSaveButton->setFont(QFont("Arial", 24, QFont::Bold));
+          pSaveButton->setFont(defaultFont);
           connect(pSaveButton, &QPushButton::clicked, this, [&] {
             setUiState(SAVE);
           });
@@ -913,7 +894,7 @@ class ShadertoyApp : public QApplication {
 
         //{
         //  QPushButton * pLoadButton = new QPushButton("Toggle Persistence");
-        //  pLoadButton->setFont(QFont("Arial", 20, QFont::Bold));
+        //  pLoadButton->setFont(defaultFont);
         //  connect(pLoadButton, &QPushButton::clicked, this, [&] {
         //    emit toggleOvrFlag(ovrHmdCap_LowPersistence);
         //  });
@@ -923,7 +904,7 @@ class ShadertoyApp : public QApplication {
 
         //{
         //  QPushButton * pLoadButton = new QPushButton("Toggle V-Sync");
-        //  pLoadButton->setFont(QFont("Arial", 20, QFont::Bold));
+        //  pLoadButton->setFont(defaultFont);
         //  connect(pLoadButton, &QPushButton::clicked, this, [&] {
         //    emit toggleOvrFlag(ovrHmdCap_NoVSync);
         //  });
@@ -945,8 +926,7 @@ class ShadertoyApp : public QApplication {
     channelSelector.setLayout(new QVBoxLayout());
     {
       QLabel * label = new QLabel("Textures");
-      QFont f("Arial", 24, QFont::Bold);
-      label->setFont(f);
+      label->setFont(defaultFont);
       channelSelector.layout()->addWidget(label);
 
       QWidget * pButtonRow = new QWidget();
@@ -980,8 +960,7 @@ class ShadertoyApp : public QApplication {
 
     {
       QLabel * label = new QLabel("Cubemaps");
-      QFont f("Arial", 24, QFont::Bold);
-      label->setFont(f);
+      label->setFont(defaultFont);
       channelSelector.layout()->addWidget(label);
 
       QWidget * pButtonRow = new QWidget();
@@ -1021,7 +1000,7 @@ class ShadertoyApp : public QApplication {
 
   QLabel * makeLabel(const QString & label) {
     QLabel * pLabel = new QLabel(label);
-    pLabel->setFont(defaultLabelFont);
+    pLabel->setFont(defaultFont);
     pLabel->setMaximumHeight(48);
     return pLabel;
   }
@@ -1038,7 +1017,7 @@ class ShadertoyApp : public QApplication {
       pPresetHolder->layout()->addWidget(makeLabel("Presets"));
 
       QListWidget * pPresets = new QListWidget();
-      pPresets->setFont(defaultLabelFont);
+      pPresets->setFont(defaultFont);
 
       for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
         shadertoy::Preset & preset = shadertoy::PRESETS[i];
@@ -1061,7 +1040,7 @@ class ShadertoyApp : public QApplication {
       loadDialog.layout()->addWidget(pUserShaderHolder);
 
       QListWidget * pUserShaders = new QListWidget();
-      pUserShaders->setFont(defaultLabelFont);
+      pUserShaders->setFont(defaultFont);
       connect(this, &ShadertoyApp::refreshUserShaders, pUserShaders, [=]() {
         pUserShaders->clear();
         QDir shaderDir = QDir(configPath.absoluteFilePath("shaders"));
@@ -1091,7 +1070,6 @@ class ShadertoyApp : public QApplication {
   }
 
   void setupSave() {
-    QFont defaultFont("Arial", 20, QFont::Bold);
     QWidget & saveDialog = *(new QWidget());
     saveDialog.resize(UI_SIZE.x, UI_SIZE.y);
     QFormLayout * formLayout = new QFormLayout();
@@ -1113,7 +1091,7 @@ class ShadertoyApp : public QApplication {
       pButtonRow->setLayout(pButtonRowLayout);
       {
         QPushButton * pButton = new QPushButton("Cancel");
-        pButton->setFont(QFont("Arial", 20, QFont::Bold));
+        pButton->setFont(defaultFont);
         connect(pButton, &QPushButton::clicked, this, [&] {
           setUiState(EDIT);
         });
@@ -1122,7 +1100,7 @@ class ShadertoyApp : public QApplication {
       }
       {
         QPushButton * pButton = new QPushButton("Save");
-        pButton->setFont(QFont("Arial", 20, QFont::Bold));
+        pButton->setFont(defaultFont);
         connect(pButton, &QPushButton::clicked, this, [&, pStatus] {
           activeShader.fragmentSource = shaderTextWidget.toPlainText();
           activeShader.saveFile(
@@ -1227,8 +1205,12 @@ public:
       riftRenderWidget.stop();
       QApplication::instance()->quit();
     });
+    connect(&uiScene, &QGraphicsScene::changed, this, [&](const QList<QRectF> &region) {
+      currentWindowImage = uiView.grab();
+      uiTextureRefresh();
+    });
     connect(&riftRenderWidget, &ShadertoyRiftWidget::mouseMoved, this, [&](QPointF pos) {
-      uiMouseOnlyRefresh();
+      uiTextureRefresh();
     });
 
     
@@ -1267,6 +1249,7 @@ private slots:
     this->uiVisible = uiVisible;
     if (uiVisible) {
       uiView.install(&riftRenderWidget);
+      uiTextureRefresh();
     } else {
       uiChannelDialog->hide();
       uiEditDialog->show();
@@ -1293,7 +1276,7 @@ private slots:
     qp.end();
   }
 
-  void uiMouseOnlyRefresh() {
+  void uiTextureRefresh() {
     if (!uiVisible) {
       return;
     }
@@ -1328,8 +1311,9 @@ private slots:
       return;
     }
 
-    currentWindowImage = uiView.grab();
-    uiMouseOnlyRefresh();
+
+//    currentWindowImage = uiView.grab();
+//    uiMouseOnlyRefresh();
   }
 
 signals:

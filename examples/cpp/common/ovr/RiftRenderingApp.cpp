@@ -84,8 +84,8 @@ void RiftRenderingApp::draw() {
   MatrixStack & mv = Stacks::modelview();
   MatrixStack & pr = Stacks::projection();
 
-  ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, eyePoses, nullptr);
-  static ovrPosef outputPoses[2];
+  ovrPosef fetchPoses[2];
+  ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, fetchPoses, nullptr);
   static ovrEyeType lastEyeRendered = ovrEye_Count;
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
@@ -95,7 +95,7 @@ void RiftRenderingApp::draw() {
     }
     // We want to ensure that we only update the pose we 
     // send to the SDK if we actually render this eye.
-    outputPoses[eye] = eyePoses[eye];
+    eyePoses[eye] = fetchPoses[eye];
 
     lastEyeRendered = eye;
     Stacks::withPush(pr, mv, [&] {
@@ -119,7 +119,7 @@ void RiftRenderingApp::draw() {
   }
   // Restore the default framebuffer
   //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-  ovrHmd_EndFrame(hmd, outputPoses, eyeTextures);
+  ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
   onFrameEnd();
   rateCounter.increment();
   if (rateCounter.elapsed() > 2.0f) {

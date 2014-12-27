@@ -158,7 +158,7 @@ public:
 };
 
 
-class OffscreenUiWindow : public QWindow {
+class OffscreenUiWindow : public QObject {
   //Q_OBJECT
 
   QOpenGLContext *m_context{ nullptr };
