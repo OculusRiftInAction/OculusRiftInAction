@@ -184,6 +184,7 @@ static Map createGlslMap() {
 
   return finalMap;
 }
+#if 0
 
 OffscreenUiWindow::OffscreenUiWindow(const QSize & size, QOpenGLContext * sharedContext) {
   setSurfaceType(QSurface::OpenGLSurface);
@@ -332,5 +333,6 @@ void OffscreenUiWindow::updateQuick() {
   m_quickWindow->resetOpenGLState();
   QOpenGLFramebufferObject::bindDefault();
 }
+#endif
 
 #include "QtUtils.moc"

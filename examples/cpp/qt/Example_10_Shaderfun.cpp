@@ -24,17 +24,19 @@ static const float INV_ROOT_2 = 1.0f / ROOT_2;
 static uvec2 UI_SIZE(UI_X, UI_Y);
 
 
-/**
-  This encapsulates all the information about a specific input channel for a shader
-*/
-struct Channel {
-  TexturePtr texture;
-  oglplus::Texture::Target target;
-  vec3 resolution;
-  Resource resource{ NO_RESOURCE };
-};
-
 namespace shadertoy {
+
+  ChannelInputType channelTypeFromString(const QString & channelTypeStr) {
+    ChannelInputType channelType = ChannelInputType::TEXTURE;
+    if (channelTypeStr == "tex") {
+      channelType = ChannelInputType::TEXTURE;
+    } else if (channelTypeStr == "cube") {
+      channelType = ChannelInputType::CUBEMAP;
+    } 
+    return channelType;
+  }
+
+
   // FIXME move struct into the header and make save / load functions 
   // helpers defined here.  Shadertoy header should not be bound to Qt
   struct Shader {
@@ -42,13 +44,16 @@ namespace shadertoy {
     static const char * XML_ROOT_NAME;
     static const char * XML_FRAGMENT_SOURCE;
     static const char * XML_CHANNEL;
+    static const char * XML_CHANNEL_ATTR_TYPE;
     static const char * XML_CHANNEL_ATTR_ID;
+    // Deprecated
     static const char * XML_CHANNEL_ATTR_SOURCE;
 
     QString url;
+    QString name;
     QString fragmentSource;
     ChannelInputType channelTypes[MAX_CHANNELS];
-    int channelIndices[MAX_CHANNELS];
+    QUrl channelTextures[MAX_CHANNELS];
 
     Shader() {
       loadPreset(SHADERTOY_SHADERS_DEFAULT_XML);
@@ -86,9 +91,6 @@ namespace shadertoy {
     
     // FIXME no error handling.  
     void loadXml(QIODevice & ioDevice) {
-      for (int i = 0; i < MAX_CHANNELS; ++i) {
-        channelIndices[i] = -1;
-      }
       QDomDocument dom;
       dom.setContent(&ioDevice);
 
@@ -111,27 +113,23 @@ namespace shadertoy {
             continue;
           }
 
+
+          // Compatibility mode
           if (attributes.contains(XML_CHANNEL_ATTR_SOURCE)) {
             source = attributes.namedItem(XML_CHANNEL_ATTR_SOURCE).nodeValue();
-          }
-          QRegExp re(CHANNEL_REGEX);
-          if (!re.exactMatch(source)) {
+            QRegExp re(CHANNEL_REGEX);
+            if (!re.exactMatch(source)) {
+              continue;
+            }
+            channelTypes[channelIndex] = channelTypeFromString(re.cap(1));
+            channelTextures[channelIndex] = QUrl("preset://" + re.cap(1) + "/" + re.cap(2));
             continue;
           }
-          int texIndex = re.cap(2).toInt();
-          QString channelTypeStr = re.cap(1);
-          shadertoy::ChannelInputType channelType;
-          if (channelTypeStr == "tex") {
-            channelType = shadertoy::ChannelInputType::TEXTURE;
-          } else if (channelTypeStr == "cube") {
-            channelType = shadertoy::ChannelInputType::CUBEMAP;
-          } else {
-            continue;
+
+          if (attributes.contains(XML_CHANNEL_ATTR_TYPE)) {
+            channelTypes[channelIndex] = channelTypeFromString(attributes.namedItem(XML_CHANNEL_ATTR_SOURCE).nodeValue());
+            channelTextures[channelIndex] = child.firstChild().nodeValue();
           }
-          channelTypes[channelIndex] = channelType;
-          channelIndices[channelIndex] = texIndex;
-        } else {
-          OutputDebugStringA(child.nodeName().toLocal8Bit());
         }
       }
     }
@@ -143,13 +141,14 @@ namespace shadertoy {
       result.appendChild(root);
 
       for (int i = 0; i < MAX_CHANNELS; ++i) {
-        if (channelIndices[i] != -1) {
+        if (channelTextures[i] != QUrl()) {
           QDomElement channelElement = result.createElement(XML_CHANNEL);
           channelElement.setAttribute(XML_CHANNEL_ATTR_ID, i);
-          QString source; source.sprintf("%s%d",
-            (channelTypes[i] == ChannelInputType::CUBEMAP ? "cube" : "tex"),
-            channelIndices[i]);
-          channelElement.setAttribute(XML_CHANNEL_ATTR_SOURCE, source);
+          // FIXME
+          //QString source; source.sprintf("%s%d",
+          //  (channelTypes[i] == ChannelInputType::CUBEMAP ? "cube" : "tex"),
+          //  channelIndices[i]);
+          //channelElement.setAttribute(XML_CHANNEL_ATTR_SOURCE, source);
           root.appendChild(channelElement);
         }
       }
@@ -165,8 +164,7 @@ namespace shadertoy {
   const char * Shader::XML_CHANNEL = "channel";
   const char * Shader::XML_CHANNEL_ATTR_ID = "id";
   const char * Shader::XML_CHANNEL_ATTR_SOURCE = "source";
-
-
+  const char * Shader::XML_CHANNEL_ATTR_TYPE = "type";
 }
 
 class ShadertoyRiftWidget : public QRiftWidget {
@@ -183,13 +181,44 @@ class ShadertoyRiftWidget : public QRiftWidget {
     TexturePtr tex;
     uvec2 size;
   };
-  typedef std::map<Resource, TextureData> TextureMap;
+  typedef std::map<QUrl, TextureData> TextureMap;
+
+  // A cache of all the input textures available 
+  TextureMap textureCache;
+
+  void initTextureCache() {
+    using namespace shadertoy;
+    for (int i = 0; i < MAX_TEXTURES; ++i) {
+      Resource res = TEXTURES[i];
+      if (NO_RESOURCE == res) {
+        continue;
+      }
+
+      uvec2 size;
+      TexturePtr ptr = oria::load2dTexture(res, size);
+      textureCache[QUrl("preset://tex/" + i)].tex = ptr;
+      textureCache[QUrl("preset://tex/" + i)].size = size;
+      textureCache[QUrl(QString().sprintf("preset://tex/%02d", i))].tex = ptr;
+      textureCache[QUrl(QString().sprintf("preset://tex/%02d", i))].size = size;
+    }
+    for (int i = 0; i < MAX_CUBEMAPS; ++i) {
+      Resource res = CUBEMAPS[i];
+      if (NO_RESOURCE == res) {
+        continue;
+      }
+      static int resourceOrder[] = {
+        0, 1, 2, 3, 4, 5
+      };
+      uvec2 size;
+      TexturePtr ptr = oria::loadCubemapTexture(res, resourceOrder, false);
+      textureCache[QUrl("preset://cube/" + i)].tex = ptr;
+      textureCache[QUrl(QString().sprintf("preset://cube/%02d", i))].tex = ptr;
+    }
+  }
 
   // Contains the current 'camera position'
   vec3 position;
 
-  // A cache of all the input textures available 
-  TextureMap textureCache;
 
   // Geometry for the skybox used to render the scene
   ShapeWrapperPtr skybox;
@@ -206,6 +235,13 @@ class ShadertoyRiftWidget : public QRiftWidget {
   ProgramPtr shadertoyProgram;
 
   // The currently active input channels
+  struct Channel {
+    QUrl source;
+    oglplus::Texture::Target target;
+    TexturePtr texture;
+    vec3 resolution;
+  };
+
   Channel channels[4];
 
   // The shadertoy rendering resolution scale.  1.0 means full resolution 
@@ -213,6 +249,7 @@ class ShadertoyRiftWidget : public QRiftWidget {
   // pre-distortion
   float texRes{ 1.0f };
   float eyePosScale{ 1.0f };
+  float startTime{ 0.0f };
 
   bool uiVisible{ false };
   
@@ -231,34 +268,8 @@ class ShadertoyRiftWidget : public QRiftWidget {
   // The current fragment source
   LambdaList uniformLambdas;
 
-  void initTextureCache() {
-    using namespace shadertoy;
-    for (int i = 0; i < MAX_TEXTURES; ++i) {
-      Resource res = TEXTURES[i];
-      if (NO_RESOURCE == res) {
-        continue;
-      }
-      TextureData & tex = textureCache[res];
-      tex.tex = oria::load2dTexture(res, tex.size);
-    }
-    for (int i = 0; i < MAX_CUBEMAPS; ++i) {
-      Resource res = CUBEMAPS[i];
-      if (NO_RESOURCE == res) {
-        continue;
-      }
-      TextureData & tex = textureCache[res];
-      static int resourceOrder[] = {
-        0, 1, 2, 3, 4, 5
-      };
-      tex.tex = oria::loadCubemapTexture(res, resourceOrder, false);
-    }
-  }
 
 protected:
-  virtual void setup() {
-    QRiftWidget::setup();
-    initTextureCache();
-  }
 
 public:
   explicit ShadertoyRiftWidget(QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0)
@@ -281,6 +292,10 @@ public:
   }
 
 protected:
+  virtual void setup() {
+    QRiftWidget::setup();
+    initTextureCache();
+  }
   
   void mouseMoveEvent(QMouseEvent * me) {
     emit mouseMoved(me->localPos());
@@ -318,7 +333,13 @@ protected:
       break;
 
     case Qt::Key_F4:
-      emit recompileShader();  //shaderSourceChanged(shaderTextWidget.toPlainText());
+      if (Qt::ShiftModifier == ke->modifiers()) {
+        startTime = Platform::elapsedSeconds();
+      } else {
+        emit recompileShader();
+      }
+      return;
+
       return;
 
     case Qt::Key_F5:
@@ -525,40 +546,52 @@ protected:
       } 
       fragmentShader.swap(newFragmentShader);
       updateUniforms();
+      startTime = Platform::elapsedSeconds();
       emit compileSuccess();
     } catch (ProgramBuildError & err) {
       emit compileError(QString(err.Log().c_str()));
     }
   }
 
-  virtual void setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, int index) {
+  virtual TexturePtr loadTexture(const QUrl & source) {
+    qDebug() << "Looking for texture " << source;
+    if (!textureCache.count(source)) {
+      qDebug() << "Texture " << source << " not found, loading";
+      // FIXME
+      QFile f(source.toLocalFile());
+      f.open(QFile::ReadOnly);
+      QByteArray ba = f.readAll();
+      std::vector<uint8_t> v;  v.assign(ba.constData(), ba.constData() + ba.size());
+      textureCache[source].tex = oria::load2dTexture(v);
+    }
+    return textureCache[source].tex;
+  }
+
+  virtual void setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, const QUrl & textureSource) {
     using namespace oglplus;
     Channel & channelRef = channels[channel];
-    Resource res = shadertoy::getChannelInputResource(type, index);
-    if (res == channelRef.resource) {
+    if (textureSource == channelRef.source) {
       return;
     }
 
-    if (index < 0) {
+    if (QUrl() == textureSource) {
       channels[channel].texture.reset();
       channels[channel].target = Texture::Target::_2D;
-      channels[channel].resource = res;
       return;
     }
     
     Channel newChannel;
-    newChannel.resource = res;
     uvec2 size;
     switch (type) {
     case shadertoy::ChannelInputType::TEXTURE:
-      newChannel.texture = textureCache[res].tex;
+      newChannel.texture = loadTexture(textureSource);
       newChannel.target = Texture::Target::_2D;
-      newChannel.resolution = vec3(textureCache[res].size, 0);
+//      newChannel.resolution = vec3(textureCache[res].size, 0);
       break;
 
     case shadertoy::ChannelInputType::CUBEMAP:
     {
-      newChannel.texture = textureCache[res].tex;
+      newChannel.texture = loadTexture(textureSource);
       newChannel.target = Texture::Target::CubeMap;
     }
     break;
@@ -573,7 +606,7 @@ protected:
 
   virtual void setShaderInternal(const shadertoy::Shader & shader) {
     for (int i = 0; i < shadertoy::MAX_CHANNELS; ++i) {
-      setChannelTextureInternal(i, shader.channelTypes[i], shader.channelIndices[i]);
+      setChannelTextureInternal(i, shader.channelTypes[i], shader.channelTextures[i]);
     }
     setShaderSourceInternal(shader.fragmentSource);
   }
@@ -599,7 +632,7 @@ protected:
     uniformLambdas.clear();
     if (activeUniforms.count(UNIFORM_GLOBALTIME)) {
       uniformLambdas.push_back([&] {
-        Uniform<GLfloat>(*shadertoyProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds());
+        Uniform<GLfloat>(*shadertoyProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds() - startTime);
       });
     }
 
@@ -645,9 +678,9 @@ public slots:
     });
   }
 
-  void setChannelTexture(int channel, shadertoy::ChannelInputType type, int index) {
-    queueRenderThreadTask([&, channel, type, index] {
-      setChannelTextureInternal(channel, type, index);
+  void setChannelTexture(int channel, shadertoy::ChannelInputType type, const QUrl & textureSource) {
+    queueRenderThreadTask([&, channel, type, textureSource] {
+      setChannelTextureInternal(channel, type, textureSource);
       updateUniforms();
     });
   }
@@ -724,7 +757,7 @@ class ShadertoyApp : public QApplication {
   QGraphicsProxyWidget * uiSaveDialog;
 
   // Holds the most recently captured UI image
-  std::map<Resource, QIcon> iconCache;
+  std::map<QUrl, QIcon> iconCache;
   QPixmap currentWindowImage;
   int activePresetIndex{ 0 };
   int activeChannelIndex{ 0 };
@@ -744,24 +777,39 @@ class ShadertoyApp : public QApplication {
       if (NO_RESOURCE == res) {
         continue;
       }
-      iconCache[res] = QIcon(QPixmap::fromImage(oria::qt::loadImageResource(res).scaled(QSize(128, 128))));
+      QIcon icon = QIcon(QPixmap::fromImage(oria::qt::loadImageResource(res).scaled(QSize(128, 128))));
+      iconCache[QUrl("preset://tex/" + i)] = icon;
+      iconCache[QUrl(QString().sprintf("preset://tex/%02d", i))] = icon;
     }
     for (int i = 0; i < MAX_CUBEMAPS; ++i) {
       Resource res = CUBEMAPS[i];
       if (NO_RESOURCE == res) {
         continue;
       }
-      iconCache[res] = QIcon(QPixmap::fromImage(oria::qt::loadImageResource(res).scaled(QSize(128, 128))));
+      QIcon icon = QIcon(QPixmap::fromImage(oria::qt::loadImageResource(res).scaled(QSize(128, 128))));
+      iconCache[QUrl("preset://cube/" + i)] = icon;
+      iconCache[QUrl(QString().sprintf("preset://cube/%02d", i))] = icon;
     }
-    iconCache[NO_RESOURCE] = QIcon();
+    iconCache[QUrl()] = QIcon();
   }
 
-  QToolButton * makeImageButton(Resource res = NO_RESOURCE, const QSize & size = QSize(128, 128)) {
+  QIcon loadIcon(const QUrl & url) {
+    qDebug() << "Looking for icon for URL " << url;
+    if (!iconCache.count(url)) {
+      qDebug() << "Existing icon not found, opening URL to create a new one";
+      QImage image;
+      image.load(url.toLocalFile());
+      iconCache[url] = QIcon(QPixmap::fromImage(image.scaled(QSize(128, 128))));
+    }
+    return iconCache[url];
+  }
+
+  QToolButton * makeImageButton(const QUrl & url = QUrl(), const QSize & size = QSize(128, 128)) {
     QToolButton  * button = new QToolButton();
     button->resize(size);
     button->setAutoFillBackground(true);
-    if (res != NO_RESOURCE) {
-      button->setIcon(iconCache[res]);
+    if (iconCache.count(url)) {
+      button->setIcon(iconCache[url]);
     }
     button->setIconSize(size);
     return button;
@@ -787,7 +835,7 @@ class ShadertoyApp : public QApplication {
       break;
     case SAVE:
       uiSaveDialog->show();
-      filenameTextWidget.setText("");
+      filenameTextWidget.setText(activeShader.name);
       filenameTextWidget.setFocus();
       break;
     }
@@ -810,18 +858,15 @@ class ShadertoyApp : public QApplication {
           activeChannelIndex = i;
           setUiState(CHANNEL);
         });
-        connect(this, &ShadertoyApp::channelTextureChanged, button, [=](int channel, shadertoy::ChannelInputType type, int index) {
+        connect(this, &ShadertoyApp::channelTextureChanged, button, [=](int channel, shadertoy::ChannelInputType type, const QUrl & textureSource) {
           if (i == channel) {
-            assert(channel == i);
-            Resource res = shadertoy::getChannelInputResource(type, index);
-            button->setIcon(iconCache[res]);
+            button->setIcon(loadIcon(textureSource));
             activeShader.channelTypes[channel] = type;
-            activeShader.channelIndices[channel] = index;
+            activeShader.channelTextures[channel] = textureSource;
           }
         });
         connect(this, &ShadertoyApp::shaderLoaded, button, [=](const shadertoy::Shader & shader) {
-          Resource res = shadertoy::getChannelInputResource(shader.channelTypes[i], shader.channelIndices[i]);
-          button->setIcon(iconCache[res]);
+          button->setIcon(loadIcon(shader.channelTextures[i]));
         });
         pButtonCol->layout()->addWidget(button);
       }
@@ -891,7 +936,6 @@ class ShadertoyApp : public QApplication {
           pButtonLayout->setAlignment(pSaveButton, Qt::AlignRight);
         }
 
-
         //{
         //  QPushButton * pLoadButton = new QPushButton("Toggle Persistence");
         //  pLoadButton->setFont(defaultFont);
@@ -947,10 +991,10 @@ class ShadertoyApp : public QApplication {
           buttonCount = 0;
         };
 
-        Resource res = shadertoy::TEXTURES[i];
-        QToolButton  * button = makeImageButton(res);
-        connect(button, &QToolButton::clicked, this, [&, i] {
-          emit channelTextureChanged(activeChannelIndex, shadertoy::ChannelInputType::TEXTURE, i);
+        QUrl url = QUrl("preset://tex/" + i);
+        QToolButton  * button = makeImageButton(url);
+        connect(button, &QToolButton::clicked, this, [&, url] {
+          emit channelTextureChanged(activeChannelIndex, shadertoy::ChannelInputType::TEXTURE, url);
           setUiState(EDIT);
         });
         pButtonRow->layout()->addWidget(button);
@@ -980,22 +1024,51 @@ class ShadertoyApp : public QApplication {
           buttonCount = 0;
         };
 
-        Resource res = shadertoy::CUBEMAPS[i];
-        QToolButton  * button = makeImageButton(res);
-        connect(button, &QToolButton::clicked, this, [&, i, button] {
-          emit channelTextureChanged(activeChannelIndex, shadertoy::ChannelInputType::CUBEMAP, i);
+        QUrl url = QUrl("preset://cube/" + i);
+        QToolButton  * button = makeImageButton(url);
+        connect(button, &QToolButton::clicked, this, [&, url] {
+          emit channelTextureChanged(activeChannelIndex, shadertoy::ChannelInputType::CUBEMAP, url);
           setUiState(EDIT);
         });
         pButtonRow->layout()->addWidget(button);
       }
       channelSelector.layout()->addWidget(pButtonRow);
-
-      QWidget * pCubemapRow = new QWidget();
-      pCubemapRow->setLayout(new QHBoxLayout());
-      channelSelector.layout()->addWidget(pCubemapRow);
     }
+
+    {
+      QWidget * pButtonRow = new QWidget();
+      pButtonRow->setLayout(new QHBoxLayout());
+      pButtonRow->layout()->setAlignment(Qt::AlignLeft);
+      {
+        QPushButton * pSaveButton = new QPushButton("Load");
+        pSaveButton->setFont(defaultFont);
+        connect(pSaveButton, &QPushButton::clicked, this, [&, this] {
+          QFileDialog * fileDialog = new QFileDialog();
+          fileDialog->setNameFilters(QStringList() << "Image files (*.png *.jpg)");
+          fileDialog->show();
+          fileDialog->move(0, 0);
+          fileDialog->resize(UI_SIZE.x, UI_SIZE.y);
+          fileDialog->hide();
+          fileDialog->setDirectory(QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+          QGraphicsProxyWidget * uiOpenDialog = uiScene.addWidget(fileDialog);
+          uiChannelDialog->hide();
+          uiOpenDialog->show();
+          connect(fileDialog, &QFileDialog::fileSelected, this, [&, this](const QString& file) {
+            QUrl fileUrl = QUrl::fromLocalFile(file);
+            // FIXME
+            emit channelTextureChanged(activeChannelIndex, shadertoy::ChannelInputType::TEXTURE, fileUrl);
+            setUiState(EDIT);
+          });
+        });
+        pButtonRow->layout()->addWidget(pSaveButton);
+        pButtonRow->layout()->setAlignment(pSaveButton, Qt::AlignRight);
+      }
+      channelSelector.layout()->addWidget(pButtonRow);
+    }
+
     uiChannelDialog = uiScene.addWidget(&channelSelector);
     uiChannelDialog->hide();
+
   }
 
   QLabel * makeLabel(const QString & label) {
@@ -1102,10 +1175,11 @@ class ShadertoyApp : public QApplication {
         QPushButton * pButton = new QPushButton("Save");
         pButton->setFont(defaultFont);
         connect(pButton, &QPushButton::clicked, this, [&, pStatus] {
+          activeShader.name = filenameTextWidget.toPlainText();
           activeShader.fragmentSource = shaderTextWidget.toPlainText();
           activeShader.saveFile(
             configPath.absoluteFilePath(QString("shaders/") 
-              + filenameTextWidget.toPlainText() 
+              + activeShader.name
               + ".xml"));
           setUiState(EDIT);
         });
@@ -1318,7 +1392,7 @@ private slots:
 
 signals:
   void shaderSourceChanged(QString str);
-  void channelTextureChanged(int channelIndex, shadertoy::ChannelInputType, int index);
+  void channelTextureChanged(int channelIndex, shadertoy::ChannelInputType, const QUrl & textureSource);
   void shaderLoaded(const shadertoy::Shader & shader);
   void uiToggled(bool newValue);
   void mouseMoved();
