@@ -18,7 +18,6 @@
  ************************************************************************************/
 
 #pragma once
-
 #include <QtWidgets>
 #include <QOpenGLWidget>
 #include <QPixmap>
@@ -34,59 +33,14 @@
 
 
 namespace oria { namespace qt {
-  inline vec2 toGlm(const QSize & size) {
-    return vec2(size.width(), size.height());
-  }
-
-  inline vec2 toGlm(const QPointF & pt) {
-    return vec2(pt.x(), pt.y());
-  }
-
-  inline QSize sizeFromGlm(const vec2 & size) {
-    return QSize(size.x, size.y);
-  }
-
-  inline QPointF pointFromGlm(const vec2 & pt) {
-    return QPointF(pt.x, pt.y);
-  }
-
-  template<typename T> 
-  T toQtType(Resource res) {
-    T result;
-    size_t size = Resources::getResourceSize(res);
-    result.resize(size);
-    Resources::getResourceData(res, result.data());
-    return result;
-  }
-
-  inline QByteArray toByteArray(Resource res) {
-    return toQtType<QByteArray>(res);
-  }
-
-  inline QString toString(Resource res) {
-    QByteArray data = toByteArray(res);
-    return QString::fromUtf8(data.data(), data.size());
-  }
-
-  inline QImage loadImageResource(Resource res) {
-    QImage image;
-    image.loadFromData(toByteArray(res));
-    return image;
-  }
-
-  inline QPixmap loadXpmResource(Resource res) {
-    QString cursorXpmStr = oria::qt::toString(res);
-    QStringList list = cursorXpmStr.split(QRegExp("\\n|\\r\\n|\\r"));
-    std::vector<QByteArray> bv;
-    std::vector<const char*> v;
-    foreach(QString line, list) {
-      bv.push_back(line.toLocal8Bit());
-      v.push_back(*bv.rbegin());
-    }
-    QPixmap result = QPixmap(&v[0]);
-    return result;
-  }
-
+  vec2 toGlm(const QSize & size);
+  vec2 toGlm(const QPointF & pt);
+  QSize sizeFromGlm(const vec2 & size);
+  QPointF pointFromGlm(const vec2 & pt);
+  QByteArray toByteArray(Resource res);
+  QString toString(Resource res);
+  QImage loadImageResource(Resource res);
+  QPixmap loadXpmResource(Resource res);
 
 } } // namespaces
 /**
@@ -158,42 +112,27 @@ public:
 };
 
 
-class OffscreenUiWindow : public QObject {
-  //Q_OBJECT
-
-  QOpenGLContext *m_context{ nullptr };
-  QOffscreenSurface *m_offscreenSurface{ nullptr };
-  QQuickRenderControl *m_renderControl{ nullptr };
+class OffscreenUiWindow : public QQuickRenderControl {
+  Q_OBJECT
   QQuickWindow *m_quickWindow{ nullptr };
-  QQuickItem *m_rootItem{ nullptr };
-  QTimer m_updateTimer;
-
 protected:
   QOpenGLFramebufferObject *m_fbo{ nullptr };
-  QQmlEngine *m_qmlEngine{ nullptr };
   QQmlComponent *m_qmlComponent{ nullptr };
 
 public:
-  OffscreenUiWindow(const QSize & size, QOpenGLContext * sharedContext);
+  std::atomic<GLuint> m_currentTexture;
 
-  virtual void setupScene();
+public:
+  OffscreenUiWindow();
+  void setupScene(const QSize & size, QOpenGLContext * context, QQmlComponent* qmlComponent);
+  void renderSceneToFbo();
 
-  virtual void loadSceneComponents() = 0;
-
-  void createFbo();
-
-  void destroyFbo();
-
-  void updateSizes();
-
-  void requestUpdate();
-
-  void resizeEvent(QResizeEvent *);
-
-  virtual void updateQuick();
+signals:
+  void offscreenTextureUpdated();
 };
 
 class LambdaThread : public QThread {
+  Q_OBJECT
   Lambda f;
 
   void run() {

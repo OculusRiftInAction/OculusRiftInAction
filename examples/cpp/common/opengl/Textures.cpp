@@ -25,12 +25,16 @@
 #include <oglplus/images/png.hpp>
 #endif
 
-typedef std::map<Resource, TexturePtr> TextureMap;
+struct TextureInfo {
+  uvec2 size;
+  TexturePtr tex;
+};
+typedef std::map<Resource, TextureInfo> TextureMap;
 typedef TextureMap::iterator TextureMapItr;
 
 namespace oria {
 
-  ImagePtr loadImage(std::vector<uint8_t> & data, bool flip) {
+  ImagePtr loadImage(const std::vector<uint8_t> & data, bool flip) {
     using namespace oglplus;
 #ifdef HAVE_OPENCV
     cv::Mat image = cv::imdecode(data, cv::IMREAD_COLOR);
@@ -46,9 +50,8 @@ namespace oria {
 #endif
   }
 
-  ImagePtr loadImage(Resource resource, bool flip) {
-    std::vector<uint8_t> data = Platform::getResourceByteVector(resource);
-    return loadImage(data, flip);
+  ImagePtr loadImage(Resource res, bool flip) {
+    return loadImage(Platform::getResourceByteVector(res), flip);
   }
 
   TextureMap & getTextureMap() {
@@ -66,16 +69,10 @@ namespace oria {
 
   template <typename T, typename F>
   T loadOrPopulate(std::map<Resource, T> & map, Resource resource, F loader) {
-    auto itr = map.find(resource);
-    if (map.end() == itr) {
-      T built = loader();
-      if (!built) {
-        FAIL("Unable to construct object");
-      }
-      map[resource] = built;
-      return built;
+    if (!map.count(resource)) {
+      map[resource] = loader();
     }
-    return itr->second;
+    return map[resource];
   }
 
   TexturePtr load2dTextureFromPngData(std::vector<uint8_t> & data) {
@@ -91,52 +88,72 @@ namespace oria {
     return texture;
   }
 
-  TexturePtr load2dTexture(Resource resource) {
-    return loadOrPopulate(getTextureMap(), resource, [&]{
-      uvec2 size;
-      return load2dTexture(resource, size);
-    });
-  }
-
-
-  TexturePtr load2dTexture(Resource resource, uvec2 & outSize) {
+  TextureInfo load2dTextureInternal(const std::vector<uint8_t> & data) {
     using namespace oglplus;
-    TexturePtr texture(new Texture());
-    Context::Bound(TextureTarget::_2D, *texture)
+    TextureInfo result;
+    result.tex = TexturePtr(new Texture());
+    Context::Bound(TextureTarget::_2D, *result.tex)
       .MagFilter(TextureMagFilter::Linear)
       .MinFilter(TextureMinFilter::Linear);
-    ImagePtr image = loadImage(resource);
-    outSize.x = image->Width();
-    outSize.y = image->Height();
+    ImagePtr image = loadImage(data);
+    result.size.x = image->Width();
+    result.size.y = image->Height();
     // FIXME detect alignment properly, test on both OpenCV and LibPNG
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     Texture::Image2D(TextureTarget::_2D, *image);
-    return texture;
+    return result;
+  }
+
+  TexturePtr load2dTexture(const std::vector<uint8_t> & data, uvec2 & outSize) {
+    TextureInfo texInfo = load2dTextureInternal(data);
+    outSize = texInfo.size;
+    return texInfo.tex;
+  }
+
+  TexturePtr load2dTexture(const std::vector<uint8_t> & data) {
+    uvec2 size;
+    return load2dTexture(data, size);
+  }
+
+  TexturePtr load2dTexture(Resource resource, uvec2 & outSize) {
+    const TextureInfo & texInfo = loadOrPopulate(getTextureMap(), resource, [&] {
+      return load2dTextureInternal(Platform::getResourceByteVector(resource));
+    });
+    outSize = texInfo.size;
+    return texInfo.tex;
+
+  }
+
+  TexturePtr load2dTexture(Resource resource) {
+    uvec2 size;
+    return load2dTexture(resource, size);
   }
 
   TexturePtr loadCubemapTexture(Resource firstResource, int resourceOrder[6], bool flip) {
-  return loadOrPopulate(getTextureMap(), firstResource, [&]{
-    using namespace oglplus;
-    TexturePtr texture(new Texture());
-    Context::Bound(TextureTarget::CubeMap, *texture)
-      .MagFilter(TextureMagFilter::Linear)
-      .MinFilter(TextureMinFilter::Linear)
-      .WrapS(TextureWrap::ClampToEdge)
-      .WrapT(TextureWrap::ClampToEdge)
-      .WrapR(TextureWrap::ClampToEdge);
+    const TextureInfo & texInfo = loadOrPopulate(getTextureMap(), firstResource, [&] {
+      using namespace oglplus;
+      TextureInfo result;
+      result.tex = TexturePtr(new Texture());
+      Context::Bound(TextureTarget::CubeMap, *result.tex)
+        .MagFilter(TextureMagFilter::Linear)
+        .MinFilter(TextureMinFilter::Linear)
+        .WrapS(TextureWrap::ClampToEdge)
+        .WrapT(TextureWrap::ClampToEdge)
+        .WrapR(TextureWrap::ClampToEdge);
 
-    glm::uvec2 size;
-    for (int i = 0; i < 6; ++i) {
-      Resource image = static_cast<Resource>(firstResource + i);
-      int cubeMapFace = resourceOrder[i];
-      Texture::Image2D(
-        Texture::CubeMapFace(cubeMapFace),
-        *loadImage(image, flip)
-        );
-    }
-    return texture;
-  });
-}
+      glm::uvec2 size;
+      for (int i = 0; i < 6; ++i) {
+        Resource imageRes = static_cast<Resource>(firstResource + i);
+        int cubeMapFace = resourceOrder[i];
+        ImagePtr imageData = loadImage(imageRes, flip);
+        size.x = imageData->Width();
+        size.y = imageData->Height();
+        Texture::Image2D(Texture::CubeMapFace(cubeMapFace), *imageData);
+      }
+      return result;
+    });
+    return texInfo.tex;
+  }
 
   TexturePtr loadCubemapTexture(Resource firstResource, bool flip) {
     static int RESOURCE_ORDER[] = {

@@ -135,3 +135,5 @@ void QRiftWidget::setup() {
 
 
 #endif
+
+#include "RiftQtApp.moc"

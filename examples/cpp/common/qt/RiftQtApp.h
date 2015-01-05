@@ -18,10 +18,10 @@
  ************************************************************************************/
 
 #pragma once
-
 #include <QtOpenGL/QGLWidget>
 
 class QRiftWidget : public QGLWidget, public RiftRenderingApp {
+  Q_OBJECT
   bool shuttingDown{ false };
   LambdaThread renderThread;
   TaskQueueWrapper tasks;
