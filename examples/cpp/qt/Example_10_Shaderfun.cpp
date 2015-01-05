@@ -7,6 +7,7 @@
 #include <QtOpenGL/QGLFunctions>
 #include <QDomDocument>
 #include <QXmlQuery>
+#include <QQuickImageProvider>
 
 #include "Shadertoy.h"
 
@@ -144,11 +145,8 @@ namespace shadertoy {
         if (channelTextures[i] != QUrl()) {
           QDomElement channelElement = result.createElement(XML_CHANNEL);
           channelElement.setAttribute(XML_CHANNEL_ATTR_ID, i);
-          // FIXME
-          //QString source; source.sprintf("%s%d",
-          //  (channelTypes[i] == ChannelInputType::CUBEMAP ? "cube" : "tex"),
-          //  channelIndices[i]);
-          //channelElement.setAttribute(XML_CHANNEL_ATTR_SOURCE, source);
+          channelElement.setAttribute(XML_CHANNEL_ATTR_TYPE, channelTypes[i] == ChannelInputType::CUBEMAP ? "cube" : "tex");
+          channelElement.appendChild(result.createTextNode(channelTextures[i].toDisplayString()));
           root.appendChild(channelElement);
         }
       }
@@ -158,6 +156,8 @@ namespace shadertoy {
       return result;
     }
   };
+
+
   const char * Shader::CHANNEL_REGEX = "(\\w+)(\\d{2})";
   const char * Shader::XML_ROOT_NAME = "shadertoy";
   const char * Shader::XML_FRAGMENT_SOURCE = "fragmentSource";
@@ -720,6 +720,32 @@ signals:
   void saveShader();
 };
 
+class QResourceImageProvider : public QQuickImageProvider {
+  std::map<QString, Resource> map;
+public:
+  QResourceImageProvider() : QQuickImageProvider(QQmlImageProviderBase::Image) {
+    for (int i = 0; Resources::RESOURCE_MAP_VALUES[i].first != NO_RESOURCE; ++i) {
+      const Resources::Pair & r = Resources::RESOURCE_MAP_VALUES[i];
+      map[r.second.c_str()] = r.first;
+    }
+  }
+
+  virtual QImage	requestImage(const QString & id, QSize * size, const QSize & requestedSize) {
+    qDebug() << "Requested image " << id << " " << requestedSize;
+    QImage image;
+
+    if (map.count(id)) {
+      if (size) {
+        *size = QSize(128, 128);
+      }
+      image.loadFromData(oria::qt::toByteArray(map[id]));
+      image = image.scaled(QSize(128, 128));
+    }
+
+    return image;
+  }
+};
+
 class ShadertoyApp : public QApplication {
   Q_OBJECT
 
@@ -733,15 +759,8 @@ class ShadertoyApp : public QApplication {
   TaskQueueWrapper tasks;
   bool uiVisible{ false };
 
-  // These structures are used to contain the UI elements for the application.  
-  // FIXME Move to QML for controls and offscreen rendering using QQuickRenderControl
-  ForwardingGraphicsView uiView;
-  QGraphicsScene uiScene;
-  QGLWidget uiGlWidget;
-
   QWidget desktopWindow;
   QFont defaultFont{ "Arial", 24, QFont::Bold };
-
 
   // A custom text widget with syntax highlighting for GLSL 
   GlslEditor shaderTextWidget;
@@ -749,11 +768,26 @@ class ShadertoyApp : public QApplication {
 
   shadertoy::Shader activeShader;
   QDir configPath;
+
+
   // The various UI 'panes'
+#ifdef OLD_UI
+  // These structures are used to contain the UI elements for the application.  
+  // FIXME Move to QML for controls and offscreen rendering using QQuickRenderControl
+  ForwardingGraphicsView uiView;
+  QGraphicsScene uiScene;
+  QGLWidget uiGlWidget;
+
   QGraphicsProxyWidget * uiEditDialog;
   QGraphicsProxyWidget * uiChannelDialog;
   QGraphicsProxyWidget * uiLoadDialog;
   QGraphicsProxyWidget * uiSaveDialog;
+#else
+  QOpenGLContext uiContext;
+  QOffscreenSurface uiOffscreenSurface;
+  OffscreenUiWindow uiFrame;
+  QQmlEngine qmlEngine;
+#endif
 
   // Holds the most recently captured UI image
   std::map<QUrl, QIcon> iconCache;
@@ -792,6 +826,14 @@ class ShadertoyApp : public QApplication {
     iconCache[QUrl()] = QIcon();
   }
 
+  QLabel * makeLabel(const QString & label) {
+    QLabel * pLabel = new QLabel(label);
+    pLabel->setFont(defaultFont);
+    pLabel->setMaximumHeight(48);
+    return pLabel;
+  }
+
+#ifdef OLD_UI
   QIcon loadIcon(const QUrl & url) {
     qDebug() << "Looking for icon for URL " << url;
     if (!iconCache.count(url)) {
@@ -1067,14 +1109,6 @@ class ShadertoyApp : public QApplication {
 
     uiChannelDialog = uiScene.addWidget(&channelSelector);
     uiChannelDialog->hide();
-
-  }
-
-  QLabel * makeLabel(const QString & label) {
-    QLabel * pLabel = new QLabel(label);
-    pLabel->setFont(defaultFont);
-    pLabel->setMaximumHeight(48);
-    return pLabel;
   }
 
   void setupLoad() {
@@ -1192,6 +1226,7 @@ class ShadertoyApp : public QApplication {
     uiSaveDialog = uiScene.addWidget(&saveDialog);
     uiSaveDialog->hide();
   }
+#endif
 
   void setupDesktopWindow() {
     desktopWindow.setLayout(new QFormLayout());
@@ -1224,12 +1259,29 @@ public:
   ShadertoyApp(int argc, char ** argv) :
     QApplication(argc, argv),
     riftRenderWidget(QRiftWidget::getFormat()),
-    uiGlWidget(QRiftWidget::getFormat(), 0, &riftRenderWidget),
+//    uiFrame(riftRenderWidget.context()->contextHandle()),
+//    uiGlWidget(QRiftWidget::getFormat(), 0, &riftRenderWidget),
     timer(this) { 
-
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
+    setFont(defaultFont);
+
+    {
+      uiContext.setShareContext(riftRenderWidget.context()->contextHandle());
+      {
+        QSurfaceFormat format;
+        // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
+        format.setDepthBufferSize(16);
+        format.setStencilBufferSize(8);
+        uiContext.setFormat(format);
+      }
+      uiContext.create();
+      uiOffscreenSurface.setFormat(uiContext.format());
+      uiOffscreenSurface.create();
+      uiContext.makeCurrent(&uiOffscreenSurface);
+    }
+
 
     QString configLocation = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
     configPath = QDir(configLocation);
@@ -1237,17 +1289,25 @@ public:
 
     initIconCache();
 
+#ifdef OLD_UI
     // Set up the UI renderer
     uiView.setViewport(new QWidget());
     uiView.setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
     uiView.setScene(&uiScene);
     uiView.resize(UI_SIZE.x, UI_SIZE.y);
-
     // Set up the various UI dialogs shown in the VR view
     setupChannelSelector();
     setupShaderEditor();
     setupLoad();
     setupSave();
+#else
+
+    qmlEngine.addImageProvider(QLatin1String("resources"), new QResourceImageProvider());
+    QQmlComponent * m_qmlComponent = new QQmlComponent(&qmlEngine,
+      QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\ChannelSelect.qml"));
+    uiFrame.setupScene(QSize(UI_SIZE.x, UI_SIZE.y), &uiContext, m_qmlComponent);
+    uiFrame.sceneChanged();
+#endif
 
     // Setup the desktop UI window
     setupDesktopWindow();
@@ -1278,13 +1338,25 @@ public:
       riftRenderWidget.stop();
       QApplication::instance()->quit();
     });
+    connect(&riftRenderWidget, &ShadertoyRiftWidget::mouseMoved, this, [&](QPointF pos) {
+      uiTextureRefresh();
+    });
+
+
+#ifdef OLD_UI    
     connect(&uiScene, &QGraphicsScene::changed, this, [&](const QList<QRectF> &region) {
       currentWindowImage = uiView.grab();
       uiTextureRefresh();
     });
-    connect(&riftRenderWidget, &ShadertoyRiftWidget::mouseMoved, this, [&](QPointF pos) {
-      uiTextureRefresh();
-    });
+
+    foreach(QGraphicsItem *item, uiScene.items()) {
+      item->setFlag(QGraphicsItem::ItemIsMovable);
+      item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    }
+#else
+    connect(&uiFrame, &OffscreenUiWindow::offscreenTextureUpdated, this, &ShadertoyApp::uiTextureRefresh);
+//    connect(&uiFrame, &ShadertoyUi::sceneChanged, this, &ShadertoyApp::uiTextureRefresh);
+#endif
 
     
 
@@ -1303,10 +1375,6 @@ public:
     riftRenderWidget.setMouseTracking(true);
     shaderTextWidget.setFocus();
 
-    foreach(QGraphicsItem *item, uiScene.items()) {
-      item->setFlag(QGraphicsItem::ItemIsMovable);
-      item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
-    }
 
     
     connect(&timer, SIGNAL(timeout()), this, SLOT(onTimer()));
@@ -1320,6 +1388,7 @@ public:
 private slots:
   void toggleUi(bool uiVisible) {
     this->uiVisible = uiVisible;
+#ifdef OLD_UI
     if (uiVisible) {
       uiView.install(&riftRenderWidget);
       uiTextureRefresh();
@@ -1328,9 +1397,11 @@ private slots:
       uiEditDialog->show();
       uiView.remove(&riftRenderWidget);
     }
+#endif
   }
 
   void mouseRefresh(QPixmap & currentWindowWithMouseImage) {
+#ifdef OLD_UI
     QCursor cursor = riftRenderWidget.cursor();
     QPoint position = cursor.pos();
     // Fetching the cursor pixmap isn't working... 
@@ -1347,9 +1418,13 @@ private slots:
     qp.begin(&currentWindowWithMouseImage);
     qp.drawPixmap(relative, cursorPm);
     qp.end();
+#endif
   }
 
   void uiTextureRefresh() {
+    GLuint newTexture = 0, oldTexture = 0;
+
+#ifdef OLD_UI
     if (!uiVisible) {
       return;
     }
@@ -1375,7 +1450,33 @@ private slots:
         glDeleteTextures(1, &oldTexture);
       }
     }
+#else
+    newTexture = uiFrame.m_currentTexture.exchange(0);
+#endif
+    if (newTexture) {
+      uiContext.makeCurrent(&uiOffscreenSurface);
+      Texture::Active(0);
+      // Is this needed?
+      glBindTexture(GL_TEXTURE_2D, newTexture);
+      GLenum err = glGetError();
+      Texture::MagFilter(Texture::Target::_2D, TextureMagFilter::Nearest);
+      Texture::MinFilter(Texture::Target::_2D, TextureMinFilter::Nearest);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glFlush();
+
+      oldTexture = riftRenderWidget.exchangeUiTexture(newTexture);
+    }
+
+#ifdef OLD_UI
     uiGlWidget.doneCurrent();
+    // If we get a non-0 value back it means the drawing thread never 
+    // used this texture, so we can delete it right away
+    if (oldTexture) {
+      glDeleteTextures(1, &oldTexture);
+    }
+#else
+    uiFrame.m_currentTexture.exchange(oldTexture);
+#endif
   }
 
   void onTimer() {
@@ -1383,8 +1484,6 @@ private slots:
     if (!uiVisible) {
       return;
     }
-
-
 //    currentWindowImage = uiView.grab();
 //    uiMouseOnlyRefresh();
   }
