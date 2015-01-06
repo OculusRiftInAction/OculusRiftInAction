@@ -634,7 +634,7 @@ namespace oria {
   }
 
 
-  void APIENTRY debugCallback(
+  void GL_CALLBACK debugCallback(
     GLenum source,
     GLenum type,
     GLuint id,

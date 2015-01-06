@@ -54,8 +54,15 @@ namespace oria {
       float fontSize = 12.0f, Resource font =
           Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
 
+#if defined(GLAPIENTRY)
+#define GL_CALLBACK GLAPIENTRY
+#elif defined(APIENTRY)
+#define GL_CALLBACK APIENTRY
+#else
+#define GL_CALLBACK 
+#endif
 
-  void APIENTRY debugCallback(
+  void GL_CALLBACK debugCallback(
     GLenum source,
     GLenum type,
     GLuint id,
