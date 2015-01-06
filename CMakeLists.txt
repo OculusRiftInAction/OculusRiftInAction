@@ -176,8 +176,7 @@ if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
     set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
 endif()
 
-
-find_package(Qt5 ${QT_COMPONENTS})
+find_package(Qt5 QUIET COMPONENTS ${QT_COMPONENTS})
 
 if (Qt5Core_FOUND)
     message(STATUS "Qt Found")
