@@ -513,7 +513,7 @@ private:
 #elif defined(OS_OSX)
 #define OVR_OS_MAC
 #elif defined(OS_LINUX)
-#define OVR_OS_LIUNX
+#define OVR_OS_LINUX
 #endif
 
 #include <OVR_CAPI_GL.h>
@@ -772,7 +772,6 @@ protected:
       // On windows, the SDK does a good job of automatically
       // finding the correct window.  On Linux, not so much.
       cfg.OGL.Disp = glfwGetX11Display();
-      cfg.OGL.Win = glfwGetX11Window(window);
     });
 
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,

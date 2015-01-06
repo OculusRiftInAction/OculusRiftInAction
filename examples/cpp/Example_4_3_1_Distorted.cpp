@@ -53,7 +53,6 @@ public:
 #if defined(OVR_OS_WIN32)
     ((ovrGLConfigData&)config).Window = 0;
 #elif defined(OVR_OS_LINUX)
-    ((ovrGLConfigData&)config).Win = 0;
     ((ovrGLConfigData&)config).Disp = 0;
 #endif
 
