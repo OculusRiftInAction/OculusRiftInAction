@@ -95,36 +95,37 @@ public:
         -100.0f, 100.0f);
 
       // Text display of our current sensor settings
-      //mv.withPush([&]{
-      //  mv.identity();
-      //  glm::vec3 euler = glm::eulerAngles(orientation);
-      //  glm::vec2 cursor(-0.9, windowAspectInverse * 0.9);
-      //  std::string message = Platform::format(
-      //    "Current orientation\n"
-      //    "roll  %0.2f\n"
-      //    "pitch %0.2f\n"
-      //    "yaw   %0.2f",
-      //    euler.z * RADIANS_TO_DEGREES,
-      //    euler.x * RADIANS_TO_DEGREES,
-      //    euler.y * RADIANS_TO_DEGREES);
-      //  GlUtils::renderString(message, cursor, 18.0f);
-      //});
+      mv.withPush([&]{
+        mv.identity();
+        glm::vec3 euler = glm::eulerAngles(orientation);
+        glm::vec2 cursor(-0.9, windowAspectInverse * 0.9);
+        std::string message = Platform::format(
+          "Current orientation\n"
+          "roll  %0.2f\n"
+          "pitch %0.2f\n"
+          "yaw   %0.2f",
+          euler.z * RADIANS_TO_DEGREES,
+          euler.x * RADIANS_TO_DEGREES,
+          euler.y * RADIANS_TO_DEGREES);
+        oria::renderString(message, cursor, 18.0f);
+      });
 
-      //if (renderSensors) {
-      //  mv.withPush([&]{
-      //    mv.top() = glm::lookAt(
-      //      glm::vec3(3.0f, 1.0f, 3.0f),
-      //      GlUtils::ORIGIN, GlUtils::UP);
-      //    mv.translate(glm::vec3(0.75f, -0.3f, 0.0f));
-      //    mv.scale(0.2f);
+      if (renderSensors) {
+        mv.withPush([&]{
+          mv.top() = glm::lookAt(
+            glm::vec3(3.0f, 1.0f, 3.0f),
+            Vectors::ORIGIN, Vectors::UP);
+          mv.translate(glm::vec3(0.75f, -0.3f, 0.0f));
+          mv.scale(0.2f);
 
-      //    GlUtils::draw3dGrid();
-      //    GlUtils::draw3dVector(linearA, 
-      //      Colors::green);
-      //    GlUtils::draw3dVector(angularV, 
-      //      Colors::yellow);
-      //  });
-      //}
+          //FIXME 
+          //GlUtils::draw3dGrid();
+          //GlUtils::draw3dVector(linearA, 
+          //  Colors::green);
+          //GlUtils::draw3dVector(angularV, 
+          //  Colors::yellow);
+        });
+      }
     });
   }
 };
