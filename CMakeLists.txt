@@ -177,7 +177,7 @@ if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
 endif()
 
 
-find_package(Qt5 REQUIRED ${QT_COMPONENTS})
+find_package(Qt5 ${QT_COMPONENTS})
 
 if (Qt5Core_FOUND)
     message(STATUS "Qt Found")
