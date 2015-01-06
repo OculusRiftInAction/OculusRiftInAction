@@ -54,6 +54,9 @@ namespace oria {
       float fontSize = 12.0f, Resource font =
           Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
 
+  void draw3dGrid();
+  void draw3dVector(const glm::vec3 & end, const glm::vec3 & col = glm::vec3(1));
+
 #if defined(GLAPIENTRY)
 #define GL_CALLBACK GLAPIENTRY
 #elif defined(APIENTRY)
@@ -63,13 +66,13 @@ namespace oria {
 #endif
 
   void GL_CALLBACK debugCallback(
-    GLenum source,
-    GLenum type,
-    GLuint id,
-    GLenum severity,
-    GLsizei length,
-    const GLchar * message,
-    void * userParam);
+      GLenum source,
+      GLenum type,
+      GLuint id,
+      GLenum severity,
+      GLsizei length,
+      const GLchar * message,
+      void * userParam);
 }
 
 template <typename F>

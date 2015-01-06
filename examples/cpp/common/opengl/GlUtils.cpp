@@ -29,6 +29,8 @@
 #include <oglplus/shapes/wicker_torus.hpp>
 #include <oglplus/shapes/sky_box.hpp>
 #include <oglplus/shapes/plane.hpp>
+#include <oglplus/shapes/grid.hpp>
+#include <oglplus/shapes/vector.hpp>
 #include <oglplus/opt/list_init.hpp>
 #include <oglplus/shapes/obj_mesh.hpp>
 
@@ -685,6 +687,47 @@ namespace oria {
   ShapeWrapperPtr loadSphere(const std::initializer_list<const GLchar*>& names, ProgramPtr program) {
     using namespace oglplus;
     return ShapeWrapperPtr(new shapes::ShapeWrapper(names, shapes::Sphere(), *program));
+  }
+
+  ShapeWrapperPtr loadGrid(ProgramPtr program) {
+    using namespace oglplus;
+    return ShapeWrapperPtr(new shapes::ShapeWrapper(std::initializer_list<const GLchar*>({ "Position" }), shapes::Grid(
+      Vec3f(0.0f, 0.0f, 0.0f),
+      Vec3f(1.0f, 0.0f, 0.0f),
+      Vec3f(0.0f, 0.0f, -1.0f),
+      8,
+      8), *program));
+  }
+
+  void draw3dGrid() {
+    static ProgramPtr program;
+    static ShapeWrapperPtr grid;
+    if (!program) {
+      program = loadProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
+      grid = loadGrid(program);
+      Platform::addShutdownHook([&] {
+        program.reset();
+        grid.reset();
+      });
+    }
+    renderGeometry(grid, program);
+  }
+
+  /*
+   For the sin of writing compat mode OpenGL, I will go to the special hell.
+  */
+  void draw3dVector(const glm::vec3 & end, const glm::vec3 & col) {
+    oglplus::NoProgram().Bind();
+    glMatrixMode(GL_PROJECTION);
+    glLoadMatrixf(glm::value_ptr(Stacks::projection().top()));
+    glMatrixMode(GL_MODELVIEW);
+    glLoadMatrixf(glm::value_ptr(Stacks::modelview().top()));
+    glColor3f(col.r, col.g, col.b);
+    glBegin(GL_LINES);
+    glVertex3f(0, 0, 0);
+    glVertex3f(end.x, end.y, end.z);
+    glEnd();
+    GLenum err = glGetError();
   }
 
 }

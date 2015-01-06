@@ -28,15 +28,17 @@ public:
       glm::vec3(0.0f, 0.0f, 3.5f),
       Vectors::ORIGIN, Vectors::UP);
 
-    return glfw::createWindow(outSize, outPosition);
+    GLFWwindow * result = glfw::createWindow(outSize, outPosition);
+    ovr_Initialize();
+    hmd = ovrHmd_Create(0);
+    return result;
   }
 
   void initGl() {
+
     GlfwApp::initGl();
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    ovr_Initialize();
-    hmd = ovrHmd_Create(0);
     if (!hmd) {
       FAIL("Unable to open HMD");
     }
@@ -69,8 +71,9 @@ public:
   }
 
   void update() {
-    ovrTrackingState sensorState = ovrHmd_GetTrackingState(hmd, 0);
-    ovrPoseStatef & poseState = sensorState.HeadPose;
+    ovrTrackingState trackingState =
+      ovrHmd_GetTrackingState(hmd, 0);
+    ovrPoseStatef & poseState = trackingState.HeadPose;
     orientation = ovr::toGlm(
       poseState.ThePose.Orientation);
     linearA = ovr::toGlm(
@@ -118,12 +121,9 @@ public:
           mv.translate(glm::vec3(0.75f, -0.3f, 0.0f));
           mv.scale(0.2f);
 
-          //FIXME 
-          //GlUtils::draw3dGrid();
-          //GlUtils::draw3dVector(linearA, 
-          //  Colors::green);
-          //GlUtils::draw3dVector(angularV, 
-          //  Colors::yellow);
+          oria::draw3dGrid();
+          oria::draw3dVector(linearA, Colors::green);
+          oria::draw3dVector(angularV, Colors::yellow);
         });
       }
     });
