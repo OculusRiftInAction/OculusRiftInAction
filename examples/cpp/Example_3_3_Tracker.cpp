@@ -28,15 +28,17 @@ public:
       glm::vec3(0.0f, 0.0f, 3.5f),
       Vectors::ORIGIN, Vectors::UP);
 
-    return glfw::createWindow(outSize, outPosition);
+    GLFWwindow * result = glfw::createWindow(outSize, outPosition);
+    ovr_Initialize();
+    hmd = ovrHmd_Create(0);
+    return result;
   }
 
   void initGl() {
+
     GlfwApp::initGl();
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-    ovr_Initialize();
-    hmd = ovrHmd_Create(0);
     if (!hmd) {
       FAIL("Unable to open HMD");
     }
@@ -69,8 +71,9 @@ public:
   }
 
   void update() {
-    ovrTrackingState sensorState = ovrHmd_GetTrackingState(hmd, 0);
-    ovrPoseStatef & poseState = sensorState.HeadPose;
+    ovrTrackingState trackingState =
+      ovrHmd_GetTrackingState(hmd, 0);
+    ovrPoseStatef & poseState = trackingState.HeadPose;
     orientation = ovr::toGlm(
       poseState.ThePose.Orientation);
     linearA = ovr::toGlm(
@@ -95,36 +98,34 @@ public:
         -100.0f, 100.0f);
 
       // Text display of our current sensor settings
-      //mv.withPush([&]{
-      //  mv.identity();
-      //  glm::vec3 euler = glm::eulerAngles(orientation);
-      //  glm::vec2 cursor(-0.9, windowAspectInverse * 0.9);
-      //  std::string message = Platform::format(
-      //    "Current orientation\n"
-      //    "roll  %0.2f\n"
-      //    "pitch %0.2f\n"
-      //    "yaw   %0.2f",
-      //    euler.z * RADIANS_TO_DEGREES,
-      //    euler.x * RADIANS_TO_DEGREES,
-      //    euler.y * RADIANS_TO_DEGREES);
-      //  GlUtils::renderString(message, cursor, 18.0f);
-      //});
+      mv.withPush([&]{
+        mv.identity();
+        glm::vec3 euler = glm::eulerAngles(orientation);
+        glm::vec2 cursor(-0.9, windowAspectInverse * 0.9);
+        std::string message = Platform::format(
+          "Current orientation\n"
+          "roll  %0.2f\n"
+          "pitch %0.2f\n"
+          "yaw   %0.2f",
+          euler.z * RADIANS_TO_DEGREES,
+          euler.x * RADIANS_TO_DEGREES,
+          euler.y * RADIANS_TO_DEGREES);
+        oria::renderString(message, cursor, 18.0f);
+      });
 
-      //if (renderSensors) {
-      //  mv.withPush([&]{
-      //    mv.top() = glm::lookAt(
-      //      glm::vec3(3.0f, 1.0f, 3.0f),
-      //      GlUtils::ORIGIN, GlUtils::UP);
-      //    mv.translate(glm::vec3(0.75f, -0.3f, 0.0f));
-      //    mv.scale(0.2f);
+      if (renderSensors) {
+        mv.withPush([&]{
+          mv.top() = glm::lookAt(
+            glm::vec3(3.0f, 1.0f, 3.0f),
+            Vectors::ORIGIN, Vectors::UP);
+          mv.translate(glm::vec3(0.75f, -0.3f, 0.0f));
+          mv.scale(0.2f);
 
-      //    GlUtils::draw3dGrid();
-      //    GlUtils::draw3dVector(linearA, 
-      //      Colors::green);
-      //    GlUtils::draw3dVector(angularV, 
-      //      Colors::yellow);
-      //  });
-      //}
+          oria::draw3dGrid();
+          oria::draw3dVector(linearA, Colors::green);
+          oria::draw3dVector(angularV, Colors::yellow);
+        });
+      }
     });
   }
 };

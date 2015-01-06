@@ -513,7 +513,7 @@ private:
 #elif defined(OS_OSX)
 #define OVR_OS_MAC
 #elif defined(OS_LINUX)
-#define OVR_OS_LIUNX
+#define OVR_OS_LINUX
 #endif
 
 #include <OVR_CAPI_GL.h>
@@ -622,14 +622,6 @@ namespace ovr {
         outSize = glm::uvec2(mode->width, mode->height);
       }
     }
-
-    // On linux it's recommended to leave the screen in it's default portrait orientation.
-    // The SDK currently allows no mechanism to test if this is the case.  I could query
-    // GLFW for the current resolution of the Rift, but that sounds too much like actual
-    // work.
-    ON_LINUX([&]{
-      std::swap(outSize.x, outSize.y);
-    });
 
     if (directHmdMode) {
       // In direct mode, try to put the output window on a secondary screen
@@ -772,7 +764,6 @@ protected:
       // On windows, the SDK does a good job of automatically
       // finding the correct window.  On Linux, not so much.
       cfg.OGL.Disp = glfwGetX11Display();
-      cfg.OGL.Win = glfwGetX11Window(window);
     });
 
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,

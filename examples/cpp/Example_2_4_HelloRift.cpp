@@ -220,12 +220,6 @@ public:
       oglplus::Context::Disable(oglplus::Capability::CullFace);
       oria::renderManikin();
     });
-
-    //MatrixStack & mv = Stacks::modelview();
-    //mv.with_push([&]{
-    //  mv.translate(glm::vec3(0, 0, ipd * -5));
-    //  GlUtils::renderManikin();
-    //});
   }
 };
 

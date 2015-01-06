@@ -30,11 +30,13 @@ namespace ovr {
     }
 
     // On linux it's recommended to leave the screen in it's default portrait orientation.
-    // The SDK currently allows no mechanism to test if this is the case.  I could query
-    // GLFW for the current resolution of the Rift, but that sounds too much like actual
-    // work.
+    // The SDK currently allows no mechanism to test if this is the case.
     ON_LINUX([&] {
-      std::swap(outSize.x, outSize.y);
+      // If we're running in extended mode, then we have the size of the screen from the GLFW call
+      // But in direct mode we need to swap the x and y value
+      if (directHmdMode) {
+        std::swap(outSize.x, outSize.y);
+      }
     });
 
     if (directHmdMode) {
@@ -60,5 +62,5 @@ namespace ovr {
     }
 
     return window;
-  }
+   }
 }

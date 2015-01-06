@@ -176,8 +176,7 @@ if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
     set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
 endif()
 
-
-find_package(Qt5 ${QT_COMPONENTS})
+find_package(Qt5 QUIET COMPONENTS ${QT_COMPONENTS})
 
 if (Qt5Core_FOUND)
     message(STATUS "Qt Found")
@@ -185,6 +184,8 @@ if (Qt5Core_FOUND)
     set(CMAKE_INCLUDE_CURRENT_DIR ON)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-bCommon.h" "-fCommon.h")
+   
 	foreach(qtc ${QT_COMPONENTS})
     	list(APPEND EXAMPLE_LIBS ${Qt5${qtc}_LIBRARIES})
         add_definitions(${Qt5${qtc}_DEFINITIONS})

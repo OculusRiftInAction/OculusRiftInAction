@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <cstdarg>
 #endif
 
 void Platform::sleepMillis(int millis) {
@@ -108,8 +109,11 @@ std::vector<uint8_t> Platform::getResourceByteVector(Resource resource) {
   return data;
 }
 
-std::stringstream Platform::getResourceStream(Resource resource) {
-  return std::stringstream(Platform::getResourceString(resource));
+std::stringstream && Platform::getResourceStream(Resource resource) {
+  std::string data = Platform::getResourceString(resource);
+  std::stringstream result;
+  result.str(data);
+  return std::move(result);
 }
 
 

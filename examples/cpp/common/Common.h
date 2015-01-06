@@ -155,7 +155,7 @@ typedef std::list<Lambda> LambdaList;
 #include "ovr/RiftGlfwApp.h"
 #include "ovr/RiftApp.h"
 
-#ifdef HAVE_QT
+#if (HAVE_QT) || (Q_MOC_RUN)
 #include "qt/QtUtils.h"
 #include "qt/RiftQtApp.h"
 #include "qt/GlslEditor.h"
