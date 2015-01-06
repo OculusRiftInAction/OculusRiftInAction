@@ -36,7 +36,7 @@ public:
   static std::string format(const char * formatString, ...);
   static std::string getResourceString(Resource resource);
   static std::vector<uint8_t> getResourceByteVector(Resource resource);
-  static std::stringstream getResourceStream(Resource resource);
+  static std::stringstream && getResourceStream(Resource resource);
 
   static std::string replaceAll(const std::string & in, const std::string & from, const std::string & to);
   static void setThreadPriority(ThreadPriority priority = MEDIUM);

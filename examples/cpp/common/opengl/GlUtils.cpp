@@ -598,7 +598,7 @@ namespace oria {
       });
 
       program = loadProgram(Resource::SHADERS_LITMATERIALS_VS, Resource::SHADERS_LITCOLORED_FS);
-      std::stringstream stream = Platform::getResourceStream(Resource::MESHES_ARTIFICIAL_HORIZON_OBJ);
+      std::stringstream && stream = Platform::getResourceStream(Resource::MESHES_ARTIFICIAL_HORIZON_OBJ);
       shapes::ObjMesh mesh(stream);
       shape = ShapeWrapperPtr(new shapes::ShapeWrapper({ "Position", "Normal", "Material" }, mesh, *program));
       Uniform<Vec4f>(*program, "Materials[0]").Set(materials);
@@ -634,7 +634,7 @@ namespace oria {
   }
 
 
-  void __stdcall debugCallback(
+  void APIENTRY debugCallback(
     GLenum source,
     GLenum type,
     GLuint id,
