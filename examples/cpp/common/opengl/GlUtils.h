@@ -55,7 +55,7 @@ namespace oria {
           Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
 
 
-  void __stdcall debugCallback(
+  void APIENTRY debugCallback(
     GLenum source,
     GLenum type,
     GLuint id,
