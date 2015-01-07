@@ -616,7 +616,7 @@ namespace oria {
 
   }
   
-  void renderCubeScene(float ipd, float eyeHeight) {
+  void renderExampleScene(float ipd, float eyeHeight) {
     oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     oria::renderFloor();
     

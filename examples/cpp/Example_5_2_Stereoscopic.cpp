@@ -2,14 +2,13 @@
 
 static const glm::uvec2 WINDOW_SIZE(1280, 800);
 static const glm::ivec2 WINDOW_POS(100, 100);
-
 static const glm::uvec2 EYE_SIZE(
     WINDOW_SIZE.x / 2, WINDOW_SIZE.y);
 static const float EYE_ASPECT = 
     aspect(EYE_SIZE);
 
 struct PerEyeArg {
-  glm::uvec2 viewportPosition;
+  glm::ivec2 viewportPosition;
   glm::mat4 modelviewOffset;
 };
 
@@ -28,16 +27,18 @@ public:
 
     glm::vec3 offset(OVR_DEFAULT_IPD / 2.0f, 0, 0);
     eyes[ovrEye_Left] = {
-      glm::uvec2(0, 0),
+      glm::ivec2(0, 0),
       glm::translate(glm::mat4(), offset)
     };
     eyes[ovrEye_Right] = {
-      glm::uvec2(WINDOW_SIZE.x / 2, 0),
+      glm::ivec2(WINDOW_SIZE.x / 2, 0),
       glm::translate(glm::mat4(), -offset)
     };
   }
 
-  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+  virtual GLFWwindow * createRenderingTarget(
+    glm::uvec2 & outSize, glm::ivec2 & outPosition) 
+  {
     outSize = WINDOW_SIZE;
     outPosition = WINDOW_POS;
     return glfw::createWindow(outSize, outPosition);
@@ -49,10 +50,11 @@ public:
 
     for (int i = 0; i < 2; ++i) {
       PerEyeArg & eyeArgs = eyes[i];
-      viewport(EYE_SIZE, ivec2(eyeArgs.viewportPosition));
+      viewport(EYE_SIZE, eyeArgs.viewportPosition);
       Stacks::withPush(mv, [&]{
         mv.preMultiply(eyeArgs.modelviewOffset);
-        oria::renderCubeScene(OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
+        oria::renderExampleScene(
+          OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
       });
     }
   }

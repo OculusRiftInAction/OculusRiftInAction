@@ -25,11 +25,12 @@ private:
   glm::uvec2    windowSize;
   glm::ivec2    windowPosition;
   int           frame{ 0 };
+  RateCounter   fpsCounter;
 
 protected:
   float         windowAspect{ 1.0f };
   float         windowAspectInverse{ 1.0f };
-  float         fps{ 0.0 };
+  //float         fps{ 0.0 };
 
 public:
   GlfwApp();

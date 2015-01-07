@@ -44,7 +44,7 @@ namespace oria {
   void renderManikin();
   void renderRift();
   void renderArtificialHorizon(float alpha = 0.0f);
-  void renderCubeScene(float ipd, float eyeHeight);
+  void renderExampleScene(float ipd, float eyeHeight);
 
   void renderString(const std::string & str, glm::vec2 & cursor,
       float fontSize = 12.0f, Resource font =
