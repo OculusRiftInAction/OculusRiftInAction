@@ -10,12 +10,14 @@ public:
         PI / 2.0f, aspect(WINDOW_SIZE), 0.01f, 100.0f);
 
     Stacks::modelview().top() = glm::lookAt(
-      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 1), 
+      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 5 * OVR_DEFAULT_IPD), 
       vec3(0, OVR_DEFAULT_EYE_HEIGHT, 0), 
       Vectors::UP);
   }
 
-  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+  virtual GLFWwindow * createRenderingTarget(
+    glm::uvec2 & outSize, glm::ivec2 & outPosition) 
+  {
     outSize = WINDOW_SIZE;
     outPosition = WINDOW_POS;
     return glfw::createWindow(outSize, outPosition);
@@ -23,7 +25,8 @@ public:
 
   virtual void draw() {
     oglplus::Context::Clear().ColorBuffer().DepthBuffer();
-    oria::renderCubeScene(OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
+    oria::renderExampleScene(
+      OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
   }
 };
 

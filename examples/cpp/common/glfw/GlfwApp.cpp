@@ -74,12 +74,14 @@ int GlfwApp::run() {
     preCreate();
     window = createRenderingTarget(windowSize, windowPosition);
     postCreate();
-
     if (!window) {
       FAIL("Unable to create OpenGL window");
     }
 
+    // Sometimes window initialization generates GL errors, so clear them out 
+    // before calling any oglplus stuff
     glGetError();
+
     initGl();
     // Ensure we shutdown the GL resources even if we throw an exception
     Finally f([&]{
@@ -89,19 +91,17 @@ int GlfwApp::run() {
     int framecount = 0;
     long start = Platform::elapsedMillis();
     while (!glfwWindowShouldClose(window)) {
+      fpsCounter.startCounter();
       glfwPollEvents();
       ++frame;
       update();
       draw();
       finishFrame();
-      long now = Platform::elapsedMillis();
-      ++framecount;
-      if ((now - start) >= 2000) {
-        float elapsed = (now - start) / 1000.f;
-        fps = (float)framecount / elapsed;
+      fpsCounter.increment();
+      if (fpsCounter.elapsed() >= 2.0f) {
+        float fps = fpsCounter.getRate();
         SAY("FPS: %0.2f", fps);
-        start = now;
-        framecount = 0;
+        fpsCounter.reset();
       }
     }
   }
