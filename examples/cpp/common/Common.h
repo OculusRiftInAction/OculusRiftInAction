@@ -40,6 +40,26 @@
 #include <thread>
 #include <unordered_map>
 
+#include <GL/glew.h>
+#define OGLPLUS_USE_GLEW 1
+#include <oglplus/gl.hpp>
+#pragma warning(disable : 4068)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+#pragma warning( disable : 4244 4267 4065 4101)
+#include <oglplus/all.hpp>
+#include <oglplus/interop/glm.hpp>
+#include <oglplus/bound/texture.hpp>
+#include <oglplus/bound/framebuffer.hpp>
+#include <oglplus/bound/renderbuffer.hpp>
+#include <oglplus/shapes/wrapper.hpp>
+#pragma warning( default : 4244 4267 4065 4101)
+#pragma clang diagnostic pop
+
+#ifdef HAVE_QT
+#include <QtWidgets>
+#endif
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -61,44 +81,9 @@ inline float aspect(const glm::vec2 & v) {
   return (float)v.x / (float)v.y;
 }
 
-#ifdef HAVE_QT
-#include <GL/glew.h>
-#else
-#include <GL/glew.h>
-#endif
-
-#define OGLPLUS_USE_GLEW 1
-
-#pragma warning(disable : 4068)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-#pragma warning( disable : 4244 4267 4065 4101)
-#include <oglplus/config/gl.hpp>
-#include <oglplus/all.hpp>
-#include <oglplus/interop/glm.hpp>
-#include <oglplus/bound/texture.hpp>
-#include <oglplus/bound/framebuffer.hpp>
-#include <oglplus/bound/renderbuffer.hpp>
-#include <oglplus/shapes/wrapper.hpp>
-#pragma warning( default : 4244 4267 4065 4101)
-#pragma clang diagnostic pop
 
 
 #include <GLFW/glfw3.h>
-// For some interaction with the Oculus SDK we'll need the native window 
-// handle from GLFW.  To get it we need to define a couple of macros 
-// (that depend on OS) and include an additional header 
-#if defined(OS_WIN)
-#define GLFW_EXPOSE_NATIVE_WIN32
-#define GLFW_EXPOSE_NATIVE_WGL
-#elif defined(OS_OSX)
-#define GLFW_EXPOSE_NATIVE_COCOA
-#define GLFW_EXPOSE_NATIVE_NSGL
-#elif defined(OS_LINUX)
-#define GLFW_EXPOSE_NATIVE_X11
-#define GLFW_EXPOSE_NATIVE_GLX
-#endif
-#include <GLFW/glfw3native.h>
 
 
 #include <Resources.h>
