@@ -77,20 +77,7 @@ namespace glfw {
     return nullptr;
   }
 
-  inline void * getNativeWindowHandle(GLFWwindow * window) {
-    void * nativeWindowHandle = nullptr;
-    ON_WINDOWS([&]{ 
-      nativeWindowHandle = (void*)glfwGetWin32Window(window); 
-    });
-    ON_LINUX([&]{ 
-      nativeWindowHandle = (void*)glfwGetX11Window(window); 
-    });
-    ON_MAC([&]{ 
-      nativeWindowHandle = (void*)glfwGetCocoaWindow(window); 
-    });
-    return nativeWindowHandle;
-  }
-
+  void * getNativeWindowHandle(GLFWwindow * window);
 
   inline GLFWwindow * createWindow(const glm::uvec2 & size, const glm::ivec2 & position = glm::ivec2(INT_MIN)) {
     GLFWwindow * window = glfwCreateWindow(size.x, size.y, "glfw", nullptr, nullptr);
