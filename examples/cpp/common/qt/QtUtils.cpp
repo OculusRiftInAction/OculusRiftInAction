@@ -18,7 +18,6 @@
  ************************************************************************************/
 
 #include "Common.h"
-#include "Qt/QtUtils.h"
 
 #include <QDomDocument>
 
