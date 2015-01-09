@@ -531,7 +531,6 @@ protected:
       source.insert(0, header);
       QByteArray qb = source.toLocal8Bit();
       GLchar * fragmentSource = (GLchar*)qb.data();
-      OutputDebugStringA(fragmentSource);
       StrCRef src(fragmentSource);
       newFragmentShader->Source(GLSLSource(src));
       newFragmentShader->Compile();
