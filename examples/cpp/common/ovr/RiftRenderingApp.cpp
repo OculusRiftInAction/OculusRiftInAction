@@ -1,19 +1,14 @@
 #include "Common.h"
 
-
-void RiftRenderingApp::initGl() {
-    glewExperimental = true;
-    glewInit();
-    glGetError();
-    //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-
+void RiftRenderingApp::initializeRiftRendering() {
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.BackBufferSize = ovr::fromGlm(hmdNativeResolution);
     cfg.OGL.Header.Multisample = 1;
+
     ON_WINDOWS([&]{
-      cfg.OGL.Window = (HWND)getRenderWindow();
+      cfg.OGL.Window = (HWND)getNativeWindow();
     });
 
     int distortionCaps =
@@ -117,31 +112,16 @@ void RiftRenderingApp::draw() {
       break;
     }
   }
-  // Restore the default framebuffer
-  //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+
   ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
   onFrameEnd();
   rateCounter.increment();
   if (rateCounter.elapsed() > 2.0f) {
     float fps = rateCounter.getRate();
+    updateFps(fps);
     SAY("FPS: %0.2f", fps);
     rateCounter.reset();
   }
 }
 
-
-//int framecount = 0;
-//long start = Platform::elapsedMillis();
-//while (!glfwWindowShouldClose(window)) {
-//  glfwPollEvents();
-//  ++frame;
-//  update();
-//  draw();
-//  finishFrame();
-//  long now = Platform::elapsedMillis();
-//  ++framecount;
-//  if ((now - start) >= 2000) {
-//  }
-//}
-//
 

@@ -36,8 +36,12 @@ private:
   bool renderingConfigured{ false };
 
 protected:
-  virtual void initGl();
+  virtual void initializeRiftRendering();
+
   bool isRenderingConfigured();
+
+  virtual void updateFps(float fps) {
+  }
 
   virtual void onFrameStart() {
   }
@@ -45,8 +49,7 @@ protected:
   virtual void onFrameEnd() {
   }
 
-  virtual void * getRenderWindow() = 0;
-
+  virtual void * getNativeWindow() = 0;
 
   virtual void renderScene() = 0;
 
