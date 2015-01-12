@@ -20,25 +20,21 @@
 #pragma once
 #include <QtOpenGL/QGLWidget>
 
-class QRiftWidget : public QGLWidget, public RiftRenderingApp {
+class QRiftWindow : public QWindow, public RiftRenderingApp {
   Q_OBJECT
   bool shuttingDown{ false };
   LambdaThread renderThread;
   TaskQueueWrapper tasks;
-
-  void paintGL();
-  virtual void * getRenderWindow();
+  QOpenGLContext * m_context;
 
 public:
-  static QGLFormat & getFormat();
 
-  explicit QRiftWidget(QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
+  QRiftWindow();
+  virtual ~QRiftWindow();
 
-  explicit QRiftWidget(QGLContext *context, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
-
-  explicit QRiftWidget(const QGLFormat& format, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
-
-  virtual ~QRiftWidget();
+  QOpenGLContext * context() {
+    return m_context;
+  }
 
   void start();
 
@@ -47,9 +43,20 @@ public:
 
   void queueRenderThreadTask(Lambda task);
 
-private:
-  void initWidget();
+  void * getNativeWindow() {
+    return (void*)winId();
+  }
 
+  void toggleOvrFlag(ovrHmdCaps flag) {
+    int caps = ovrHmd_GetEnabledCaps(hmd);
+    if (caps & flag) {
+      ovrHmd_SetEnabledCaps(hmd, caps & ~flag);
+    } else {
+      ovrHmd_SetEnabledCaps(hmd, caps | flag);
+    }
+  }
+
+private:
   virtual void renderLoop();
 
 protected:

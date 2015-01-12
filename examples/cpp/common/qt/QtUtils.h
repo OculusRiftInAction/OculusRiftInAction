@@ -30,6 +30,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QQuickRenderControl>
+#include <QQuickImageProvider>
 
 
 namespace oria { namespace qt {
@@ -112,23 +113,96 @@ public:
 };
 
 
-class OffscreenUiWindow : public QQuickRenderControl {
+class QResourceImageProvider : public QQuickImageProvider {
+  std::map<QString, Resource> map;
+public:
+  QResourceImageProvider() : QQuickImageProvider(QQmlImageProviderBase::Image) {
+    for (int i = 0; Resources::RESOURCE_MAP_VALUES[i].first != NO_RESOURCE; ++i) {
+      const Resources::Pair & r = Resources::RESOURCE_MAP_VALUES[i];
+      map[r.second.c_str()] = r.first;
+    }
+  }
+
+  virtual QImage	requestImage(const QString & id, QSize * size, const QSize & requestedSize) {
+    qDebug() << "Requested image " << id << " " << requestedSize;
+    QImage image;
+
+    if (map.count(id)) {
+      if (size) {
+        *size = QSize(128, 128);
+      }
+      image.loadFromData(oria::qt::toByteArray(map[id]));
+      image = image.scaled(QSize(128, 128));
+    }
+
+    return image;
+  }
+};
+
+class QMyQuickRenderControl : public QQuickRenderControl {
+public:
+  QWindow * m_renderWindow{ nullptr };
+
+  QWindow * renderWindow(QPoint * offset) Q_DECL_OVERRIDE{
+    if (nullptr == m_renderWindow) {
+      return QQuickRenderControl::renderWindow(offset);
+    }
+    if (nullptr != offset) {
+      offset->rx() = offset->ry() = 0;
+    }
+    return m_renderWindow;
+  }
+
+};
+
+
+class QOffscreenUi : public QObject {
   Q_OBJECT
-  QQuickWindow *m_quickWindow{ nullptr };
-protected:
-  QOpenGLFramebufferObject *m_fbo{ nullptr };
-  QQmlComponent *m_qmlComponent{ nullptr };
 
+  bool m_paused;
 public:
-  std::atomic<GLuint> m_currentTexture;
+  QOffscreenUi();
+  ~QOffscreenUi();
+  void setup(const QUrl & qmlSource, const QSize & size, QOpenGLContext * context);
 
-public:
-  OffscreenUiWindow();
-  void setupScene(const QSize & size, QOpenGLContext * context, QQmlComponent* qmlComponent);
-  void renderSceneToFbo();
+  void pause() {
+    m_paused = true;
+  }
+
+  void resume() {
+    m_paused = false;
+    requestRender();
+  }
+
+  void setProxyWindow(QWindow * window) {
+    m_renderControl->m_renderWindow = window;
+  }
+
+  void deleteOldTextures(const std::vector<GLuint> & oldTextures);
+
+  private slots:
+  void updateQuick();
+  void run();
+
+  public slots:
+  void requestUpdate();
+  void requestRender();
 
 signals:
-  void offscreenTextureUpdated();
+  void textureUpdated();
+
+public:
+  QOpenGLContext *m_context{ new QOpenGLContext };
+  QOffscreenSurface *m_offscreenSurface{ new QOffscreenSurface };
+  QMyQuickRenderControl  *m_renderControl{ new QMyQuickRenderControl };
+  QQuickWindow *m_quickWindow{ nullptr };
+  QQmlEngine *m_qmlEngine{ nullptr };
+  QQmlComponent *m_qmlComponent{ nullptr };
+  QQuickItem * m_rootItem{ nullptr };
+  QOpenGLFramebufferObject *m_fbo{ nullptr };
+  QTimer m_updateTimer;
+  QSize m_size;
+  bool m_polish{ true };
 };
 
 class LambdaThread : public QThread {
