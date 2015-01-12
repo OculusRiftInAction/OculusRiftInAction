@@ -128,4 +128,12 @@ public:
     pop();
     assert(startingDepth = size());
   }
+
+  template <typename Function>
+  void withIdentity(Function f) {
+    withPush([&] {
+      identity();
+      f();
+    });
+  }
 };
