@@ -287,6 +287,9 @@ void QOffscreenUi::setup(const QSize & size, QOpenGLContext * shareContext) {
   // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
   format.setDepthBufferSize(16);
   format.setStencilBufferSize(8);
+  format.setMajorVersion(3);
+  format.setMinorVersion(3);
+  format.setProfile(QSurfaceFormat::OpenGLContextProfile::CoreProfile);
   m_context->setFormat(format);
   if (nullptr != shareContext) {
     m_context->setShareContext(shareContext);
