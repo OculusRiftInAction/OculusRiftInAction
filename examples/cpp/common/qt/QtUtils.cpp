@@ -398,7 +398,7 @@ void QOffscreenUi::setup(const QUrl & qmlSource, const QSize & size, QOpenGLCont
   m_quickWindow = new QQuickWindow(m_renderControl);
   m_quickWindow->setRenderTarget(m_fbo);
 
-  m_quickWindow->setColor(QColor(255, 255, 255, 128));
+  m_quickWindow->setColor(QColor(255, 255, 255, 0));
   m_quickWindow->setFlags(m_quickWindow->flags() | static_cast<Qt::WindowFlags>(Qt::WA_TranslucentBackground));
   // Create a QML engine.
   m_qmlEngine = new QQmlEngine;

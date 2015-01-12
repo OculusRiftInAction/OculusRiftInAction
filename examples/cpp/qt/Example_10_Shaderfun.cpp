@@ -227,7 +227,8 @@ protected:
   };
 
   typedef std::map<QUrl, TextureData> TextureMap;
-  
+  typedef std::map<QUrl, QUrl> CanonicalUrlMap;
+  CanonicalUrlMap canonicalUrlMap;
   TextureMap textureCache;
 
   // The currently active input channels
@@ -268,9 +269,15 @@ protected:
       QUrl url(QString("image://resources/") + QString(Resources::getResourceMnemonic(res).c_str()));
       TextureData & cacheEntry = textureCache[url];
       cacheEntry.tex = oria::load2dTexture(res, cacheEntry.size);
+
       // Backward compatibility
-      textureCache[QUrl(QString().sprintf("preset://tex/%d", i))] = cacheEntry;
-      textureCache[QUrl(QString().sprintf("preset://tex/%02d", i))] = cacheEntry;
+      QUrl alternate = QUrl(QString().sprintf("preset://tex/%d", i));
+      canonicalUrlMap[alternate] = url;
+      textureCache[alternate] = cacheEntry;
+
+      alternate = QUrl(QString().sprintf("preset://tex/%02d", i));
+      canonicalUrlMap[alternate] = url;
+      textureCache[alternate] = cacheEntry;
     }
     for (int i = 0; i < MAX_CUBEMAPS; ++i) {
       Resource res = CUBEMAPS[i];
@@ -284,9 +291,15 @@ protected:
       uvec2 size;
       TextureData & cacheEntry = textureCache[url];
       cacheEntry.tex = oria::loadCubemapTexture(res, resourceOrder, false);
+
       // Backward compatibility
-      textureCache[QUrl(QString().sprintf("preset://cube/%d", i))] = cacheEntry;
-      textureCache[QUrl(QString().sprintf("preset://cube/%02d", i))] = cacheEntry;
+      QUrl alternate = QUrl(QString().sprintf("preset://cube/%d", i));
+      canonicalUrlMap[alternate] = url;
+      textureCache[alternate] = cacheEntry;
+
+      alternate = QUrl(QString().sprintf("preset://cube/%02d", i));
+      canonicalUrlMap[alternate] = url;
+      textureCache[alternate] = cacheEntry;
     }
   }
 
@@ -635,11 +648,15 @@ private:
     uiWindow.setProxyWindow(this);
   }
 
-  void setItemText(const QString & itemName, const QString & text) {
+  void setItemProperty(const QString & itemName, const QString & property, const QVariant & value) {
     QQuickItem * item = uiWindow.m_rootItem->findChild<QQuickItem*>(itemName);
     if (nullptr != item) {
-      item->setProperty("text", text);
+      item->setProperty(property.toLocal8Bit(), value);
     }
+  }
+
+  void setItemText(const QString & itemName, const QString & text) {
+    setItemProperty(itemName, "text", text);
   }
 
 
@@ -759,6 +776,15 @@ private:
     assert(!shader.fragmentSource.isEmpty());
     activeShader = shader;
     editorControl->setProperty("text", shader.fragmentSource);
+    for (int i = 0; i < 4; ++i) {
+      QUrl url = activeShader.channelTextures[i];
+        
+      while (canonicalUrlMap.count(url)) {
+        url = canonicalUrlMap[url];
+      }
+      qDebug() << url;
+      setItemProperty(QString().sprintf("channel%d", i), "source",  url);
+    }
     // FIXME update the channel texture buttons
     queueRenderThreadTask([&, shader] {
       setShaderInternal(shader);
@@ -905,6 +931,7 @@ private:
         Texture::Active(0);
         // Composite the UI image and the mouse sprite
         uiFramebuffer->Bound([&] {
+          Context::Clear().ColorBuffer();
           oria::viewport(UI_SIZE);
           // Clear out the projection and modelview here.
           Stacks::withIdentity([&] {
@@ -978,11 +1005,6 @@ public:
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
     setupDesktopWindow();
-
-    // Connect the UI to the rendering system so that when the a channel texture or the shader source is changed 
-    // we reflect it in rendering
-    // connect(this, &ShadertoyApp::shaderLoaded, &riftRenderWidget, &ShadertoyRiftWidget::setShader);
-
     riftRenderWidget.start();
     riftRenderWidget.requestActivate();
   }
