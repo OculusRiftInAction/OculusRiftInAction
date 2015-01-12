@@ -121,11 +121,13 @@ namespace shadertoy {
 
     void loadPreset(Resource res) {
       QByteArray presetData = oria::qt::toByteArray(res);
-      loadXml(QBuffer(&presetData));
+      QBuffer buffer(&presetData);
+      loadXml(buffer);
     }
 
-    void loadFile(const QString & file) {
-      loadXml(QFile(file));
+    void loadFile(const QString & fileName) {
+      QFile file(fileName);
+      loadXml(file);
     }
 
     // FIXME no error handling.  
@@ -213,7 +215,7 @@ namespace shadertoy {
   const char * Shader::XML_CHANNEL_ATTR_TYPE = "type";
 }
 
-struct ShadertoyRenderer : public QRiftWindow {
+class ShadertoyRenderer : public QRiftWindow {
   Q_OBJECT
 protected:
   struct Channel {
@@ -427,7 +429,6 @@ protected:
 
   virtual void setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, const QUrl & textureSource) {
     using namespace oglplus;
-    Channel & channelRef = channels[channel];
     if (textureSource == channelSources[channel]) {
       return;
     }
@@ -476,13 +477,13 @@ signals:
   void compileSuccess();
 };
 
-class ShadertoyRiftWidget : public ShadertoyRenderer {
+class ShadertoyWindow : public ShadertoyRenderer {
   Q_OBJECT
   
   typedef std::atomic<GLuint> AtomicGlTexture;
   typedef std::pair<GLuint, GLsync> SyncPair;
   typedef std::queue<SyncPair> TextureTrashcan;
-  typedef std::atomic<vec2> ActomicVec2;
+  typedef std::atomic<QPointF> ActomicVec2;
   typedef std::vector<GLuint> TextureDeleteQueue;
   typedef std::mutex Mutex;
   typedef std::unique_lock<Mutex> Lock;
@@ -547,17 +548,16 @@ class ShadertoyRiftWidget : public ShadertoyRenderer {
   }
 
 public:
-  ShadertoyRiftWidget() : timer(this) {
+  ShadertoyWindow() {
     {
       QString configLocation = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
       configPath = QDir(configLocation);
       configPath.mkpath("shaders");
     }
 
-    connect(&timer, &QTimer::timeout, this, &ShadertoyRiftWidget::onTimer);
+    connect(&timer, &QTimer::timeout, this, &ShadertoyWindow::onTimer);
     timer.start(100);
-
-    connect(this, &ShadertoyRiftWidget::fpsUpdated, this, [&](float fps){
+    connect(this, &ShadertoyWindow::fpsUpdated, this, [&](float fps){
       setItemText("fps", QString().sprintf("%0.2f", fps));
     });
     setupOffscreenUi();
@@ -567,7 +567,7 @@ public:
 private:
 
   virtual void initializeRiftRendering() {
-    QRiftWindow::initializeRiftRendering();
+    ShadertoyRenderer::initializeRiftRendering();
     setupShadertoy();
 
 
@@ -817,11 +817,12 @@ private:
     // Make sure we don't show the system cursor over the window
     qApp->setOverrideCursor(QCursor(Qt::BlankCursor));
     // Interpret the mouse position as NDC coordinates
-    vec2 mp = oria::qt::toGlm(me->localPos());
-    mp /= oria::qt::toGlm(size());
+    QPointF mp = me->localPos();
+    mp.rx() /= size().width();
+    mp.ry() /= size().height();
     mp *= 2.0f;
-    mp -= 1.0f;
-    mp.y *= -1.0f;
+    mp -= QPointF(1.0f, 1.0f);
+    mp.ry() *= -1.0f;
     mousePosition.store(mp);
     QRiftWindow::mouseMoveEvent(me);
   }
@@ -939,8 +940,8 @@ private:
             oria::renderGeometry(plane, uiProgram);
 
             // Render the mouse sprite on the UI
-            vec2 mp = mousePosition.load();
-            mv.translate(vec3(mp.x, mp.y, 0.0f));
+            QPointF mp = mousePosition.load();
+            mv.translate(vec3(mp.x(), mp.y(), 0.0f));
             mv.scale(vec3(0.1f));
             mouseTexture->Bind(Texture::Target::_2D);
             oria::renderGeometry(mouseShape, uiProgram);
@@ -963,7 +964,7 @@ private:
       GLsync & sync = top.second;
       GLenum result = glClientWaitSync(sync, 0, 0);
       if (GL_ALREADY_SIGNALED == result || GL_CONDITION_SATISFIED == result) {
-        tempTextureDeleteQueue.push_back(top.first);
+        tempTextureDeleteQueue.push_back(texture);
         textureTrash.pop();
       } else {
         break;
@@ -993,7 +994,7 @@ signals:
 class ShadertoyApp : public QApplication {
   Q_OBJECT
 
-  ShadertoyRiftWidget riftRenderWidget;
+  ShadertoyWindow riftRenderWidget;
 
   // A timer for updating the UI
   QWidget desktopWindow;
@@ -1046,6 +1047,8 @@ MAIN_DECL {
   } 
   return -1; 
 } 
+
+
 
 #include "Example_10_Shaderfun.moc"
 

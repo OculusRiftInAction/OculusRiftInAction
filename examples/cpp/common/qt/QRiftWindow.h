@@ -18,9 +18,8 @@
  ************************************************************************************/
 
 #pragma once
-#include <QtOpenGL/QGLWidget>
 
-class QRiftWindow : public QWindow, public RiftRenderingApp {
+class QRiftWindow : public QWindow, protected RiftRenderingApp {
   Q_OBJECT
   bool shuttingDown{ false };
   LambdaThread renderThread;
