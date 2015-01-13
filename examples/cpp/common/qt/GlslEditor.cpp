@@ -93,15 +93,15 @@ static Map createGlslMap() {
 //  darkYellow,
 //  transparent
 //! [0]
-GlslHighlighter::GlslHighlighter(QTextDocument *parent)
+GlslHighlighter::GlslHighlighter(bool nightMode, QTextDocument *parent)
   : QSyntaxHighlighter(parent) {
 
-  multiLineCommentFormat.setForeground(Qt::darkGray);
+  multiLineCommentFormat.setForeground(nightMode ? Qt::gray : Qt::darkGray);
 
   Map m = createGlslMap();
   {
     HighlightingRule rule;
-    rule.format.setForeground(Qt::darkBlue);
+    rule.format.setForeground(nightMode ? Qt::yellow : Qt::darkBlue);
     rule.format.setFontWeight(QFont::Bold);
     foreach(const QString &keyword, m["Keyword"]) {
       rule.pattern = QRegExp("\\b" + keyword + "\\b");
@@ -111,7 +111,7 @@ GlslHighlighter::GlslHighlighter(QTextDocument *parent)
 
   {
     HighlightingRule rule;
-    rule.format.setForeground(Qt::darkGreen);
+    rule.format.setForeground(nightMode ? Qt::green : Qt::darkGreen);
     rule.format.setFontWeight(QFont::Bold);
     foreach(const QString &keyword, m["Keywordstypes"]) {
       rule.pattern = QRegExp("\\b" + keyword + "\\b");
@@ -128,14 +128,14 @@ GlslHighlighter::GlslHighlighter(QTextDocument *parent)
     HighlightingRule rule;
     QTextCharFormat functionFormat;
     rule.format.setFontItalic(true);
-    rule.format.setForeground(Qt::blue);
+    rule.format.setForeground(nightMode ? Qt::yellow : Qt::blue);
     rule.pattern = QRegExp("\\b[A-Za-z0-9_]+(?=\\()");
     highlightingRules.append(rule);
   }
 
   {
     HighlightingRule rule;
-    rule.format.setForeground(Qt::darkBlue);
+    rule.format.setForeground(nightMode ? Qt::yellow : Qt::darkBlue);
     rule.format.setFontWeight(QFont::Bold);
     rule.format.setFontItalic(true);
     foreach(const QString &keyword, m["Buildinfunctions"]) {
@@ -147,7 +147,7 @@ GlslHighlighter::GlslHighlighter(QTextDocument *parent)
 
   {
     HighlightingRule rule;
-    rule.format.setForeground(Qt::darkRed);
+    rule.format.setForeground(nightMode ? Qt::red : Qt::darkRed);
     rule.format.setFontStrikeOut(true);
     foreach(const QString &keyword, m["Reserved"]) {
       rule.pattern = QRegExp("\\b" + keyword + "\\b");
@@ -158,7 +158,7 @@ GlslHighlighter::GlslHighlighter(QTextDocument *parent)
   {
     HighlightingRule rule;
     QTextCharFormat singleLineCommentFormat;
-    singleLineCommentFormat.setForeground(Qt::darkGray);
+    singleLineCommentFormat.setForeground(nightMode ? Qt::gray  : Qt::darkGray);
     rule.pattern = QRegExp("//[^\n]*");
     rule.format = singleLineCommentFormat;
     highlightingRules.append(rule);
@@ -166,7 +166,7 @@ GlslHighlighter::GlslHighlighter(QTextDocument *parent)
 
   {
     HighlightingRule rule;
-    rule.format.setForeground(Qt::darkGreen);
+    rule.format.setForeground(nightMode ? Qt::green : Qt::darkGreen);
     rule.pattern = QRegExp("\".*\"");
     highlightingRules.append(rule);
   }

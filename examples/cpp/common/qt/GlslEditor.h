@@ -8,7 +8,7 @@ class GlslHighlighter : public QSyntaxHighlighter {
   Q_OBJECT
 
 public:
-  GlslHighlighter(QTextDocument *parent = 0);
+  GlslHighlighter(bool nightMode = true, QTextDocument *parent = 0);
 
 protected:
   void highlightBlock(const QString &text);

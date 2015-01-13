@@ -597,7 +597,7 @@ private:
   }
 
   void setupOffscreenUi() {
-    qApp->setFont(QFont("Arial", 24, QFont::Bold));
+    qApp->setFont(QFont("Arial", 14, QFont::Bold));
     uiWindow.pause();
     uiWindow.setup(
       QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml"),

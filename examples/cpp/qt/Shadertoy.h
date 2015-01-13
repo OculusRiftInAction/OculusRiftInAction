@@ -54,7 +54,7 @@ namespace shadertoy {
     Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_XML, "Steel Cubes"),
     Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_XML, "Infinite City"),
     Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_XML, "Oceanic"),
-    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_XML, "Cubemap"),
+//    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_XML, "Cubemap"),
 #endif
 
 #if 0
