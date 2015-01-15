@@ -88,8 +88,6 @@ int GlfwApp::run() {
       shutdownGl();
     });
 
-    int framecount = 0;
-    long start = Platform::elapsedMillis();
     while (!glfwWindowShouldClose(window)) {
       fpsCounter.startCounter();
       glfwPollEvents();
