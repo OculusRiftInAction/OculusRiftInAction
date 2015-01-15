@@ -74,6 +74,7 @@ if (HAVE_QT)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
     message(STATUS "Creating Qt examples")
+	list(APPEND EXAMPLE_LIBS ExampleResourcesQt)
     make_examples(qt/*.cpp "Examples/Qt")
 endif()
 

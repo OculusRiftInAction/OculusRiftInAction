@@ -20,81 +20,41 @@
 #pragma once
 
 class RiftRenderingApp : public RiftManagerApp {
-
-protected:
-  ovrTexture eyeTextures[2];
-  ovrVector3f eyeOffsets[2];
-  bool eyePerFrameMode{false};
-
-private:
-  ovrEyeRenderDesc eyeRenderDescs[2];
-  ovrPosef eyePoses[2];
-  ovrEyeType currentEye;
-  glm::mat4 projections[2];
+  ovrEyeType currentEye{ovrEye_Count};
   FramebufferWrapperPtr eyeFramebuffers[2];
   unsigned int frameCount{ 0 };
-  bool renderingConfigured{ false };
 
 protected:
-  virtual void initializeRiftRendering();
+  ovrPosef eyePoses[2];
+  ovrVector3f eyeOffsets[2];
+  ovrTexture eyeTextures[2];
+  glm::mat4 projections[2];
+  bool eyePerFrameMode{ false };
+  std::mutex * endFrameLock{ nullptr };
 
-  bool isRenderingConfigured();
-
-  virtual void updateFps(float fps) {
-  }
-
-  virtual void onFrameStart() {
-  }
-
-  virtual void onFrameEnd() {
-  }
-
+private:
   virtual void * getNativeWindow() = 0;
 
-  virtual void renderScene() = 0;
+protected:
 
   inline ovrEyeType getCurrentEye() const {
     return currentEye;
   }
 
-  const ovrEyeRenderDesc & getEyeRenderDesc(ovrEyeType eye) const {
-    return eyeRenderDescs[eye];
-  }
-
-  const ovrFovPort & getFov(ovrEyeType eye) const {
-    return eyeRenderDescs[eye].Fov;
-  }
-
-  const glm::mat4 & getPerspectiveProjection(ovrEyeType eye) const {
-    return projections[eye];
-  }
-
-  const ovrPosef & getEyePose(ovrEyeType eye) const {
-    return eyePoses[eye];
-  }
-
   const ovrPosef & getEyePose() const {
-    return getEyePose(getCurrentEye());
+    return eyePoses[currentEye];
   }
 
-  const ovrFovPort & getFov() const {
-    return getFov(getCurrentEye());
+  virtual void updateFps(float fps) {
   }
 
-  const ovrEyeRenderDesc & getEyeRenderDesc() const {
-    return getEyeRenderDesc(getCurrentEye());
-  }
-
-  const glm::mat4 & getPerspectiveProjection() const {
-    return getPerspectiveProjection(getCurrentEye());
-  }
-
-
+  virtual void initializeRiftRendering();
+  virtual void drawRiftFrame();
+  virtual void renderScene() = 0;
+  
 public:
   RiftRenderingApp();
   virtual ~RiftRenderingApp();
-  virtual void draw();
-
 };
 
 

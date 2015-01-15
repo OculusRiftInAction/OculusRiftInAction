@@ -3,11 +3,10 @@
 #endif
 
 #include "Common.h"
-#include <QtOpenGL/QGLContext>
-#include <QtOpenGL/QGLFunctions>
 #include <QDomDocument>
 #include <QXmlQuery>
 #include <QQuickTextDocument>
+#include <QGuiApplication>
 #ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
 #else
@@ -268,7 +267,8 @@ protected:
       if (NO_RESOURCE == res) {
         continue;
       }
-      QUrl url(QString("image://resources/") + QString(Resources::getResourceMnemonic(res).c_str()));
+      QUrl url(QString("qrc:/") + QString(Resources::getResourceMnemonic(res).c_str()));
+      qDebug() << url;
       TextureData & cacheEntry = textureCache[url];
       cacheEntry.tex = oria::load2dTexture(res, cacheEntry.size);
 
@@ -289,7 +289,7 @@ protected:
       static int resourceOrder[] = {
         0, 1, 2, 3, 4, 5
       };
-      QUrl url(QString("image://resources/") + QString(Resources::getResourceMnemonic(res).c_str()));
+      QUrl url(QString("qrc:/") + QString(Resources::getResourceMnemonic(res).c_str()));
       uvec2 size;
       TextureData & cacheEntry = textureCache[url];
       cacheEntry.tex = oria::loadCubemapTexture(res, resourceOrder, false);
@@ -549,6 +549,7 @@ class ShadertoyWindow : public ShadertoyRenderer {
 
 public:
   ShadertoyWindow() {
+    this->endFrameLock = &uiWindow.renderLock;
     {
       QString configLocation = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
       configPath = QDir(configLocation);
@@ -637,6 +638,8 @@ private:
       this, SLOT(onResetPositionScale()));
     QObject::connect(uiWindow.m_rootItem, SIGNAL(toggleEyePerFrame()),
       this, SLOT(onToggleEyePerFrame()));
+    QObject::connect(uiWindow.m_rootItem, SIGNAL(epfModeChanged(bool)),
+      this, SLOT(onEpfModeChanged(bool)));
     QObject::connect(uiWindow.m_rootItem, SIGNAL(startShutdown()),
       this, SLOT(onShutdown()));
     QObject::connect(uiWindow.m_rootItem, SIGNAL(restartShader()),
@@ -687,9 +690,10 @@ private slots:
 
   void onChannelTextureChanged(const int & channelIndex, const int & channelType, const QString & texturePath) {
     queueRenderThreadTask([&, channelIndex, channelType, texturePath] {
+      qDebug() << texturePath;
       setChannelTextureInternal(channelIndex, 
         (shadertoy::ChannelInputType)channelType, 
-        QUrl("image://resources/" + texturePath));
+        QUrl(texturePath));
       updateUniforms();
     });
   }
@@ -737,11 +741,15 @@ private slots:
   }
 
   void onToggleEyePerFrame() {
-    bool newEyePerFrameMode = !eyePerFrameMode;
+    onEpfModeChanged(!eyePerFrameMode);
+  }
+
+  void onEpfModeChanged(bool checked) {
+    bool newEyePerFrameMode = checked;
     queueRenderThreadTask([&, newEyePerFrameMode] {
       eyePerFrameMode = newEyePerFrameMode;
     });
-    setItemText("epf", newEyePerFrameMode ? "On" : "Off");
+    setItemProperty("epf", "checked", newEyePerFrameMode);
   }
 
   void onRestartShader() {
@@ -778,7 +786,6 @@ private:
     editorControl->setProperty("text", shader.fragmentSource);
     for (int i = 0; i < 4; ++i) {
       QUrl url = activeShader.channelTextures[i];
-        
       while (canonicalUrlMap.count(url)) {
         url = canonicalUrlMap[url];
       }
@@ -1001,7 +1008,7 @@ class ShadertoyApp : public QApplication {
   shadertoy::Shader activeShader;
 
 public:
-  ShadertoyApp(int argc, char ** argv) : QApplication(argc, argv) { 
+  ShadertoyApp(int argc, char ** argv) : QApplication(argc, argv) {
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
@@ -1039,6 +1046,7 @@ MAIN_DECL {
     qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "."); 
 #endif
     QT_APP_WITH_ARGS(ShadertoyApp);
+    Q_INIT_RESOURCE(Resource);
     return app.exec(); 
   } catch (std::exception & error) { 
     SAY_ERR(error.what()); 

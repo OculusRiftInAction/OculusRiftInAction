@@ -79,94 +79,6 @@ namespace oria {
     }
   }
 }
-ForwardingGraphicsView::ForwardingGraphicsView(QWidget * filterTarget)  {
-  if (filterTarget) {
-    install(filterTarget);
-  }
-}
-
-void ForwardingGraphicsView::install(QWidget * filterTarget) {
-  if (filterTarget == this->filterTarget) {
-    return;
-  }
-  if (this->filterTarget) {
-    remove(this->filterTarget);
-  }
-
-  this->filterTarget = filterTarget;
-
-  if (this->filterTarget) {
-    this->filterTarget->installEventFilter(this);
-  }
-}
-
-void ForwardingGraphicsView::remove(QWidget * filterTarget) {
-  if (!filterTarget || filterTarget != this->filterTarget) {
-    return;
-  }
-
-  if (filterTarget) {
-    filterTarget->removeEventFilter(this);
-    this->filterTarget = nullptr;
-  }
-}
-
-void ForwardingGraphicsView::resizeEvent(QResizeEvent *event) {
-  if (scene())
-    scene()->setSceneRect(QRect(QPoint(0, 0), event->size()));
-  QGraphicsView::resizeEvent(event);
-}
-
-void ForwardingGraphicsView::forwardMouseEvent(QMouseEvent * event) {
-  // Translate the incoming coordinates to the target window coordinates
-  vec2 scaleFactor = oria::qt::toGlm(size()) / oria::qt::toGlm(filterTarget->size());
-  vec2 sourceHit = oria::qt::toGlm(event->localPos());
-  QPointF targetHit = oria::qt::pointFromGlm(sourceHit * scaleFactor);
-  QPointF screenHit = mapToGlobal(targetHit.toPoint());
-  
-  // Build a new event
-  QMouseEvent newEvent(event->type(),
-    targetHit, targetHit, screenHit,
-    event->button(), event->buttons(), event->modifiers());
-  viewportEvent(&newEvent);
-}
-
-void ForwardingGraphicsView::forwardKeyEvent(QKeyEvent * event) {
-  viewportEvent(event);
-}
-
-bool ForwardingGraphicsView::eventFilter(QObject *object, QEvent *event) {
-  if (object == filterTarget) {
-    switch (event->type()) {
-    case QEvent::MouseMove:
-      forwardMouseEvent((QMouseEvent *)event);
-      break;
-
-    case QEvent::MouseButtonRelease:
-    case QEvent::MouseButtonDblClick:
-    case QEvent::MouseButtonPress:
-      forwardMouseEvent((QMouseEvent *)event);
-      break;
-
-    case QEvent::Wheel:
-      viewportEvent((QWheelEvent *)event);
-      break;
-
-    case QEvent::KeyPress:
-      keyPressEvent((QKeyEvent*)event);
-      break;
-
-    case QEvent::KeyRelease:
-      keyReleaseEvent((QKeyEvent*)event);
-      break;
-
-    default:
-      break;
-    }
-    return false;
-  }
-  return QGraphicsView::eventFilter(object, event);
-}
 
 typedef std::list<QString> List;
 typedef std::map<QString, List> Map;
@@ -481,7 +393,6 @@ void QOffscreenUi::updateQuick() {
   if (!m_context->makeCurrent(m_offscreenSurface))
     return;
 
-  m_fbo->bind();
   // Polish, synchronize and render the next frame (into our fbo).  In this example
   // everything happens on the same thread and therefore all three steps are performed
   // in succession from here. In a threaded setup the render() call would happen on a
@@ -492,7 +403,13 @@ void QOffscreenUi::updateQuick() {
     m_polish = false;
   }
 
+  if (!renderLock.try_lock()) {
+    requestRender(); 
+    return;
+  }
+  m_fbo->bind();
   m_renderControl->render();
+  renderLock.unlock();
   m_quickWindow->resetOpenGLState();
   QOpenGLFramebufferObject::bindDefault();
   glFlush();

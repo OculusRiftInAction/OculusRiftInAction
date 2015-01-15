@@ -18,9 +18,6 @@
  ************************************************************************************/
 
 #pragma once
-#include <QtWidgets>
-#include <QOpenGLWidget>
-#include <QPixmap>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QOpenGLFramebufferObject>
@@ -50,68 +47,6 @@ namespace oria { namespace qt {
  * OpenGl window with controls rendered inside it) and have the resulting
  * click reflected on the scene displayed in this view.
  */
-class ForwardingGraphicsView : public QGraphicsView {
-  QWidget * filterTarget{ nullptr };
-
-public:
-  ForwardingGraphicsView(QWidget * filterTarget = nullptr);
-
-  void install(QWidget * filterTarget);
-  void remove(QWidget * filterTarget);
-
-protected:
-  void forwardMouseEvent(QMouseEvent * event);
-  void forwardKeyEvent(QKeyEvent * event);
-  void resizeEvent(QResizeEvent *event);
-  bool eventFilter(QObject *object, QEvent *event);
-};
-
-
-class PaintlessOpenGLWidget : public QOpenGLWidget {
-protected:
-  bool event(QEvent * e) {
-    if (QEvent::Paint == e->type()) {
-      return true;
-    }
-    return QOpenGLWidget::event(e);
-  }
-
-public:
-  explicit PaintlessOpenGLWidget() : QOpenGLWidget() {
-  }
-};
-
-
-class DelegatingOpengGLWindow : public PaintlessOpenGLWidget {
-  typedef std::function<void()> Callback;
-  typedef std::function<void(int, int)> ResizeCallback;
-
-
-  Callback paintCallback;
-  Callback initCallback;
-  ResizeCallback resizeCallback;
-
-protected:
-  void initializeGL() {
-    initCallback();
-  }
-
-  void resizeGL(int w, int h) {
-    resizeCallback(w, h);
-  }
-
-  void paintGL() {
-    paintCallback();
-    update();
-  }
-
-public:
-  explicit DelegatingOpengGLWindow(
-    Callback paint, Callback init = []{}, ResizeCallback resize = [](int, int){}) :
-    PaintlessOpenGLWidget(), paintCallback(paint), initCallback(init), resizeCallback(resize) {
-  }
-};
-
 
 class QResourceImageProvider : public QQuickImageProvider {
   std::map<QString, Resource> map;
@@ -203,6 +138,7 @@ public:
   QTimer m_updateTimer;
   QSize m_size;
   bool m_polish{ true };
+  std::mutex renderLock;
 };
 
 class LambdaThread : public QThread {

@@ -51,9 +51,7 @@ QRiftWindow::QRiftWindow() {
       ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
     }
   }
-
 }
-
 
 QRiftWindow::~QRiftWindow() {
   stop();
@@ -90,11 +88,7 @@ void QRiftWindow::renderLoop() {
     if (app->hasPendingEvents())
       app->processEvents();
     tasks.drainTaskQueue();
-    if (isRenderingConfigured()) {
-      draw();
-    } else {
-      QThread::msleep(4);
-    }
+    drawRiftFrame();
   }
   m_context->doneCurrent();
   m_context->moveToThread(QApplication::instance()->thread());

@@ -11,8 +11,8 @@ void RiftRenderingApp::initializeRiftRendering() {
       cfg.OGL.Window = (HWND)getNativeWindow();
     });
 
-    int distortionCaps =
-      ovrDistortionCap_Chromatic
+    int distortionCaps = 0
+      | ovrDistortionCap_Chromatic
       | ovrDistortionCap_Vignette
       | ovrDistortionCap_Overdrive
       | ovrDistortionCap_TimeWarp;
@@ -21,10 +21,10 @@ void RiftRenderingApp::initializeRiftRendering() {
       distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
     });
 
+    ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
     assert(configResult);
-    renderingConfigured = configResult;
 
     for_each_eye([&](ovrEyeType eye){
       const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
@@ -65,15 +65,10 @@ RiftRenderingApp::RiftRenderingApp() {
 RiftRenderingApp::~RiftRenderingApp() {
 }
 
-bool RiftRenderingApp::isRenderingConfigured() {
-  return renderingConfigured;
-}
-
 static RateCounter rateCounter;
 
-void RiftRenderingApp::draw() {
+void RiftRenderingApp::drawRiftFrame() {
   ++frameCount;
-  onFrameStart();
   rateCounter.startCounter();
   ovrHmd_BeginFrame(hmd, frameCount);
   MatrixStack & mv = Stacks::modelview();
@@ -113,8 +108,13 @@ void RiftRenderingApp::draw() {
     }
   }
 
+  if (endFrameLock) {
+    endFrameLock->lock();
+  }
   ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
-  onFrameEnd();
+  if (endFrameLock) {
+    endFrameLock->unlock();
+  }
   rateCounter.increment();
   if (rateCounter.elapsed() > 2.0f) {
     float fps = rateCounter.getRate();
