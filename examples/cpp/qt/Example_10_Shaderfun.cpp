@@ -354,7 +354,7 @@ class ShadertoyWindow : public ShadertoyRenderer {
 
   QOffscreenUi uiWindow;
   GlslHighlighter highlighter;
-  QQuickItem * editorControl;
+//  QQuickItem * editorControl;
   int activePresetIndex{ 0 };
   float savedEyePosScale{ 1.0f };
 
@@ -474,16 +474,15 @@ private:
         auto qmlContext = uiWindow.m_qmlEngine->rootContext();
         qmlContext->setContextProperty("presetsModel", QVariant::fromValue(dataList));
         // Qt.resolvedUrl("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders")
-        QUrl urlBad = QUrl::fromLocalFile(configPath.absolutePath() + "/shaders" );
         QUrl url = QUrl::fromLocalFile("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders");
-        qDebug() << urlBad;
-        qDebug() << url;
         qmlContext->setContextProperty("userPresetsFolder", url);
       }
       uiWindow.setProxyWindow(this);
+      qApp->setFont(QFont("Arial", 14, QFont::Bold));
     }
-
-    uiWindow.loadQml(QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml"));
+	QUrl qml = QUrl::fromLocalFile("/Users/bradd/git/OculusRiftInAction/resources/shadertoy/Combined.qml");
+//	QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
+    uiWindow.loadQml(qml);
     connect(&uiWindow, &QOffscreenUi::textureUpdated, this, [&] {
       GLuint newTexture = uiWindow.m_fbo->takeTexture();
       GLuint oldTexture = exchangeUiTexture(newTexture);
@@ -492,9 +491,12 @@ private:
       }
     });
 
+    QQuickItem * editorControl;
     editorControl = uiWindow.m_rootItem->findChild<QQuickItem*>("shaderTextEdit");
-    highlighter.setDocument(
-      editorControl->property("textDocument").value<QQuickTextDocument*>()->textDocument());
+    if (editorControl) {
+      highlighter.setDocument(
+                              editorControl->property("textDocument").value<QQuickTextDocument*>()->textDocument());
+    }
 
     QObject::connect(uiWindow.m_rootItem, SIGNAL(toggleUi()),
       this, SLOT(onToggleUi()));
@@ -534,7 +536,6 @@ private:
 
     setItemText("eps", QString().sprintf("%0.2f", eyePosScale));
     setItemText("res", QString().sprintf("%0.2f", texRes));
-
   }
 
   void setItemProperty(const QString & itemName, const QString & property, const QVariant & value) {
@@ -552,21 +553,16 @@ private:
 
 private slots:
   void onToggleUi() {
-    uiVisible = !uiVisible;
-    if (uiVisible) {
-      savedEyePosScale = eyePosScale;
-      eyePosScale = 0.0f;
-      uiWindow.resume();
-      editorControl->setProperty("readOnly", false);
-    } else {
-      eyePosScale = savedEyePosScale;
-      editorControl->setProperty("readOnly", true);
-      uiWindow.pause();
-    }
-  }
-
-  void onReloadUi() {
-    //setupOffscreenUi();
+	  uiVisible = !uiVisible;
+	  setItemProperty("shaderTextEdit", "readOnly", !uiVisible);
+	  if (uiVisible) {
+		savedEyePosScale = eyePosScale;
+		eyePosScale = 0.0f;
+		uiWindow.resume();
+	  } else {
+		eyePosScale = savedEyePosScale;
+		uiWindow.pause();
+	  }
   }
 
   void onLoadNextPreset() {
@@ -685,7 +681,7 @@ private:
   void loadShader(const shadertoy::Shader & shader) {
     assert(!shader.fragmentSource.empty());
     activeShader = shader;
-    editorControl->setProperty("text", QString(shader.fragmentSource.c_str()));
+    setItemText("shaderTextEdit", QString(shader.fragmentSource.c_str()));
     for (int i = 0; i < 4; ++i) {
       QUrl url = QString(activeShader.channelTextures[i].c_str());
       while (canonicalUrlMap.count(url)) {
@@ -741,6 +737,14 @@ private:
           return true;
         }
       }
+
+        
+        
+    case QEvent::FocusIn:
+      QApplication::sendEvent(uiWindow.m_quickWindow, e);
+      QRiftWindow::event(e);
+      break;
+        
     case QEvent::KeyRelease:
     case QEvent::Scroll:
     case QEvent::Wheel:
@@ -750,12 +754,13 @@ private:
       break;
 
     case QEvent::MouseMove:
-//      mouseMoveEvent((QMouseEvent*)e);
     case QEvent::MouseButtonDblClick:
     case QEvent::MouseButtonPress:
     case QEvent::MouseButtonRelease:
       forwardMouseEvent((QMouseEvent*)e);
       return QRiftWindow::event(e);
+
+    default: break;
     }
 
     return QRiftWindow::event(e);
@@ -785,6 +790,66 @@ private:
     return uvec2(texRes * textureSize());
   }
 
+  void perFrameRender() {
+    if (uiVisible) {
+      static GLuint lastUiTexture = 0;
+      static GLsync lastUiSync;
+      GLuint currentUiTexture = uiTexture.exchange(0);
+      if (0 == currentUiTexture) {
+        currentUiTexture = lastUiTexture;
+      } else {
+        // If the texture has changed, push it into the trash bin for
+        // deletion once it's finished rendering
+        if (lastUiTexture) {
+          textureTrash.push(SyncPair(lastUiTexture, lastUiSync));
+        }
+        lastUiTexture = currentUiTexture;
+      }
+      MatrixStack & mv = Stacks::modelview();
+      if (currentUiTexture) {
+        Texture::Active(0);
+        // Composite the UI image and the mouse sprite
+        uiFramebuffer->Bound([&] {
+          Context::Clear().ColorBuffer();
+          oria::viewport(UI_SIZE);
+          // Clear out the projection and modelview here.
+          Stacks::withIdentity([&] {
+            glBindTexture(GL_TEXTURE_2D, currentUiTexture);
+            oria::renderGeometry(plane, uiProgram);
+            
+            // Render the mouse sprite on the UI
+            QPointF mp = mousePosition.load();
+            mv.translate(vec3(mp.x(), mp.y(), 0.0f));
+            mv.scale(vec3(0.1f));
+            mouseTexture->Bind(Texture::Target::_2D);
+            oria::renderGeometry(mouseShape, uiProgram);
+          });
+        });
+        lastUiSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+      }
+    }
+    
+    TextureDeleteQueue tempTextureDeleteQueue;
+    while (!textureTrash.empty()) {
+      SyncPair & top = textureTrash.front();
+      GLuint & texture = top.first;
+      GLsync & sync = top.second;
+      GLenum result = glClientWaitSync(sync, 0, 0);
+      if (GL_ALREADY_SIGNALED == result || GL_CONDITION_SATISFIED == result) {
+        tempTextureDeleteQueue.push_back(texture);
+        textureTrash.pop();
+      } else {
+        break;
+      }
+    }
+    
+    if (!tempTextureDeleteQueue.empty()) {
+      Lock lock(textureLock);
+      textureDeleteQueue.insert(textureDeleteQueue.end(),
+                                tempTextureDeleteQueue.begin(), tempTextureDeleteQueue.end());
+    }
+  }
+
   void renderScene() {
     Context::Enable(Capability::Blend);
     Context::BlendFunc(BlendFunction::SrcAlpha, BlendFunction::OneMinusSrcAlpha);
@@ -812,69 +877,14 @@ private:
     });
 
     if (uiVisible) {
-      static GLuint lastUiTexture = 0;
-      static GLsync lastUiSync;
-      GLuint currentUiTexture = uiTexture.exchange(0);
-      if (0 == currentUiTexture) {
-        currentUiTexture = lastUiTexture;
-      } else {
-        // If the texture has changed, push it into the trash bin for 
-        // deletion once it's finished rendering
-        if (lastUiTexture) {
-          textureTrash.push(SyncPair(lastUiTexture, lastUiSync));
-        }
-        lastUiTexture = currentUiTexture;
-      }
-
       MatrixStack & mv = Stacks::modelview();
-      MatrixStack & pr = Stacks::projection();
-      if (currentUiTexture) {
-        Texture::Active(0);
-        // Composite the UI image and the mouse sprite
-        uiFramebuffer->Bound([&] {
-          Context::Clear().ColorBuffer();
-          oria::viewport(UI_SIZE);
-          // Clear out the projection and modelview here.
-          Stacks::withIdentity([&] {
-            glBindTexture(GL_TEXTURE_2D, currentUiTexture);
-            oria::renderGeometry(plane, uiProgram);
-
-            // Render the mouse sprite on the UI
-            QPointF mp = mousePosition.load();
-            mv.translate(vec3(mp.x(), mp.y(), 0.0f));
-            mv.scale(vec3(0.1f));
-            mouseTexture->Bind(Texture::Target::_2D);
-            oria::renderGeometry(mouseShape, uiProgram);
-          });
-        });
-        lastUiSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-        oria::viewport(textureSize());
-        mv.withPush([&] {
-          mv.translate(vec3(0, 0, -1));
-          uiFramebuffer->BindColor();
-          oria::renderGeometry(uiShape, uiProgram);
-        });
-      }
-    }
-
-    TextureDeleteQueue tempTextureDeleteQueue;
-    while (!textureTrash.empty()) {
-      SyncPair & top = textureTrash.front();
-      GLuint & texture = top.first;
-      GLsync & sync = top.second;
-      GLenum result = glClientWaitSync(sync, 0, 0);
-      if (GL_ALREADY_SIGNALED == result || GL_CONDITION_SATISFIED == result) {
-        tempTextureDeleteQueue.push_back(texture);
-        textureTrash.pop();
-      } else {
-        break;
-      }
-    }
-
-    if (!tempTextureDeleteQueue.empty()) {
-      Lock lock(textureLock);
-      textureDeleteQueue.insert(textureDeleteQueue.end(), 
-        tempTextureDeleteQueue.begin(), tempTextureDeleteQueue.end());
+      Texture::Active(0);
+      oria::viewport(textureSize());
+      mv.withPush([&] {
+        mv.translate(vec3(0, 0, -1));
+        uiFramebuffer->BindColor();
+        oria::renderGeometry(uiShape, uiProgram);
+      });
     }
   }
 

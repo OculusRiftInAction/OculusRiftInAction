@@ -114,7 +114,7 @@ void QRiftWindow::setup() {
   initializeRiftRendering();
 }
 
+//#include "QRiftWindow.moc"
 
 #endif
 
-#include "QRiftWindow.moc"

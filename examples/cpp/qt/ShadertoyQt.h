@@ -32,9 +32,9 @@ namespace shadertoy {
     for (int i = 0; i < children.count(); ++i) {
       auto child = children.at(i);
       if (child.nodeName() == "url") {
-        result.url = child.firstChild().nodeValue().toLocal8Bit();
+        result.url = std::string(child.firstChild().nodeValue().toLocal8Bit());
       } if (child.nodeName() == XML_FRAGMENT_SOURCE) {
-        result.fragmentSource = child.firstChild().nodeValue().toLocal8Bit();
+        result.fragmentSource = std::string(child.firstChild().nodeValue().toLocal8Bit());
       } else if (child.nodeName() == XML_CHANNEL) {
         auto attributes = child.attributes();
         int channelIndex = -1;
@@ -56,13 +56,13 @@ namespace shadertoy {
             continue;
           }
           result.channelTypes[channelIndex] = channelTypeFromString(re.cap(1));
-          result.channelTextures[channelIndex] = ("preset://" + re.cap(1) + "/" + re.cap(2)).toLocal8Bit();
+          result.channelTextures[channelIndex] = std::string(("preset://" + re.cap(1) + "/" + re.cap(2)).toLocal8Bit());
           continue;
         }
 
         if (attributes.contains(XML_CHANNEL_ATTR_TYPE)) {
           result.channelTypes[channelIndex] = channelTypeFromString(attributes.namedItem(XML_CHANNEL_ATTR_SOURCE).nodeValue());
-          result.channelTextures[channelIndex] = child.firstChild().nodeValue().toLocal8Bit();
+          result.channelTextures[channelIndex] = std::string(child.firstChild().nodeValue().toLocal8Bit());
         }
       }
     }

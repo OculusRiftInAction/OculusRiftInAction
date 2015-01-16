@@ -74,6 +74,8 @@ void RiftRenderingApp::drawRiftFrame() {
   MatrixStack & mv = Stacks::modelview();
   MatrixStack & pr = Stacks::projection();
 
+  perFrameRender();
+  
   ovrPosef fetchPoses[2];
   ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, fetchPoses, nullptr);
   static ovrEyeType lastEyeRendered = ovrEye_Count;

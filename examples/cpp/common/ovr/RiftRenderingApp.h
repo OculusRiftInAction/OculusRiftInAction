@@ -50,6 +50,9 @@ protected:
 
   virtual void initializeRiftRendering();
   virtual void drawRiftFrame();
+  virtual void perFrameRender() {
+    
+  };
   virtual void renderScene() = 0;
   
 public:

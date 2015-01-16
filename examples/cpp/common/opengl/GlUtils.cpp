@@ -345,17 +345,17 @@ namespace oria {
   }
 
   void renderParagraph(const std::string & str) {
-    glm::vec2 cursor;
-    Text::FontPtr font = getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
-    rectf bounds;
-    std::wstring wstr = toUtf16(str);
-    for (size_t i = 0; i < wstr.length(); ++i) {
-      uint16_t wchar = wstr.at(i);
-      rectf letterBound = font->getBounds(wchar);
-      //    extendLeft(bounds, letterBound);
-      SAY("foo");
-    }
-    renderString(str, cursor);
+    // FIXME
+//    glm::vec2 cursor;
+//    Text::FontPtr font = getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
+//    rectf bounds;
+//    std::wstring wstr = toUtf16(str);
+//    for (size_t i = 0; i < wstr.length(); ++i) {
+//      uint16_t wchar = wstr.at(i);
+//      rectf letterBound = font->getBounds(wchar);
+//      extendLeft(bounds, letterBound);
+//    }
+//    renderString(str, cursor);
   }
 
   void renderString(const std::string & str, glm::vec3 & cursor3d,
