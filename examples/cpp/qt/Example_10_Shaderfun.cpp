@@ -3,17 +3,18 @@
 #endif
 
 #include "Common.h"
-#include <QDomDocument>
-#include <QXmlQuery>
+#include "Shadertoy.h"
+#include "ShadertoyQt.h"
+
 #include <QQuickTextDocument>
 #include <QGuiApplication>
+#include <QQmlContext>
 #ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
 #else
 #include <oglplus/images/png.hpp>
 #endif
 
-#include "Shadertoy.h"
 
 const char * ORG_NAME = "Oculus Rift in Action";
 const char * ORG_DOMAIN = "oculusriftinaction.com";
@@ -48,7 +49,6 @@ static ImagePtr loadImageWithAlpha(const std::vector<uint8_t> & data, bool flip)
   return ImagePtr(new images::PNGImage(stream));
 #endif
 }
-
 static TexturePtr loadCursor(Resource res) {
   using namespace oglplus;
   TexturePtr texture(new Texture());
@@ -69,149 +69,6 @@ static TexturePtr loadCursor(Resource res) {
   Texture::SubImage2D(TextureTarget::_2D, *image, image->Width(), 0);
   DefaultTexture().Bind(TextureTarget::_2D);
   return texture;
-}
-
-namespace shadertoy {
-
-  ChannelInputType channelTypeFromString(const QString & channelTypeStr) {
-    ChannelInputType channelType = ChannelInputType::TEXTURE;
-    if (channelTypeStr == "tex") {
-      channelType = ChannelInputType::TEXTURE;
-    } else if (channelTypeStr == "cube") {
-      channelType = ChannelInputType::CUBEMAP;
-    } 
-    return channelType;
-  }
-
-
-  // FIXME move struct into the header and make save / load functions 
-  // helpers defined here.  Shadertoy header should not be bound to Qt
-  struct Shader {
-    static const char * CHANNEL_REGEX; 
-    static const char * XML_ROOT_NAME;
-    static const char * XML_FRAGMENT_SOURCE;
-    static const char * XML_CHANNEL;
-    static const char * XML_CHANNEL_ATTR_TYPE;
-    static const char * XML_CHANNEL_ATTR_ID;
-    // Deprecated
-    static const char * XML_CHANNEL_ATTR_SOURCE;
-
-    QString url;
-    QString name;
-    QString fragmentSource;
-    ChannelInputType channelTypes[MAX_CHANNELS];
-    QUrl channelTextures[MAX_CHANNELS];
-
-    Shader() {
-      loadPreset(SHADERTOY_SHADERS_DEFAULT_XML);
-    };
-
-    Shader(Resource res) {
-      loadPreset(res);
-    };
-
-    Shader(const QString & file) {
-      loadFile(file);
-    };
-
-    Shader(QIODevice & ioDevice) {
-      loadXml(ioDevice);
-    };
-
-    void loadPreset(Resource res) {
-      QByteArray presetData = oria::qt::toByteArray(res);
-      QBuffer buffer(&presetData);
-      loadXml(buffer);
-    }
-
-    void loadFile(const QString & fileName) {
-      QFile file(fileName);
-      loadXml(file);
-    }
-
-    // FIXME no error handling.  
-    void saveFile(const QString & name) {
-      QDomDocument doc = writeDocument();
-      QFile file(name);
-      file.open(QIODevice::Truncate | QIODevice::WriteOnly | QIODevice::Text);
-      file.write(doc.toByteArray());
-      file.close();
-    }
-    
-    // FIXME no error handling.  
-    void loadXml(QIODevice & ioDevice) {
-      QDomDocument dom;
-      dom.setContent(&ioDevice);
-
-      auto children = dom.documentElement().childNodes();
-      for (int i = 0; i < children.count(); ++i) {
-        auto child = children.at(i);
-        if (child.nodeName() == "url") {
-          url = child.firstChild().nodeValue();
-        } if (child.nodeName() == XML_FRAGMENT_SOURCE) {
-          fragmentSource = child.firstChild().nodeValue();
-        } else if (child.nodeName() == XML_CHANNEL) {
-          auto attributes = child.attributes();
-          int channelIndex = -1;
-          QString source;
-          if (attributes.contains(XML_CHANNEL_ATTR_ID)) {
-            channelIndex = attributes.namedItem(XML_CHANNEL_ATTR_ID).nodeValue().toInt();
-          }
-
-          if (channelIndex < 0 || channelIndex >= shadertoy::MAX_CHANNELS) {
-            continue;
-          }
-
-
-          // Compatibility mode
-          if (attributes.contains(XML_CHANNEL_ATTR_SOURCE)) {
-            source = attributes.namedItem(XML_CHANNEL_ATTR_SOURCE).nodeValue();
-            QRegExp re(CHANNEL_REGEX);
-            if (!re.exactMatch(source)) {
-              continue;
-            }
-            channelTypes[channelIndex] = channelTypeFromString(re.cap(1));
-            channelTextures[channelIndex] = QUrl("preset://" + re.cap(1) + "/" + re.cap(2));
-            continue;
-          }
-
-          if (attributes.contains(XML_CHANNEL_ATTR_TYPE)) {
-            channelTypes[channelIndex] = channelTypeFromString(attributes.namedItem(XML_CHANNEL_ATTR_SOURCE).nodeValue());
-            channelTextures[channelIndex] = child.firstChild().nodeValue();
-          }
-        }
-      }
-    }
-
-
-    QDomDocument writeDocument() {
-      QDomDocument result;
-      QDomElement root = result.createElement(XML_ROOT_NAME);
-      result.appendChild(root);
-
-      for (int i = 0; i < MAX_CHANNELS; ++i) {
-        if (channelTextures[i] != QUrl()) {
-          QDomElement channelElement = result.createElement(XML_CHANNEL);
-          channelElement.setAttribute(XML_CHANNEL_ATTR_ID, i);
-          channelElement.setAttribute(XML_CHANNEL_ATTR_TYPE, channelTypes[i] == ChannelInputType::CUBEMAP ? "cube" : "tex");
-          channelElement.appendChild(result.createTextNode(channelTextures[i].toDisplayString()));
-          root.appendChild(channelElement);
-        }
-      }
-      root.appendChild(result.createElement(XML_FRAGMENT_SOURCE)).
-        appendChild(result.createCDATASection(fragmentSource));
-
-      return result;
-    }
-  };
-
-  const char * Shader::CHANNEL_REGEX = "(\\w+)(\\d{2})";
-  const char * Shader::XML_ROOT_NAME = "shadertoy";
-  const char * Shader::XML_FRAGMENT_SOURCE = "fragmentSource";
-  const char * Shader::XML_CHANNEL = "channel";
-  const char * Shader::XML_CHANNEL_ATTR_ID = "id";
-  const char * Shader::XML_CHANNEL_ATTR_SOURCE = "source";
-  const char * Shader::XML_CHANNEL_ATTR_TYPE = "type";
 }
 
 class ShadertoyRenderer : public QRiftWindow {
@@ -331,9 +188,7 @@ protected:
     for (int i = 0; i < 4; ++i) {
       const char * uniformName = shadertoy::UNIFORM_CHANNELS[i];
       if (activeUniforms.count(uniformName)) {
-        // glUniform1i(activeUniforms[uniformName], i);
-        // context()->functions()->glUniform1i(activeUniforms[uniformName], i);
-        //Uniform<GLuint>(*skyboxProgram, uniformName).Set(i);
+        context()->functions()->glUniform1i(activeUniforms[uniformName], i);
       }
     }
     if (activeUniforms.count(UNIFORM_RESOLUTION)) {
@@ -467,9 +322,9 @@ protected:
 
   virtual void setShaderInternal(const shadertoy::Shader & shader) {
     for (int i = 0; i < shadertoy::MAX_CHANNELS; ++i) {
-      setChannelTextureInternal(i, shader.channelTypes[i], shader.channelTextures[i]);
+      setChannelTextureInternal(i, shader.channelTypes[i], QString(shader.channelTextures[i].c_str()));
     }
-    setShaderSourceInternal(shader.fragmentSource);
+    setShaderSourceInternal(shader.fragmentSource.c_str());
   }
 
 signals:
@@ -549,11 +404,18 @@ class ShadertoyWindow : public ShadertoyRenderer {
 
 public:
   ShadertoyWindow() {
+
+    // Fixes an occasional crash caused by a race condition between the Rift 
+    // render thread and the UI thread, triggered when Rift swapbuffers overlaps 
+    // with the UI thread binding a new FBO (specifically, generating a texture 
+    // for the FBO.  
+    // Perhaps I should just create N FBOs and have the UI object iterate over them
     this->endFrameLock = &uiWindow.renderLock;
     {
       QString configLocation = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
       configPath = QDir(configLocation);
       configPath.mkpath("shaders");
+
     }
 
     connect(&timer, &QTimer::timeout, this, &ShadertoyWindow::onTimer);
@@ -562,7 +424,7 @@ public:
       setItemText("fps", QString().sprintf("%0.2f", fps));
     });
     setupOffscreenUi();
-    loadPreset(shadertoy::PRESETS[0]);
+    onLoadPreset(0);
   }
 
 private:
@@ -598,12 +460,30 @@ private:
   }
 
   void setupOffscreenUi() {
-    qApp->setFont(QFont("Arial", 14, QFont::Bold));
-    uiWindow.pause();
-    uiWindow.setup(
-      QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml"),
-      QSize(UI_SIZE.x, UI_SIZE.y), context());
+    static bool uiInit = false;
+    if (!uiInit) {
+      uiInit = true;
+      qApp->setFont(QFont("Arial", 14, QFont::Bold));
+      uiWindow.pause();
+      uiWindow.setup(QSize(UI_SIZE.x, UI_SIZE.y), context());
+      {
+        QStringList dataList;
+        for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
+          dataList.append(shadertoy::PRESETS[i].name);
+        }
+        auto qmlContext = uiWindow.m_qmlEngine->rootContext();
+        qmlContext->setContextProperty("presetsModel", QVariant::fromValue(dataList));
+        // Qt.resolvedUrl("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders")
+        QUrl urlBad = QUrl::fromLocalFile(configPath.absolutePath() + "/shaders" );
+        QUrl url = QUrl::fromLocalFile("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders");
+        qDebug() << urlBad;
+        qDebug() << url;
+        qmlContext->setContextProperty("userPresetsFolder", url);
+      }
+      uiWindow.setProxyWindow(this);
+    }
 
+    uiWindow.loadQml(QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml"));
     connect(&uiWindow, &QOffscreenUi::textureUpdated, this, [&] {
       GLuint newTexture = uiWindow.m_fbo->takeTexture();
       GLuint oldTexture = exchangeUiTexture(newTexture);
@@ -618,16 +498,23 @@ private:
 
     QObject::connect(uiWindow.m_rootItem, SIGNAL(toggleUi()),
       this, SLOT(onToggleUi()));
+    QObject::connect(uiWindow.m_rootItem, SIGNAL(reloadUi()),
+      this, SLOT(onReloadUi()));
     QObject::connect(uiWindow.m_rootItem, SIGNAL(channelTextureChanged(int, int, QString)),
       this, SLOT(onChannelTextureChanged(int, int, QString)));
     QObject::connect(uiWindow.m_rootItem, SIGNAL(shaderSourceChanged(QString)),
       this, SLOT(onShaderSourceChanged(QString)));
 
     // FIXME add confirmation for when the user might lose edits.
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadNextPreset()), 
+    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadPreset(int)),
+      this, SLOT(onLoadPreset(int)));
+    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadNextPreset()),
       this, SLOT(onLoadNextPreset()));
     QObject::connect(uiWindow.m_rootItem, SIGNAL(loadPreviousPreset()), 
       this, SLOT(onLoadPreviousPreset()));
+    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadShaderXml(QString)),
+      this, SLOT(onLoadShaderXml(QString)));
+    
     QObject::connect(uiWindow.m_rootItem, SIGNAL(recenterPose()),
       this, SLOT(onRecenterPosition()));
     QObject::connect(uiWindow.m_rootItem, SIGNAL(modifyTextureResolution(double)),
@@ -648,13 +535,13 @@ private:
     setItemText("eps", QString().sprintf("%0.2f", eyePosScale));
     setItemText("res", QString().sprintf("%0.2f", texRes));
 
-    uiWindow.setProxyWindow(this);
   }
 
   void setItemProperty(const QString & itemName, const QString & property, const QVariant & value) {
     QQuickItem * item = uiWindow.m_rootItem->findChild<QQuickItem*>(itemName);
     if (nullptr != item) {
-      item->setProperty(property.toLocal8Bit(), value);
+      bool result = item->setProperty(property.toLocal8Bit(), value);
+      qDebug() << "Set property " << property << " on item " << itemName << " returned " << result;
     }
   }
 
@@ -665,27 +552,42 @@ private:
 
 private slots:
   void onToggleUi() {
-  uiVisible = !uiVisible;
-  if (uiVisible) {
-    savedEyePosScale = eyePosScale;
-    eyePosScale = 0.0f;
-    uiWindow.resume();
-    editorControl->setProperty("readOnly", false);
-  } else {
-    eyePosScale = savedEyePosScale;
-    editorControl->setProperty("readOnly", true);
-    uiWindow.pause();
+    uiVisible = !uiVisible;
+    if (uiVisible) {
+      savedEyePosScale = eyePosScale;
+      eyePosScale = 0.0f;
+      uiWindow.resume();
+      editorControl->setProperty("readOnly", false);
+    } else {
+      eyePosScale = savedEyePosScale;
+      editorControl->setProperty("readOnly", true);
+      uiWindow.pause();
+    }
   }
-}
+
+  void onReloadUi() {
+    //setupOffscreenUi();
+  }
 
   void onLoadNextPreset() {
     int newPreset = (activePresetIndex + 1) % shadertoy::MAX_PRESETS;
-    loadPreset(shadertoy::PRESETS[newPreset]);
+    onLoadPreset(newPreset);
   }
 
   void onLoadPreviousPreset() {
     int newPreset = (activePresetIndex + shadertoy::MAX_PRESETS - 1) % shadertoy::MAX_PRESETS;
-    loadPreset(shadertoy::PRESETS[newPreset]);
+    onLoadPreset(newPreset);
+  }
+
+  void onLoadPreset(int index) {
+    activePresetIndex = index;
+    auto preset = shadertoy::PRESETS[index];
+    loadShader(shadertoy::loadShaderXml(preset.res));
+  }
+
+  void onLoadShaderXml(const QString & shaderPath) {
+    qDebug() << shaderPath;
+    loadShader(shadertoy::loadShaderXml(shaderPath));
   }
 
   void onChannelTextureChanged(const int & channelIndex, const int & channelType, const QString & texturePath) {
@@ -781,11 +683,11 @@ private slots:
 
 private:
   void loadShader(const shadertoy::Shader & shader) {
-    assert(!shader.fragmentSource.isEmpty());
+    assert(!shader.fragmentSource.empty());
     activeShader = shader;
-    editorControl->setProperty("text", shader.fragmentSource);
+    editorControl->setProperty("text", QString(shader.fragmentSource.c_str()));
     for (int i = 0; i < 4; ++i) {
-      QUrl url = activeShader.channelTextures[i];
+      QUrl url = QString(activeShader.channelTextures[i].c_str());
       while (canonicalUrlMap.count(url)) {
         url = canonicalUrlMap[url];
       }
@@ -799,17 +701,8 @@ private:
     });
   }
 
-  void loadPreset(shadertoy::Preset & preset) {
-    for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
-      if (shadertoy::PRESETS[i].res == preset.res) {
-        activePresetIndex = i;
-      }
-    }
-    loadShader(shadertoy::Shader(preset.res));
-  }
-
   void loadFile(const QString & file) {
-    loadShader(shadertoy::Shader(file));
+    loadShader(shadertoy::loadShaderXml(file));
   }
 
   void updateFps(float fps) {
@@ -1001,7 +894,7 @@ signals:
 class ShadertoyApp : public QApplication {
   Q_OBJECT
 
-  ShadertoyWindow riftRenderWidget;
+  ShadertoyWindow * riftRenderWidget;
 
   // A timer for updating the UI
   QWidget desktopWindow;
@@ -1013,8 +906,9 @@ public:
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
     setupDesktopWindow();
-    riftRenderWidget.start();
-    riftRenderWidget.requestActivate();
+    riftRenderWidget = new ShadertoyWindow();
+    riftRenderWidget->start();
+    riftRenderWidget->requestActivate();
   }
 
   virtual ~ShadertoyApp() {
@@ -1027,16 +921,6 @@ private:
     desktopWindow.layout()->addWidget(label);
     desktopWindow.show();
   }
-
-
-signals:
-  void channelTextureChanged(int channelIndex, shadertoy::ChannelInputType, const QUrl & textureSource);
-  void shaderLoaded(const shadertoy::Shader & shader);
-  void uiToggled(bool newValue);
-  void mouseMoved();
-  void refreshUserShaders();
-  void toggleOvrFlag(ovrHmdCaps cap);
-  void sixDof(vec3 tr, vec3 ro);
 };
 
 MAIN_DECL { 

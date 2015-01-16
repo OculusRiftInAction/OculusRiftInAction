@@ -280,7 +280,7 @@ QOffscreenUi::~QOffscreenUi() {
 
 
 
-void QOffscreenUi::setup(const QUrl & qmlSource, const QSize & size, QOpenGLContext * shareContext) {
+void QOffscreenUi::setup(const QSize & size, QOpenGLContext * shareContext) {
   m_size = size;
 
   QSurfaceFormat format;
@@ -330,7 +330,26 @@ void QOffscreenUi::setup(const QUrl & qmlSource, const QSize & size, QOpenGLCont
   connect(m_renderControl, &QQuickRenderControl::renderRequested, this, &QOffscreenUi::requestRender);
   connect(m_renderControl, &QQuickRenderControl::sceneChanged, this, &QOffscreenUi::requestUpdate);
 
-  m_qmlComponent = new QQmlComponent(m_qmlEngine, qmlSource);
+  m_qmlComponent = new QQmlComponent(m_qmlEngine);
+
+  // Update item and rendering related geometries.
+  m_quickWindow->setGeometry(0, 0, m_size.width(), m_size.height());
+
+  // Initialize the render control and our OpenGL resources.
+  m_context->makeCurrent(m_offscreenSurface);
+  m_renderControl->initialize(m_context);
+
+}
+
+QQmlContext * QOffscreenUi::qmlContext() {
+  if (nullptr == m_rootItem) {
+    return m_qmlComponent->creationContext();
+  }
+  return QQmlEngine::contextForObject(m_rootItem);
+}
+
+void QOffscreenUi::loadQml(const QUrl & qmlSource, std::function<void(QQmlContext*)> f) {
+  m_qmlComponent->loadUrl(qmlSource);
   if (m_qmlComponent->isLoading())
     connect(m_qmlComponent, &QQmlComponent::statusChanged, this, &QOffscreenUi::run);
   else
@@ -377,12 +396,6 @@ void QOffscreenUi::run() {
   m_rootItem->setWidth(m_size.width());
   m_rootItem->setHeight(m_size.height());
 
-  // Update item and rendering related geometries.
-  m_quickWindow->setGeometry(0, 0, m_size.width(), m_size.height());
-
-  // Initialize the render control and our OpenGL resources.
-  m_context->makeCurrent(m_offscreenSurface);
-  m_renderControl->initialize(m_context);
   SAY("Finished setting up QML");
 }
 

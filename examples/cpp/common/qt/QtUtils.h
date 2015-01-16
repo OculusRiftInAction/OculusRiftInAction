@@ -98,7 +98,9 @@ class QOffscreenUi : public QObject {
 public:
   QOffscreenUi();
   ~QOffscreenUi();
-  void setup(const QUrl & qmlSource, const QSize & size, QOpenGLContext * context);
+  void setup(const QSize & size, QOpenGLContext * context);
+  void loadQml(const QUrl & qmlSource, std::function<void(QQmlContext*)> f = [](QQmlContext*){});
+  QQmlContext * qmlContext();
 
   void pause() {
     m_paused = true;

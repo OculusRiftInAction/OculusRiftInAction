@@ -54,7 +54,7 @@ namespace shadertoy {
     Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_XML, "Steel Cubes"),
     Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_XML, "Infinite City"),
     Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_XML, "Oceanic"),
-//    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_XML, "Cubemap"),
+    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_XML, "Cubemap"),
 #endif
 
 #if 0
@@ -72,8 +72,8 @@ namespace shadertoy {
   public:
 
     ResourceCounter(T * ts, std::function<bool(const T &)> endCondition =
-      [](const T & t)->bool { return true;  }
-      ) {
+        [](const T & t)->bool { return true; }
+    ) {
       while (!endCondition(ts[count])) {
         ++count;
       }
@@ -121,34 +121,12 @@ namespace shadertoy {
   };
   const int MAX_CUBEMAPS = 6;
 
-  static std::string getChannelInputName(ChannelInputType type, int index) {
-    switch (type) {
-    case ChannelInputType::TEXTURE:
-      return Platform::format("Tex%02d", index);
-    case ChannelInputType::CUBEMAP:
-      return Platform::format("Cube%02d", index);
-    default:
-      return "";
-    }
-  }
-
-  static Resource getChannelInputResource(ChannelInputType type, int index) {
-    if (index < 0) {
-      return NO_RESOURCE;
-    }
-    switch (type) {
-    case ChannelInputType::TEXTURE:
-      if (index >= MAX_TEXTURES) {
-        return NO_RESOURCE;
-      }
-      return TEXTURES[index];
-    case ChannelInputType::CUBEMAP:
-      if (index >= MAX_CUBEMAPS) {
-        return NO_RESOURCE;
-      }
-      return CUBEMAPS[index];
-    default:
-      return NO_RESOURCE;
-    }
-  }
+  struct Shader {
+    bool vrSupport{ true };
+    std::string url;
+    std::string name;
+    std::string fragmentSource;
+    ChannelInputType channelTypes[MAX_CHANNELS];
+    std::string channelTextures[MAX_CHANNELS];
+  };
 }
