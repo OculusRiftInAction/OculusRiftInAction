@@ -21,6 +21,8 @@
 
 #include "Config.h"
 
+//#define USE_RIFT 1
+
 #include <algorithm>
 #include <array>
 #include <atomic>

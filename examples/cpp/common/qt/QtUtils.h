@@ -115,18 +115,25 @@ public:
     m_renderControl->m_renderWindow = window;
   }
 
-  void deleteOldTextures(const std::vector<GLuint> & oldTextures);
-
-  private slots:
+private slots:
   void updateQuick();
   void run();
 
-  public slots:
+public slots:
   void requestUpdate();
   void requestRender();
+  void lockTexture(int texture);
+  void releaseTexture(int texture);
 
 signals:
-  void textureUpdated();
+  void textureUpdated(int texture);
+
+private:
+  QMap<int, QSharedPointer<QOpenGLFramebufferObject>> m_fboMap;
+  QMap<int, int> m_fboLocks;
+  QQueue<QOpenGLFramebufferObject*> m_readyFboQueue;
+  
+  QOpenGLFramebufferObject* getReadyFbo();
 
 public:
   QOpenGLContext *m_context{ new QOpenGLContext };
@@ -136,11 +143,9 @@ public:
   QQmlEngine *m_qmlEngine{ nullptr };
   QQmlComponent *m_qmlComponent{ nullptr };
   QQuickItem * m_rootItem{ nullptr };
-  QOpenGLFramebufferObject *m_fbo{ nullptr };
   QTimer m_updateTimer;
   QSize m_size;
   bool m_polish{ true };
-  std::mutex renderLock;
 };
 
 class LambdaThread : public QThread {

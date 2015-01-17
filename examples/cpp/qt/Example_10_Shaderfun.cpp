@@ -109,7 +109,8 @@ protected:
   // The compiled shadertoy program
   ProgramPtr shadertoyProgram;
 
-  void setupShadertoy() {
+  virtual void setup() {
+    QRiftWindow::setup();
     initTextureCache();
 
     setShaderSourceInternal(oria::qt::toString(Resource::SHADERTOY_SHADERS_DEFAULT_FS));
@@ -192,8 +193,9 @@ protected:
       }
     }
     if (activeUniforms.count(UNIFORM_RESOLUTION)) {
-      vec3 textureSize = vec3(ovr::toGlm(this->eyeTextures[0].Header.TextureSize), 0);
-      Uniform<vec3>(*shadertoyProgram, UNIFORM_RESOLUTION).Set(textureSize);
+
+      vec3 res = vec3(textureSize(), 0);
+      Uniform<vec3>(*shadertoyProgram, UNIFORM_RESOLUTION).Set(res);
     }
     NoProgram().Bind();
 
@@ -205,12 +207,14 @@ protected:
     }
 
     if (activeUniforms.count(shadertoy::UNIFORM_POSITION)) {
+#ifdef USE_RIFT
       uniformLambdas.push_back([&] {
 //        if (!uiVisible) {
           Uniform<vec3>(*shadertoyProgram, shadertoy::UNIFORM_POSITION).Set(
             (ovr::toGlm(getEyePose().Position) + position) * eyePosScale);
 //        }
       });
+#endif
     }
     for (int i = 0; i < 4; ++i) {
       if (activeUniforms.count(UNIFORM_CHANNELS[i]) && channels[i].texture) {
@@ -223,6 +227,15 @@ protected:
       }
     }
   }
+
+  vec2 textureSize() {
+#ifdef USE_RIFT
+    return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
+#else
+    return vec2(size().width(), size().height());
+#endif
+  }
+
 
   virtual void setShaderSourceInternal(QString source) {
     try {
@@ -328,7 +341,7 @@ protected:
   }
 
 signals:
-  void compileError(QString source);
+  void compileError(const QString & source);
   void compileSuccess();
 };
 
@@ -351,13 +364,12 @@ class ShadertoyWindow : public ShadertoyRenderer {
   // 
   // Offscreen UI
   //
-
   QOffscreenUi uiWindow;
   GlslHighlighter highlighter;
-//  QQuickItem * editorControl;
+
   int activePresetIndex{ 0 };
   float savedEyePosScale{ 1.0f };
-
+  vec2 windowSize;
   //////////////////////////////////////////////////////////////////////////////
   // 
   // Shader Rendering information
@@ -410,7 +422,6 @@ public:
     // with the UI thread binding a new FBO (specifically, generating a texture 
     // for the FBO.  
     // Perhaps I should just create N FBOs and have the UI object iterate over them
-    this->endFrameLock = &uiWindow.renderLock;
     {
       QString configLocation = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
       configPath = QDir(configLocation);
@@ -421,7 +432,7 @@ public:
     connect(&timer, &QTimer::timeout, this, &ShadertoyWindow::onTimer);
     timer.start(100);
     connect(this, &ShadertoyWindow::fpsUpdated, this, [&](float fps){
-      setItemText("fps", QString().sprintf("%0.2f", fps));
+      setItemText("fps", QString().sprintf("%0.0f", fps));
     });
     setupOffscreenUi();
     onLoadPreset(0);
@@ -429,10 +440,8 @@ public:
 
 private:
 
-  virtual void initializeRiftRendering() {
-    ShadertoyRenderer::initializeRiftRendering();
-    setupShadertoy();
-
+  virtual void setup() {
+    ShadertoyRenderer::setup();
 
     // The geometry and shader for rendering the 2D UI surface when needed
     uiProgram = oria::loadProgram(
@@ -455,39 +464,35 @@ private:
     uiFramebuffer->init(UI_SIZE);
 
     shaderFramebuffer = FramebufferWrapperPtr(new FramebufferWrapper());
-    shaderFramebuffer->init(ovr::toGlm(eyeTextures[0].Header.TextureSize));
+    shaderFramebuffer->init(textureSize());
     DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
   }
 
   void setupOffscreenUi() {
-    static bool uiInit = false;
-    if (!uiInit) {
-      uiInit = true;
-      qApp->setFont(QFont("Arial", 14, QFont::Bold));
-      uiWindow.pause();
-      uiWindow.setup(QSize(UI_SIZE.x, UI_SIZE.y), context());
-      {
-        QStringList dataList;
-        for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
-          dataList.append(shadertoy::PRESETS[i].name);
-        }
-        auto qmlContext = uiWindow.m_qmlEngine->rootContext();
-        qmlContext->setContextProperty("presetsModel", QVariant::fromValue(dataList));
-        // Qt.resolvedUrl("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders")
-        QUrl url = QUrl::fromLocalFile("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders");
-        qmlContext->setContextProperty("userPresetsFolder", url);
+    qApp->setFont(QFont("Arial", 14, QFont::Bold));
+    uiWindow.pause();
+    uiWindow.setup(QSize(UI_SIZE.x, UI_SIZE.y), context());
+    {
+      QStringList dataList;
+      for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
+        dataList.append(shadertoy::PRESETS[i].name);
       }
-      uiWindow.setProxyWindow(this);
-      qApp->setFont(QFont("Arial", 14, QFont::Bold));
+      auto qmlContext = uiWindow.m_qmlEngine->rootContext();
+      qmlContext->setContextProperty("presetsModel", QVariant::fromValue(dataList));
+      // Qt.resolvedUrl("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders")
+      QUrl url = QUrl::fromLocalFile("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders");
+      qmlContext->setContextProperty("userPresetsFolder", url);
     }
-	QUrl qml = QUrl::fromLocalFile("/Users/bradd/git/OculusRiftInAction/resources/shadertoy/Combined.qml");
-//	QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
+    uiWindow.setProxyWindow(this);
+
+    //	QUrl qml = QUrl::fromLocalFile("/Users/bradd/git/OculusRiftInAction/resources/shadertoy/Combined.qml");
+	  QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
     uiWindow.loadQml(qml);
-    connect(&uiWindow, &QOffscreenUi::textureUpdated, this, [&] {
-      GLuint newTexture = uiWindow.m_fbo->takeTexture();
-      GLuint oldTexture = exchangeUiTexture(newTexture);
+    connect(&uiWindow, &QOffscreenUi::textureUpdated, this, [&](int textureId) {
+      uiWindow.lockTexture(textureId);
+      GLuint oldTexture = exchangeUiTexture(textureId);
       if (oldTexture) {
-        glDeleteTextures(1, &oldTexture);
+        uiWindow.releaseTexture(oldTexture);
       }
     });
 
@@ -534,6 +539,21 @@ private:
     QObject::connect(uiWindow.m_rootItem, SIGNAL(restartShader()),
       this, SLOT(onRestartShader()));
 
+    QObject::connect(this, &ShadertoyWindow::compileSuccess, this, [&] {
+      setItemProperty("errorFrame", "height", 0);
+      setItemProperty("errorFrame", "visible", false);
+      setItemProperty("compileErrors", "text", "");
+      setItemProperty("shaderTextFrame", "errorMargin", 0);
+    });
+
+    QObject::connect(this, &ShadertoyWindow::compileError, this, [&](const QString& errors){
+      setItemProperty("errorFrame", "height", 128);
+      setItemProperty("errorFrame", "visible", true);
+      setItemProperty("compileErrors", "text", errors);
+      setItemProperty("shaderTextFrame", "errorMargin", 8);
+      
+    });
+
     setItemText("eps", QString().sprintf("%0.2f", eyePosScale));
     setItemText("res", QString().sprintf("%0.2f", texRes));
   }
@@ -542,7 +562,9 @@ private:
     QQuickItem * item = uiWindow.m_rootItem->findChild<QQuickItem*>(itemName);
     if (nullptr != item) {
       bool result = item->setProperty(property.toLocal8Bit(), value);
-      qDebug() << "Set property " << property << " on item " << itemName << " returned " << result;
+      if (!result) {
+        qDebug() << "Set property " << property << " on item " << itemName << " returned " << result;
+      }
     }
   }
 
@@ -604,9 +626,11 @@ private slots:
   }
 
   void onRecenterPosition() {
+#ifdef USE_RIFT
     queueRenderThreadTask([&] {
       ovrHmd_RecenterPose(hmd);
     });
+#endif
   }
 
   void onModifyTextureResolution(double scale) {
@@ -639,14 +663,18 @@ private slots:
   }
 
   void onToggleEyePerFrame() {
+#ifdef USE_RIFT
     onEpfModeChanged(!eyePerFrameMode);
+#endif
   }
 
   void onEpfModeChanged(bool checked) {
     bool newEyePerFrameMode = checked;
+#ifdef USE_RIFT
     queueRenderThreadTask([&, newEyePerFrameMode] {
       eyePerFrameMode = newEyePerFrameMode;
     });
+#endif
     setItemProperty("epf", "checked", newEyePerFrameMode);
   }
 
@@ -673,7 +701,9 @@ private slots:
     }
 
     if (!tempTextureDeleteQueue.empty()) {
-      uiWindow.deleteOldTextures(tempTextureDeleteQueue);
+      std::for_each(tempTextureDeleteQueue.begin(), tempTextureDeleteQueue.end(), [&] (int usedTexture){
+        uiWindow.releaseTexture(usedTexture);
+      });
     }
   }
 
@@ -727,6 +757,7 @@ private:
     static bool dismissedHmd = false;
     switch (e->type()) {
     case QEvent::KeyPress:
+#ifdef USE_RIFT
       if (!dismissedHmd) {
         // Allow the user to remove the HSW message early
         ovrHSWDisplayState hswState;
@@ -737,28 +768,41 @@ private:
           return true;
         }
       }
+#endif
+        
+        
+    //case QEvent::FocusIn:
+    //  QApplication::sendEvent(uiWindow.m_quickWindow, e);
+    //  QRiftWindow::event(e);
+    //  break;
 
-        
-        
-    case QEvent::FocusIn:
-      QApplication::sendEvent(uiWindow.m_quickWindow, e);
-      QRiftWindow::event(e);
-      break;
-        
     case QEvent::KeyRelease:
-    case QEvent::Scroll:
-    case QEvent::Wheel:
+    {
       if (QApplication::sendEvent(uiWindow.m_quickWindow, e)) {
         return true;
       }
-      break;
+    }
+    break;
+
+    case QEvent::Wheel:
+    {
+      QWheelEvent * we = (QWheelEvent*)e;
+      QWheelEvent mappedEvent(mapWindowToUi(we->pos()), we->delta(), we->buttons(), we->modifiers(), we->orientation());
+      QCoreApplication::sendEvent(uiWindow.m_quickWindow, &mappedEvent);
+      return true;
+    }
+    break;
 
     case QEvent::MouseMove:
     case QEvent::MouseButtonDblClick:
     case QEvent::MouseButtonPress:
     case QEvent::MouseButtonRelease:
-      forwardMouseEvent((QMouseEvent*)e);
+    {
+      QMouseEvent * me = (QMouseEvent *)e;
+      QMouseEvent mappedEvent(e->type(), mapWindowToUi(me->localPos()), me->screenPos(), me->button(), me->buttons(), me->modifiers());
+      QCoreApplication::sendEvent(uiWindow.m_quickWindow, &mappedEvent);
       return QRiftWindow::event(e);
+    }
 
     default: break;
     }
@@ -766,26 +810,21 @@ private:
     return QRiftWindow::event(e);
   }
 
-  void resizeEvent(QResizeEvent *e) {}
+  void resizeEvent(QResizeEvent *e) {
+    windowSize = vec2(e->size().width(), e->size().height());
+  }
 
-  void forwardMouseEvent(QMouseEvent * e) {
-    QPointF pos = e->localPos();
-    pos.rx() /= size().width();
-    pos.ry() /= size().height();
-    pos.rx() *= UI_SIZE.x;
-    pos.ry() *= UI_SIZE.y;
-    QMouseEvent mappedEvent(e->type(), pos, e->screenPos(), e->button(), e->buttons(), e->modifiers());
-    QCoreApplication::sendEvent(uiWindow.m_quickWindow, &mappedEvent);
+  QPointF mapWindowToUi(const QPointF & p) {
+    vec2 pos = vec2(p.x(), p.y());
+    pos /= windowSize;
+    pos *= UI_SIZE;
+    return QPointF(pos.x, pos.y);
   }
 
   ///////////////////////////////////////////////////////
   //
   // Rendering functionality
   // 
-  vec2 textureSize() {
-    return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
-  }
-
   uvec2 renderSize() {
     return uvec2(texRes * textureSize());
   }
@@ -922,6 +961,7 @@ public:
   }
 
   virtual ~ShadertoyApp() {
+    delete riftRenderWidget;
   }
 
 private:
@@ -935,7 +975,9 @@ private:
 
 MAIN_DECL { 
   try { 
+#ifdef USE_RIFT
     ovr_Initialize();
+#endif
 #ifndef _DEBUG
     qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "."); 
 #endif

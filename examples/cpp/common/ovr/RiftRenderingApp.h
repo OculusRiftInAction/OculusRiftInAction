@@ -54,7 +54,16 @@ protected:
     
   };
   virtual void renderScene() = 0;
-  
+
+  void toggleOvrFlag(ovrHmdCaps flag) {
+    int caps = ovrHmd_GetEnabledCaps(hmd);
+    if (caps & flag) {
+      ovrHmd_SetEnabledCaps(hmd, caps & ~flag);
+    } else {
+      ovrHmd_SetEnabledCaps(hmd, caps | flag);
+    }
+  }
+
 public:
   RiftRenderingApp();
   virtual ~RiftRenderingApp();

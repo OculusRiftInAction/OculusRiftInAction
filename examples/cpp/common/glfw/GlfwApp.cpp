@@ -89,7 +89,6 @@ int GlfwApp::run() {
     });
 
     while (!glfwWindowShouldClose(window)) {
-      fpsCounter.startCounter();
       glfwPollEvents();
       ++frame;
       update();

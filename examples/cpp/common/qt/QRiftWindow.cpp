@@ -1,5 +1,6 @@
 #include "Common.h"
 
+
 #ifdef HAVE_QT
 
 QRiftWindow::QRiftWindow() {
@@ -20,10 +21,12 @@ QRiftWindow::QRiftWindow() {
   renderThread.setLambda([&] { renderLoop(); });
   bool directHmdMode = false;
 
+#ifdef USE_RIFT
   // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
   ON_WINDOWS([&] {
     directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
   });
+#endif
 
   if (!directHmdMode) {
     setFlags(Qt::FramelessWindowHint);
@@ -34,13 +37,12 @@ QRiftWindow::QRiftWindow() {
 
   show();
 
+#ifdef USE_RIFT
   if (directHmdMode) {
     setFramePosition(QPoint(0, -1080));
     // FIXME iterate through all screens and move the window to the best one
-//    move(0, -1080);
   } else {
     setFramePosition(QPoint(hmd->WindowsPos.x, hmd->WindowsPos.y));
-      // move(hmd->WindowsPos.x, hmd->WindowsPos.y);
   }
   resize(hmd->Resolution.w, hmd->Resolution.h);
 
@@ -51,6 +53,12 @@ QRiftWindow::QRiftWindow() {
       ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
     }
   }
+#else
+  setFramePosition(QPoint(0, -1080));
+  // FIXME iterate through all screens and move the window to the best one
+  resize(1920, 1080);
+#endif
+
 }
 
 QRiftWindow::~QRiftWindow() {
@@ -79,16 +87,43 @@ void QRiftWindow::queueRenderThreadTask(Lambda task) {
 }
 
 
+void QRiftWindow::drawFrame() {
+#ifdef USE_RIFT
+  drawRiftFrame();
+#else
+  MatrixStack & mv = Stacks::modelview();
+  MatrixStack & pr = Stacks::projection();
+  perFrameRender();
+  Stacks::withPush(pr, mv, [&] {
+    // Set up the per-eye projection matrix
+    pr.top() = glm::perspective(PI / 2.0f, (float)size().width() / (float)size().height(), 0.01f, 10000.0f);
+    renderScene();
+  });
+#endif
+}
+
+static RateCounter rateCounter;
+
 void QRiftWindow::renderLoop() {
   m_context->makeCurrent(this);
   setup();
   QCoreApplication* app = QCoreApplication::instance();
   while (!shuttingDown) {
+    m_context->makeCurrent(this);
     // Process the Qt message pump to run the standard window controls
     if (app->hasPendingEvents())
       app->processEvents();
     tasks.drainTaskQueue();
-    drawRiftFrame();
+    drawFrame();
+#ifndef USE_RIFT
+    m_context->swapBuffers(this);
+    rateCounter.increment();
+    if (rateCounter.count() > 60) {
+      float fps = rateCounter.getRate();
+      updateFps(fps);
+      rateCounter.reset();
+    }
+#endif
   }
   m_context->doneCurrent();
   m_context->moveToThread(QApplication::instance()->thread());
@@ -99,6 +134,7 @@ void QRiftWindow::setup() {
   glewExperimental = true;
   glewInit();
 
+  GLenum error = glGetError();
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
   GLuint unusedIds = 0;
   if (glDebugMessageCallback) {
@@ -110,8 +146,10 @@ void QRiftWindow::setup() {
     glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
       0, &unusedIds, true);
   }
-
+  error = glGetError();
+#ifdef USE_RIFT
   initializeRiftRendering();
+#endif
 }
 
 //#include "QRiftWindow.moc"

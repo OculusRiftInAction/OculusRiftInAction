@@ -19,7 +19,13 @@
 
 #pragma once
 
-class QRiftWindow : public QWindow, protected RiftRenderingApp {
+
+class QRiftWindow : 
+  public QWindow
+#ifdef USE_RIFT
+  , protected RiftRenderingApp 
+#endif
+{
   Q_OBJECT
   bool shuttingDown{ false };
   LambdaThread renderThread;
@@ -46,18 +52,23 @@ public:
     return (void*)winId();
   }
 
-  void toggleOvrFlag(ovrHmdCaps flag) {
-    int caps = ovrHmd_GetEnabledCaps(hmd);
-    if (caps & flag) {
-      ovrHmd_SetEnabledCaps(hmd, caps & ~flag);
-    } else {
-      ovrHmd_SetEnabledCaps(hmd, caps | flag);
-    }
-  }
-
 private:
   virtual void renderLoop();
+  virtual void drawFrame();
+
 
 protected:
   virtual void setup();
+
+#ifndef USE_RIFT
+  virtual void updateFps(float fps) {
+  }
+
+  virtual void perFrameRender() {
+
+  }
+
+  virtual void renderScene() = 0;
+#endif
+
 };

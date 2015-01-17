@@ -69,7 +69,6 @@ static RateCounter rateCounter;
 
 void RiftRenderingApp::drawRiftFrame() {
   ++frameCount;
-  rateCounter.startCounter();
   ovrHmd_BeginFrame(hmd, frameCount);
   MatrixStack & mv = Stacks::modelview();
   MatrixStack & pr = Stacks::projection();
@@ -121,7 +120,6 @@ void RiftRenderingApp::drawRiftFrame() {
   if (rateCounter.elapsed() > 2.0f) {
     float fps = rateCounter.getRate();
     updateFps(fps);
-    SAY("FPS: %0.2f", fps);
     rateCounter.reset();
   }
 }
