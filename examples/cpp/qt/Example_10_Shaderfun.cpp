@@ -11,6 +11,7 @@
 #include <QQmlContext>
 #include <QNetworkAccessManager>
 #include <QtNetwork>
+#include <QDeclarativeEngine>
 
 #ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
@@ -592,6 +593,7 @@ private:
   }
 
   void setupOffscreenUi() {
+    
 #ifdef USE_RIFT
     this->endFrameLock = &uiWindow->renderLock;
 #endif
@@ -612,6 +614,8 @@ private:
 
     //	QUrl qml = QUrl::fromLocalFile("/Users/bradd/git/OculusRiftInAction/resources/shadertoy/Combined.qml");
 	  // QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
+    uiWindow->m_qmlEngine->addImportPath("./qml");
+    uiWindow->m_qmlEngine->addImportPath(".");
     QUrl qml = QUrl("qrc:/shadertoy/Combined.qml");
     uiWindow->loadQml(qml);
     connect(uiWindow, &QOffscreenUi::textureUpdated, this, [&](int textureId) {
@@ -1171,6 +1175,7 @@ MAIN_DECL {
     ovr_Initialize();
 #endif
 #ifndef _DEBUG
+    //SetCurrentDirectoryA("F:\\shadertoy");
     qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins"); 
     qputenv("QML_IMPORT_PATH", "./qml");
 #endif
