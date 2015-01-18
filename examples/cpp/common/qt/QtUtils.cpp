@@ -59,6 +59,7 @@ namespace oria {
       return QString::fromUtf8(data.data(), data.size());
     }
 
+
     QImage loadImageResource(Resource res) {
       QImage image;
       image.loadFromData(toByteArray(res));
@@ -352,7 +353,13 @@ void QOffscreenUi::updateQuick() {
     m_polish = false;
   }
 
-  QOpenGLFramebufferObject* fbo = getReadyFbo();
+  QOpenGLFramebufferObject* fbo;
+  
+  {
+    std::unique_lock<std::mutex> Lock(renderLock);
+    fbo = getReadyFbo();
+  }
+
   m_quickWindow->setRenderTarget(fbo);
   fbo->bind();
   m_renderControl->render();

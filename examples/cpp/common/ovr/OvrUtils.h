@@ -137,8 +137,10 @@ public:
   }
 
   virtual ~RiftManagerApp() {
-    ovrHmd_Destroy(hmd);
-    hmd = nullptr;
+    if (hmd) {
+      ovrHmd_Destroy(hmd);
+      hmd = nullptr;
+    }
   }
 
   int getEnabledCaps() {

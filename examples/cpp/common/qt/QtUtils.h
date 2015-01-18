@@ -146,6 +146,7 @@ public:
   QTimer m_updateTimer;
   QSize m_size;
   bool m_polish{ true };
+  std::mutex renderLock;
 };
 
 class LambdaThread : public QThread {

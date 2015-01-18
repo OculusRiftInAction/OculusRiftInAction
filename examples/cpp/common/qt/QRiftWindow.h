@@ -41,10 +41,14 @@ public:
     return m_context;
   }
 
+  void makeCurrent() {
+    m_context->makeCurrent(this);
+  }
+
   void start();
 
   // Should only be called from the primary thread
-  void stop();
+  virtual void stop();
 
   void queueRenderThreadTask(Lambda task);
 

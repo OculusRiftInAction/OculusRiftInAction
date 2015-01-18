@@ -49,6 +49,7 @@ namespace shadertoy {
     Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_XML, "Elevated"),
     Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_XML, "Voronoi Rocks"),
     Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_XML, "Morning City"),
+    Preset(Resource::SHADERTOY_SHADERS_4SX3R2_JSON, "Monster"),
 
 #ifdef OS_WIN
     Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_XML, "Steel Cubes"),
@@ -123,6 +124,7 @@ namespace shadertoy {
 
   struct Shader {
     bool vrSupport{ true };
+    std::string id;
     std::string url;
     std::string name;
     std::string fragmentSource;

@@ -9,6 +9,9 @@
 #include <QQuickTextDocument>
 #include <QGuiApplication>
 #include <QQmlContext>
+#include <QNetworkAccessManager>
+#include <QtNetwork>
+
 #ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
 #else
@@ -19,6 +22,7 @@
 const char * ORG_NAME = "Oculus Rift in Action";
 const char * ORG_DOMAIN = "oculusriftinaction.com";
 const char * APP_NAME = "ShadertoyVR";
+const char * SHADERTOY_API_KEY = "Nt8tw7";
 
 using namespace oglplus;
 
@@ -92,6 +96,12 @@ protected:
   // The currently active input channels
   Channel channels[4];
   QUrl channelSources[4];
+  bool vrMode{ false };
+
+  // The shadertoy rendering resolution scale.  1.0 means full resolution 
+  // as defined by the Oculus SDK as the ideal offscreen resolution 
+  // pre-distortion
+  float texRes{ 1.0f };
 
   float eyePosScale{ 1.0f };
   float startTime{ 0.0f };
@@ -116,28 +126,34 @@ protected:
     setShaderSourceInternal(oria::qt::toString(Resource::SHADERTOY_SHADERS_DEFAULT_FS));
     assert(shadertoyProgram);
     skybox = oria::loadSkybox(shadertoyProgram);
+
+    Platform::addShutdownHook([&] {
+      textureCache.clear();
+      shadertoyProgram.reset();
+      vertexShader.reset();
+      fragmentShader.reset();
+      skybox.reset();
+    });
   }
 
   void initTextureCache() {
     using namespace shadertoy;
+
     for (int i = 0; i < MAX_TEXTURES; ++i) {
       Resource res = TEXTURES[i];
       if (NO_RESOURCE == res) {
         continue;
       }
-      QUrl url(QString("qrc:/") + QString(Resources::getResourceMnemonic(res).c_str()));
-      qDebug() << url;
+      QString path = QString(Resources::getResourceMnemonic(res).c_str());
+      QString fileName = path.split("/").back();
+      QUrl url(QString("qrc:/") + path);
       TextureData & cacheEntry = textureCache[url];
       cacheEntry.tex = oria::load2dTexture(res, cacheEntry.size);
 
       // Backward compatibility
-      QUrl alternate = QUrl(QString().sprintf("preset://tex/%d", i));
-      canonicalUrlMap[alternate] = url;
-      textureCache[alternate] = cacheEntry;
-
-      alternate = QUrl(QString().sprintf("preset://tex/%02d", i));
-      canonicalUrlMap[alternate] = url;
-      textureCache[alternate] = cacheEntry;
+      canonicalUrlMap[QUrl(QString().sprintf("preset://tex/%d", i))] = url;
+      canonicalUrlMap[QUrl(QString().sprintf("preset://tex/%02d", i))] = url;
+      canonicalUrlMap[QUrl("/presets/" + fileName)] = url;
     }
     for (int i = 0; i < MAX_CUBEMAPS; ++i) {
       Resource res = CUBEMAPS[i];
@@ -147,20 +163,21 @@ protected:
       static int resourceOrder[] = {
         0, 1, 2, 3, 4, 5
       };
-      QUrl url(QString("qrc:/") + QString(Resources::getResourceMnemonic(res).c_str()));
+      QString path = QString(Resources::getResourceMnemonic(res).c_str());
+      QString fileName = path.split("/").back();
+      QUrl url(QString("qrc:/") + path);
       uvec2 size;
       TextureData & cacheEntry = textureCache[url];
       cacheEntry.tex = oria::loadCubemapTexture(res, resourceOrder, false);
 
       // Backward compatibility
-      QUrl alternate = QUrl(QString().sprintf("preset://cube/%d", i));
-      canonicalUrlMap[alternate] = url;
-      textureCache[alternate] = cacheEntry;
-
-      alternate = QUrl(QString().sprintf("preset://cube/%02d", i));
-      canonicalUrlMap[alternate] = url;
-      textureCache[alternate] = cacheEntry;
+      canonicalUrlMap[QUrl(QString().sprintf("preset://cube/%d", i))] = url;
+      canonicalUrlMap[QUrl(QString().sprintf("preset://cube/%02d", i))] = url;
+      canonicalUrlMap[QUrl("/presets/" + fileName)] = url;
     }
+    //std::for_each(canonicalUrlMap.begin(), canonicalUrlMap.end(), [&](CanonicalUrlMap::const_reference & entry) {
+    //  qDebug() << entry.second << "\t" << entry.first;
+    //});
   }
 
   void renderShadertoy() {
@@ -192,17 +209,19 @@ protected:
         context()->functions()->glUniform1i(activeUniforms[uniformName], i);
       }
     }
-    if (activeUniforms.count(UNIFORM_RESOLUTION)) {
-
-      vec3 res = vec3(textureSize(), 0);
-      Uniform<vec3>(*shadertoyProgram, UNIFORM_RESOLUTION).Set(res);
-    }
     NoProgram().Bind();
 
     uniformLambdas.clear();
     if (activeUniforms.count(UNIFORM_GLOBALTIME)) {
       uniformLambdas.push_back([&] {
         Uniform<GLfloat>(*shadertoyProgram, UNIFORM_GLOBALTIME).Set(Platform::elapsedSeconds() - startTime);
+      });
+    }
+
+    if (activeUniforms.count(UNIFORM_RESOLUTION)) {
+      uniformLambdas.push_back([&] {
+        vec3 res = vec3(renderSize(), 0);
+        Uniform<vec3>(*shadertoyProgram, UNIFORM_RESOLUTION).Set(res);
       });
     }
 
@@ -236,8 +255,13 @@ protected:
 #endif
   }
 
+  uvec2 renderSize() {
+    return uvec2(texRes * textureSize());
+  }
 
-  virtual void setShaderSourceInternal(QString source) {
+
+
+  virtual bool setShaderSourceInternal(QString source) {
     try {
       position = vec3();
       if (!vertexShader) {
@@ -256,7 +280,11 @@ protected:
       }
       header += shadertoy::LINE_NUMBER_HEADER;
       FragmentShaderPtr newFragmentShader(new FragmentShader());
-      source.replace(QRegExp("\\bgl_FragColor\\b"), "FragColor").replace(QRegExp("\\btexture2D\\b"), "texture");
+      vrMode = source.contains("#pragma vr");
+      source.
+        replace(QRegExp("\\bgl_FragColor\\b"), "FragColor").
+        replace(QRegExp("\\btexture2D\\b"), "texture").
+        replace(QRegExp("\\btextureCube\\b"), "texture");
       source.insert(0, header);
       QByteArray qb = source.toLocal8Bit();
       GLchar * fragmentSource = (GLchar*)qb.data();
@@ -278,21 +306,28 @@ protected:
       emit compileSuccess();
     } catch (ProgramBuildError & err) {
       emit compileError(QString(err.Log().c_str()));
+      return false;
     }
+    return true;
   }
 
   virtual TexturePtr loadTexture(const QUrl & source) {
     qDebug() << "Looking for texture " << source;
-    if (!textureCache.count(source)) {
-      qDebug() << "Texture " << source << " not found, loading";
+    QUrl url = source;
+    while (canonicalUrlMap.count(url)) {
+      url = canonicalUrlMap[url];
+    }
+
+    if (!textureCache.count(url)) {
+      qWarning() << "Texture " << source << " not found, loading";
       // FIXME
       QFile f(source.toLocalFile());
       f.open(QFile::ReadOnly);
       QByteArray ba = f.readAll();
       std::vector<uint8_t> v;  v.assign(ba.constData(), ba.constData() + ba.size());
-      textureCache[source].tex = oria::load2dTexture(v);
+      textureCache[url].tex = oria::load2dTexture(v);
     }
-    return textureCache[source].tex;
+    return textureCache[url].tex;
   }
 
   virtual void setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, const QUrl & textureSource) {
@@ -315,18 +350,19 @@ protected:
     case shadertoy::ChannelInputType::TEXTURE:
       newChannel.texture = loadTexture(textureSource);
       newChannel.target = Texture::Target::_2D;
-      //      newChannel.resolution = vec3(textureCache[res].size, 0);
       break;
 
     case shadertoy::ChannelInputType::CUBEMAP:
-    {
       newChannel.texture = loadTexture(textureSource);
       newChannel.target = Texture::Target::CubeMap;
-    }
-    break;
-    case shadertoy::ChannelInputType::VIDEO:
       break;
+
+    case shadertoy::ChannelInputType::VIDEO:
+      // FIXME, not supported
+      break;
+
     case shadertoy::ChannelInputType::AUDIO:
+      // FIXME, not supported
       break;
     }
 
@@ -345,6 +381,70 @@ signals:
   void compileSuccess();
 };
 
+class ShadertoyFetcher : public QObject {
+  Q_OBJECT
+
+  QQueue<QString> shadersToFetch;
+  QNetworkAccessManager qnam;
+
+public:
+
+  virtual void fetchUrl(QUrl url, std::function<void(QByteArray)> f) {
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, "ShadertoyVR/1.0");
+    QNetworkReply * netReply = qnam.get(request);
+    connect(netReply, &QNetworkReply::finished, this, [&, f, netReply] {
+      QByteArray replyBuffer = netReply->readAll();
+      f(replyBuffer);
+    });
+  }
+
+  virtual void fetchNetworkShaders() {
+    static QUrl url("https://www.shadertoy.com/api/v1/shaders?key=Nt8tw7");
+    fetchUrl(url, [&](const QByteArray & replyBuffer) {
+      QJsonDocument jsonResponse = QJsonDocument::fromJson(replyBuffer);
+      QJsonObject jsonObject = jsonResponse.object();
+      QJsonArray shaders = jsonObject["Results"].toArray();
+      for (int i = 0; i < shaders.count(); ++i) {
+        QString shaderId = shaders.at(i).toString();
+        shadersToFetch.push_back(shaderId);
+      }
+      fetchNextShader();
+    });
+  }
+
+  virtual void fetchNextShader() {
+    if (shadersToFetch.empty()) {
+      return;
+    }
+    static const QString BASE_URL = "https://www.shadertoy.com/api/v1/shaders";
+    static const QString URL_KEY = "?key=Nt8tw7";
+    static const QString BASE_MEDIA_URL = "https://www.shadertoy.com/media/shaders/";
+    QDir configPath = QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
+    configPath.mkpath("shadertoy");
+    while (!shadersToFetch.empty()) {
+      QString nextShaderId = shadersToFetch.front();
+      shadersToFetch.pop_front();
+      QString shaderFile = configPath.absoluteFilePath("shadertoy/" + nextShaderId + ".json");
+      QString shaderPreviewFile = configPath.absoluteFilePath(nextShaderId + "_preview.jpg");
+      if (!QFile(shaderFile).exists()) {
+        QUrl url = QUrl(BASE_URL + "/" + nextShaderId + URL_KEY);
+        qDebug() << "Fetching shader from " << url;
+        fetchUrl(url, [&, shaderFile](const QByteArray & replyBuffer) {
+          qDebug() << replyBuffer; 
+          QFile outputFile(shaderFile);
+          outputFile.open(QIODevice::WriteOnly);
+          outputFile.write(replyBuffer);
+          outputFile.close();
+          fetchNextShader();
+        });
+        break;
+      }
+    }
+  }
+
+};
+
 class ShadertoyWindow : public ShadertoyRenderer {
   Q_OBJECT
   
@@ -357,6 +457,7 @@ class ShadertoyWindow : public ShadertoyRenderer {
   typedef std::unique_lock<Mutex> Lock;
   // A cache of all the input textures available 
   QDir configPath;
+  QSettings settings;
 
   shadertoy::Shader activeShader;
 
@@ -364,7 +465,7 @@ class ShadertoyWindow : public ShadertoyRenderer {
   // 
   // Offscreen UI
   //
-  QOffscreenUi uiWindow;
+  QOffscreenUi * uiWindow{ new QOffscreenUi() };
   GlslHighlighter highlighter;
 
   int activePresetIndex{ 0 };
@@ -384,10 +485,6 @@ class ShadertoyWindow : public ShadertoyRenderer {
   ActomicVec2 mousePosition;
   bool uiVisible{ false };
 
-  // The shadertoy rendering resolution scale.  1.0 means full resolution 
-  // as defined by the Oculus SDK as the ideal offscreen resolution 
-  // pre-distortion
-  float texRes{ 1.0f };
 
   // A wrapper for passing the UI texture from the app to the widget
   AtomicGlTexture uiTexture{ 0 };
@@ -414,9 +511,9 @@ class ShadertoyWindow : public ShadertoyRenderer {
     return uiTexture.exchange(newUiTexture);
   }
 
+  ShadertoyFetcher fetcher;
 public:
   ShadertoyWindow() {
-
     // Fixes an occasional crash caused by a race condition between the Rift 
     // render thread and the UI thread, triggered when Rift swapbuffers overlaps 
     // with the UI thread binding a new FBO (specifically, generating a texture 
@@ -426,20 +523,33 @@ public:
       QString configLocation = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
       configPath = QDir(configLocation);
       configPath.mkpath("shaders");
-
     }
+
+    fetcher.fetchNetworkShaders();
 
     connect(&timer, &QTimer::timeout, this, &ShadertoyWindow::onTimer);
     timer.start(100);
-    connect(this, &ShadertoyWindow::fpsUpdated, this, [&](float fps){
-      setItemText("fps", QString().sprintf("%0.0f", fps));
-    });
     setupOffscreenUi();
     onLoadPreset(0);
+    Platform::addShutdownHook([&] {
+      shaderFramebuffer.reset();
+      uiProgram.reset();
+      uiShape.reset();
+      mouseTexture.reset();
+      mouseShape.reset();
+      uiFramebuffer.reset();
+      planeProgram.reset();
+      plane.reset();
+    });
+  }
+
+  virtual void stop() {
+    ShadertoyRenderer::stop();
+    delete uiWindow;
+    uiWindow = nullptr;
   }
 
 private:
-
   virtual void setup() {
     ShadertoyRenderer::setup();
 
@@ -458,86 +568,103 @@ private:
     plane = oria::loadPlane(planeProgram, 1.0);
 
     mouseTexture = loadCursor(Resource::IMAGES_CURSOR_PNG);
+    Platform::addShutdownHook([&] {
+      mouseTexture.reset();
+    });
+
     mouseShape = oria::loadPlane(uiProgram, UI_INVERSE_ASPECT);
+    Platform::addShutdownHook([&] {
+      mouseShape.reset();
+    });
 
     uiFramebuffer = FramebufferWrapperPtr(new FramebufferWrapper());
     uiFramebuffer->init(UI_SIZE);
+    Platform::addShutdownHook([&] {
+      uiFramebuffer.reset();
+    });
 
     shaderFramebuffer = FramebufferWrapperPtr(new FramebufferWrapper());
     shaderFramebuffer->init(textureSize());
+    Platform::addShutdownHook([&] {
+      shaderFramebuffer.reset();
+    });
     DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
   }
 
   void setupOffscreenUi() {
+#ifdef USE_RIFT
+    this->endFrameLock = &uiWindow->renderLock;
+#endif
     qApp->setFont(QFont("Arial", 14, QFont::Bold));
-    uiWindow.pause();
-    uiWindow.setup(QSize(UI_SIZE.x, UI_SIZE.y), context());
+    uiWindow->pause();
+    uiWindow->setup(QSize(UI_SIZE.x, UI_SIZE.y), context());
     {
       QStringList dataList;
       for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
         dataList.append(shadertoy::PRESETS[i].name);
       }
-      auto qmlContext = uiWindow.m_qmlEngine->rootContext();
+      auto qmlContext = uiWindow->m_qmlEngine->rootContext();
       qmlContext->setContextProperty("presetsModel", QVariant::fromValue(dataList));
-      // Qt.resolvedUrl("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders")
-      QUrl url = QUrl::fromLocalFile("/Users/bdavis/AppData/Local/Oculusr Rift in Action/ShadertoyVR/shaders");
+      QUrl url = QUrl::fromLocalFile(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/shaders");
       qmlContext->setContextProperty("userPresetsFolder", url);
     }
-    uiWindow.setProxyWindow(this);
+    uiWindow->setProxyWindow(this);
 
     //	QUrl qml = QUrl::fromLocalFile("/Users/bradd/git/OculusRiftInAction/resources/shadertoy/Combined.qml");
-	  QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
-    uiWindow.loadQml(qml);
-    connect(&uiWindow, &QOffscreenUi::textureUpdated, this, [&](int textureId) {
-      uiWindow.lockTexture(textureId);
+	  // QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
+    QUrl qml = QUrl("qrc:/shadertoy/Combined.qml");
+    uiWindow->loadQml(qml);
+    connect(uiWindow, &QOffscreenUi::textureUpdated, this, [&](int textureId) {
+      uiWindow->lockTexture(textureId);
       GLuint oldTexture = exchangeUiTexture(textureId);
       if (oldTexture) {
-        uiWindow.releaseTexture(oldTexture);
+        uiWindow->releaseTexture(oldTexture);
       }
     });
 
     QQuickItem * editorControl;
-    editorControl = uiWindow.m_rootItem->findChild<QQuickItem*>("shaderTextEdit");
+    editorControl = uiWindow->m_rootItem->findChild<QQuickItem*>("shaderTextEdit");
     if (editorControl) {
       highlighter.setDocument(
                               editorControl->property("textDocument").value<QQuickTextDocument*>()->textDocument());
     }
 
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(toggleUi()),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(toggleUi()),
       this, SLOT(onToggleUi()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(reloadUi()),
-      this, SLOT(onReloadUi()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(channelTextureChanged(int, int, QString)),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(channelTextureChanged(int, int, QString)),
       this, SLOT(onChannelTextureChanged(int, int, QString)));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(shaderSourceChanged(QString)),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(shaderSourceChanged(QString)),
       this, SLOT(onShaderSourceChanged(QString)));
 
     // FIXME add confirmation for when the user might lose edits.
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadPreset(int)),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(loadPreset(int)),
       this, SLOT(onLoadPreset(int)));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadNextPreset()),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(loadNextPreset()),
       this, SLOT(onLoadNextPreset()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadPreviousPreset()), 
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(loadPreviousPreset()),
       this, SLOT(onLoadPreviousPreset()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(loadShaderXml(QString)),
-      this, SLOT(onLoadShaderXml(QString)));
-    
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(recenterPose()),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(loadShaderFile(QString)),
+      this, SLOT(onLoadShaderFile(QString)));
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(saveShaderXml(QString)),
+      this, SLOT(onSaveShaderXml(QString)));
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(recenterPose()),
       this, SLOT(onRecenterPosition()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(modifyTextureResolution(double)),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(modifyTextureResolution(double)),
       this, SLOT(onModifyTextureResolution(double)));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(modifyPositionScale(double)),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(modifyPositionScale(double)),
       this, SLOT(onModifyPositionScale(double)));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(resetPositionScale()),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(resetPositionScale()),
       this, SLOT(onResetPositionScale()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(toggleEyePerFrame()),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(toggleEyePerFrame()),
       this, SLOT(onToggleEyePerFrame()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(epfModeChanged(bool)),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(epfModeChanged(bool)),
       this, SLOT(onEpfModeChanged(bool)));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(startShutdown()),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(startShutdown()),
       this, SLOT(onShutdown()));
-    QObject::connect(uiWindow.m_rootItem, SIGNAL(restartShader()),
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(restartShader()),
       this, SLOT(onRestartShader()));
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(newShaderFilepath(QString)),
+      this, SLOT(onNewShaderFilepath(QString)));
 
     QObject::connect(this, &ShadertoyWindow::compileSuccess, this, [&] {
       setItemProperty("errorFrame", "height", 0);
@@ -551,20 +678,34 @@ private:
       setItemProperty("errorFrame", "visible", true);
       setItemProperty("compileErrors", "text", errors);
       setItemProperty("shaderTextFrame", "errorMargin", 8);
-      
     });
 
-    setItemText("eps", QString().sprintf("%0.2f", eyePosScale));
+    connect(this, &ShadertoyWindow::fpsUpdated, this, [&](float fps) {
+      setItemText("fps", QString().sprintf("%0.0f", fps));
+    });
+
     setItemText("res", QString().sprintf("%0.2f", texRes));
   }
 
+  QVariant getItemProperty(const QString & itemName, const QString & property) {
+    QQuickItem * item = uiWindow->m_rootItem->findChild<QQuickItem*>(itemName);
+    if (nullptr != item) {
+      return item->property(property.toLocal8Bit());
+    } else {
+      qWarning() << "Could not find item " << itemName << " on which to set property " << property;
+    }
+    return QVariant();
+  }
+
   void setItemProperty(const QString & itemName, const QString & property, const QVariant & value) {
-    QQuickItem * item = uiWindow.m_rootItem->findChild<QQuickItem*>(itemName);
+    QQuickItem * item = uiWindow->m_rootItem->findChild<QQuickItem*>(itemName);
     if (nullptr != item) {
       bool result = item->setProperty(property.toLocal8Bit(), value);
       if (!result) {
-        qDebug() << "Set property " << property << " on item " << itemName << " returned " << result;
+        qWarning() << "Set property " << property << " on item " << itemName << " returned " << result;
       }
+    } else {
+      qWarning() << "Could not find item " << itemName << " on which to set property " << property;
     }
   }
 
@@ -572,6 +713,9 @@ private:
     setItemProperty(itemName, "text", text);
   }
 
+  QString getItemText(const QString & itemName) {
+    return getItemProperty(itemName, "text").toString();
+  }
 
 private slots:
   void onToggleUi() {
@@ -580,16 +724,20 @@ private slots:
 	  if (uiVisible) {
 		savedEyePosScale = eyePosScale;
 		eyePosScale = 0.0f;
-		uiWindow.resume();
+    uiWindow->resume();
 	  } else {
 		eyePosScale = savedEyePosScale;
-		uiWindow.pause();
+    uiWindow->pause();
 	  }
   }
 
   void onLoadNextPreset() {
     int newPreset = (activePresetIndex + 1) % shadertoy::MAX_PRESETS;
     onLoadPreset(newPreset);
+  }
+
+  void onFontSizeChanged(int newSize) {
+    settings.setValue("fontSize", newSize);
   }
 
   void onLoadPreviousPreset() {
@@ -600,17 +748,52 @@ private slots:
   void onLoadPreset(int index) {
     activePresetIndex = index;
     auto preset = shadertoy::PRESETS[index];
-    loadShader(shadertoy::loadShaderXml(preset.res));
+    QString shaderPath = Resources::getResourceMnemonic(preset.res).c_str();
+    if (shaderPath.endsWith(".xml", Qt::CaseInsensitive)) {
+      loadShader(shadertoy::loadShaderXml(preset.res));
+    } else if (shaderPath.endsWith(".json", Qt::CaseInsensitive)) {
+      loadShader(shadertoy::loadShaderJson(preset.res));
+    } else {
+      qWarning() << "Don't know how to parse path " << shaderPath; 
+    }
   }
 
-  void onLoadShaderXml(const QString & shaderPath) {
-    qDebug() << shaderPath;
-    loadShader(shadertoy::loadShaderXml(shaderPath));
+  void onLoadShaderFile(const QString & shaderPath) {
+    qDebug() << "Loading shader from " << shaderPath;
+    if (shaderPath.endsWith(".xml")) {
+      loadShader(shadertoy::loadShaderXml(shaderPath));
+    } else if (shaderPath.endsWith(".json")) {
+      loadShader(shadertoy::loadShaderJson(shaderPath));
+    }
+  }
+
+  void onNewShaderFilepath(const QString & shaderPath) {
+    QDir newDir(shaderPath);
+    qDebug() << newDir;
+    qDebug() << newDir.absolutePath();
+    QUrl url = QUrl::fromLocalFile(newDir.absolutePath());
+    qDebug() << url;
+//    setItemProperty("userPresetsModel", "folder", url);
+    auto qmlContext = uiWindow->m_qmlEngine->rootContext();
+    qmlContext->setContextProperty("userPresetsFolder", url);
+  }
+  
+  void onSaveShaderXml(const QString & shaderPath) {
+    Q_ASSERT(!shaderPath.isEmpty());
+    //shadertoy::saveShaderXml(activeShader);
+    activeShader.name = shaderPath.toLocal8Bit();
+    activeShader.fragmentSource = getItemText("shaderTextEdit").toLocal8Bit();
+    QString destinationFile = configPath.absoluteFilePath(QString("shaders/")
+      + shaderPath
+      + ".xml");
+    qDebug() << "Saving shader to " << destinationFile;
+    shadertoy::saveShaderXml(destinationFile, activeShader);
   }
 
   void onChannelTextureChanged(const int & channelIndex, const int & channelType, const QString & texturePath) {
     queueRenderThreadTask([&, channelIndex, channelType, texturePath] {
-      qDebug() << texturePath;
+      activeShader.channelTypes[channelIndex] = (shadertoy::ChannelInputType)channelType;
+      activeShader.channelTextures[channelIndex] = texturePath.toLocal8Bit();
       setChannelTextureInternal(channelIndex, 
         (shadertoy::ChannelInputType)channelType, 
         QUrl(texturePath));
@@ -640,7 +823,6 @@ private slots:
       queueRenderThreadTask([&, newRes] {
         texRes = newRes;
       });
-      // FIXME update the UI
       setItemText("res", QString().sprintf("%0.2f", newRes));
     }
   }
@@ -685,7 +867,6 @@ private slots:
   }
 
   void onShutdown() {
-    stop();
     QApplication::instance()->quit();
   }
 
@@ -702,7 +883,7 @@ private slots:
 
     if (!tempTextureDeleteQueue.empty()) {
       std::for_each(tempTextureDeleteQueue.begin(), tempTextureDeleteQueue.end(), [&] (int usedTexture){
-        uiWindow.releaseTexture(usedTexture);
+        uiWindow->releaseTexture(usedTexture);
       });
     }
   }
@@ -712,12 +893,12 @@ private:
     assert(!shader.fragmentSource.empty());
     activeShader = shader;
     setItemText("shaderTextEdit", QString(shader.fragmentSource.c_str()));
+    setItemText("shaderName", QString(shader.name.c_str()));
     for (int i = 0; i < 4; ++i) {
       QUrl url = QString(activeShader.channelTextures[i].c_str());
       while (canonicalUrlMap.count(url)) {
         url = canonicalUrlMap[url];
       }
-      qDebug() << url;
       setItemProperty(QString().sprintf("channel%d", i), "source",  url);
     }
     // FIXME update the channel texture buttons
@@ -770,15 +951,9 @@ private:
       }
 #endif
         
-        
-    //case QEvent::FocusIn:
-    //  QApplication::sendEvent(uiWindow.m_quickWindow, e);
-    //  QRiftWindow::event(e);
-    //  break;
-
     case QEvent::KeyRelease:
     {
-      if (QApplication::sendEvent(uiWindow.m_quickWindow, e)) {
+      if (QApplication::sendEvent(uiWindow->m_quickWindow, e)) {
         return true;
       }
     }
@@ -788,7 +963,7 @@ private:
     {
       QWheelEvent * we = (QWheelEvent*)e;
       QWheelEvent mappedEvent(mapWindowToUi(we->pos()), we->delta(), we->buttons(), we->modifiers(), we->orientation());
-      QCoreApplication::sendEvent(uiWindow.m_quickWindow, &mappedEvent);
+      QCoreApplication::sendEvent(uiWindow->m_quickWindow, &mappedEvent);
       return true;
     }
     break;
@@ -800,7 +975,7 @@ private:
     {
       QMouseEvent * me = (QMouseEvent *)e;
       QMouseEvent mappedEvent(e->type(), mapWindowToUi(me->localPos()), me->screenPos(), me->button(), me->buttons(), me->modifiers());
-      QCoreApplication::sendEvent(uiWindow.m_quickWindow, &mappedEvent);
+      QCoreApplication::sendEvent(uiWindow->m_quickWindow, &mappedEvent);
       return QRiftWindow::event(e);
     }
 
@@ -825,10 +1000,6 @@ private:
   //
   // Rendering functionality
   // 
-  uvec2 renderSize() {
-    return uvec2(texRes * textureSize());
-  }
-
   void perFrameRender() {
     if (uiVisible) {
       static GLuint lastUiTexture = 0;
@@ -892,11 +1063,9 @@ private:
   void renderScene() {
     Context::Enable(Capability::Blend);
     Context::BlendFunc(BlendFunction::SrcAlpha, BlendFunction::OneMinusSrcAlpha);
-
     Context::Disable(Capability::ScissorTest);
     Context::Disable(Capability::DepthTest);
     Context::Disable(Capability::CullFace);
-    // Context::Clear().DepthBuffer().ColorBuffer();
 
     // Render the shadertoy effect into a framebuffer, possibly at a 
     // smaller resolution than recommended
@@ -906,19 +1075,47 @@ private:
     });
     oria::viewport(textureSize());
 
-    // Re-render the shadertoy texture to the current framebuffer, 
-    // stretching it to fit the scene
-    Stacks::withIdentity([&] {
-      shaderFramebuffer->color.Bind(Texture::Target::_2D);
-      oria::renderGeometry(plane, planeProgram, LambdaList({ [&] {
-        Uniform<vec2>(*planeProgram, "UvMultiplier").Set(vec2(texRes));
-      } }));
-    });
+    // Now re-render the shader output to the screen.
+    shaderFramebuffer->BindColor(Texture::Target::_2D);
+#ifdef USE_RIFT
+    if (vrMode) {
+#endif
+      // In VR mode, we want to cover the entire surface
+      Stacks::withIdentity([&] {
+        oria::renderGeometry(plane, planeProgram, LambdaList({ [&] {
+          Uniform<vec2>(*planeProgram, "UvMultiplier").Set(vec2(texRes));
+        } }));
+      });
+#ifdef USE_RIFT
+    } else {
+      // In 2D mode, we want to render it as a window behind the UI
+      Context::Clear().ColorBuffer();
+      MatrixStack & mv = Stacks::modelview();
+      static vec3 scale = vec3(3.0f, 3.0f / (textureSize().x / textureSize().y), 3.0f);
+      static vec3 trans = vec3(0, 0, -3.5);
+      static mat4 rot = glm::rotate(mat4(), PI / 2.0f, Vectors::Y_AXIS);
+
+
+      for (int i = 0; i < 4; ++i) {
+        mv.withPush([&] {
+          for (int j = 0; j < i; ++j) {
+            mv.postMultiply(rot);
+          }
+          mv.translate(trans);
+          mv.scale(scale);
+          oria::renderGeometry(plane, planeProgram, LambdaList({ [&] {
+            Uniform<vec2>(*planeProgram, "UvMultiplier").Set(vec2(texRes));
+          } }));
+          oria::renderGeometry(plane, planeProgram);
+        });
+      }
+    }
+#endif
 
     if (uiVisible) {
       MatrixStack & mv = Stacks::modelview();
       Texture::Active(0);
-      oria::viewport(textureSize());
+//      oria::viewport(textureSize());
       mv.withPush([&] {
         mv.translate(vec3(0, 0, -1));
         uiFramebuffer->BindColor();
@@ -943,8 +1140,6 @@ signals:
 class ShadertoyApp : public QApplication {
   Q_OBJECT
 
-  ShadertoyWindow * riftRenderWidget;
-
   // A timer for updating the UI
   QWidget desktopWindow;
   shadertoy::Shader activeShader;
@@ -954,14 +1149,11 @@ public:
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
-    setupDesktopWindow();
-    riftRenderWidget = new ShadertoyWindow();
-    riftRenderWidget->start();
-    riftRenderWidget->requestActivate();
+    QCoreApplication::setApplicationVersion("0.2");
+//    setupDesktopWindow();
   }
 
   virtual ~ShadertoyApp() {
-    delete riftRenderWidget;
   }
 
 private:
@@ -979,11 +1171,22 @@ MAIN_DECL {
     ovr_Initialize();
 #endif
 #ifndef _DEBUG
-    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "."); 
+    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins"); 
+    qputenv("QML_IMPORT_PATH", "./qml");
 #endif
     QT_APP_WITH_ARGS(ShadertoyApp);
     Q_INIT_RESOURCE(Resource);
-    return app.exec(); 
+    ShadertoyWindow * riftRenderWidget;
+    riftRenderWidget = new ShadertoyWindow();
+    riftRenderWidget->start();
+    riftRenderWidget->requestActivate();
+    int result = app.exec(); 
+    riftRenderWidget->stop();
+    riftRenderWidget->makeCurrent();
+    Platform::runShutdownHooks();
+    delete riftRenderWidget;
+    ovr_Shutdown();
+    return result;
   } catch (std::exception & error) { 
     SAY_ERR(error.what()); 
   } catch (const std::string & error) { 

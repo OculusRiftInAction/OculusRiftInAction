@@ -34,13 +34,17 @@ QRiftWindow::QRiftWindow() {
 
   // FIXME 
   setFlags(Qt::FramelessWindowHint);
-
   show();
+
 
 #ifdef USE_RIFT
   if (directHmdMode) {
-    setFramePosition(QPoint(0, -1080));
+#ifdef _DEBUG    
     // FIXME iterate through all screens and move the window to the best one
+    setFramePosition(QPoint(0, -1080));
+#else
+    setFramePosition(QPoint(0, 0));
+#endif
   } else {
     setFramePosition(QPoint(hmd->WindowsPos.x, hmd->WindowsPos.y));
   }
@@ -96,7 +100,8 @@ void QRiftWindow::drawFrame() {
   perFrameRender();
   Stacks::withPush(pr, mv, [&] {
     // Set up the per-eye projection matrix
-    pr.top() = glm::perspective(PI / 2.0f, (float)size().width() / (float)size().height(), 0.01f, 10000.0f);
+    float aspect = (float)size().width() / (float)size().height();
+    pr.top() = glm::perspective(PI / 3.0f, aspect, 0.01f, 10000.0f);
     renderScene();
   });
 #endif
