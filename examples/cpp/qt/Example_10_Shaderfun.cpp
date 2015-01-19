@@ -12,18 +12,18 @@
 #include <QNetworkAccessManager>
 #include <QtNetwork>
 #include <QDeclarativeEngine>
-
+#include <Trackerbird.h>
 #ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
 #else
 #include <oglplus/images/png.hpp>
 #endif
 
+#include "TrackerbirdConfig.h"
 
 const char * ORG_NAME = "Oculus Rift in Action";
 const char * ORG_DOMAIN = "oculusriftinaction.com";
 const char * APP_NAME = "ShadertoyVR";
-const char * SHADERTOY_API_KEY = "Nt8tw7";
 
 using namespace oglplus;
 
@@ -274,7 +274,6 @@ protected:
       QString header = shadertoy::SHADER_HEADER;
       for (int i = 0; i < 4; ++i) {
         const Channel & channel = channels[i];
-        // "uniform sampler2D iChannel0;\n"
         QString line; line.sprintf("uniform sampler%s iChannel%d;\n",
           channel.target == Texture::Target::CubeMap ? "Cube" : "2D", i);
         header += line;
@@ -612,11 +611,14 @@ private:
     }
     uiWindow->setProxyWindow(this);
 
+#ifdef _DEBUG
     //	QUrl qml = QUrl::fromLocalFile("/Users/bradd/git/OculusRiftInAction/resources/shadertoy/Combined.qml");
-	  // QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
+    QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
+#else
+    QUrl qml = QUrl("qrc:/shadertoy/Combined.qml");
     uiWindow->m_qmlEngine->addImportPath("./qml");
     uiWindow->m_qmlEngine->addImportPath(".");
-    QUrl qml = QUrl("qrc:/shadertoy/Combined.qml");
+#endif
     uiWindow->loadQml(qml);
     connect(uiWindow, &QOffscreenUi::textureUpdated, this, [&](int textureId) {
       uiWindow->lockTexture(textureId);
@@ -1170,7 +1172,11 @@ private:
 };
 
 MAIN_DECL { 
-  try { 
+  try {
+
+    TBRESULT tbResult = tbCreateConfig(purl, pproduct_id, pproduct_version, pproduct_build_number, pmulti_session_enabled);
+    tbResult = tbStart();
+
 #ifdef USE_RIFT
     ovr_Initialize();
 #endif
@@ -1186,11 +1192,13 @@ MAIN_DECL {
     riftRenderWidget->start();
     riftRenderWidget->requestActivate();
     int result = app.exec(); 
+    tbResult = tbStop(TRUE);
     riftRenderWidget->stop();
     riftRenderWidget->makeCurrent();
     Platform::runShutdownHooks();
     delete riftRenderWidget;
     ovr_Shutdown();
+
     return result;
   } catch (std::exception & error) { 
     SAY_ERR(error.what()); 
