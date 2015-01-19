@@ -413,6 +413,16 @@ public:
     });
   }
 
+  void fetchFile(const QUrl & url, const QString & path) {
+    fetchUrl(url, [&, path](const QByteArray & replyBuffer) {
+      qDebug() << replyBuffer;
+      QFile outputFile(path);
+      outputFile.open(QIODevice::WriteOnly);
+      outputFile.write(replyBuffer);
+      outputFile.close();
+    });
+  }
+
   virtual void fetchNextShader() {
     if (shadersToFetch.empty()) {
       return;
@@ -426,19 +436,21 @@ public:
       QString nextShaderId = shadersToFetch.front();
       shadersToFetch.pop_front();
       QString shaderFile = configPath.absoluteFilePath("shadertoy/" + nextShaderId + ".json");
-      QString shaderPreviewFile = configPath.absoluteFilePath(nextShaderId + "_preview.jpg");
+      QString shaderPreviewFile = configPath.absoluteFilePath("shadertoy/" + nextShaderId + ".jpg");
       if (!QFile(shaderFile).exists()) {
         QUrl url = QUrl(BASE_URL + "/" + nextShaderId + URL_KEY);
         qDebug() << "Fetching shader from " << url;
         fetchUrl(url, [&, shaderFile](const QByteArray & replyBuffer) {
-          qDebug() << replyBuffer; 
           QFile outputFile(shaderFile);
           outputFile.open(QIODevice::WriteOnly);
           outputFile.write(replyBuffer);
           outputFile.close();
-          fetchNextShader();
         });
-        break;
+      }
+      if (!QFile(shaderPreviewFile).exists()) {
+        QUrl url = QUrl(BASE_MEDIA_URL + nextShaderId + ".jpg");
+        qDebug() << "Fetching shader preview from " << url;
+        fetchFile(url, shaderPreviewFile);
       }
     }
   }
@@ -1174,13 +1186,13 @@ private:
 MAIN_DECL { 
   try {
 
-    TBRESULT tbResult = tbCreateConfig(purl, pproduct_id, pproduct_version, pproduct_build_number, pmulti_session_enabled);
-    tbResult = tbStart();
 
 #ifdef USE_RIFT
     ovr_Initialize();
 #endif
 #ifndef _DEBUG
+    tbCreateConfig(purl, pproduct_id, pproduct_version, pproduct_build_number, pmulti_session_enabled);
+    tbStart();
     //SetCurrentDirectoryA("F:\\shadertoy");
     qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins"); 
     qputenv("QML_IMPORT_PATH", "./qml");
@@ -1192,11 +1204,16 @@ MAIN_DECL {
     riftRenderWidget->start();
     riftRenderWidget->requestActivate();
     int result = app.exec(); 
-    tbResult = tbStop(TRUE);
+
+#ifndef _DEBUG
+    tbStop(TRUE);
+#endif
+
     riftRenderWidget->stop();
     riftRenderWidget->makeCurrent();
     Platform::runShutdownHooks();
     delete riftRenderWidget;
+
     ovr_Shutdown();
 
     return result;
@@ -1256,3 +1273,22 @@ SiOpenWinInit(&siData, (HWND)riftRenderWidget.effectiveWinId());
 si = SiOpen("app", devId, SI_NO_MASK, SI_EVENT, &siData);
 installNativeEventFilter(this);
 #endif
+
+
+/* 
+yes: 
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/Xlf3D8.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/XsjXR1.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/XslXW2.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ld2GRz.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldSGRW.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldfGzr.json"
+
+maybe:
+
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/Xll3Wn.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/Xsl3Rl.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldSGzR.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldX3Ws.json"
+
+*/
