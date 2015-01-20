@@ -103,6 +103,14 @@ static TexturePtr loadCursor(Resource res) {
   return texture;
 }
 
+QString readFileToString(const QString & fileName) {
+  QFile f(fileName);
+  f.open(QFile::ReadOnly);
+  QByteArray ba = f.readAll();
+  return QString(ba);
+}
+
+
 class ShadertoyRenderer : public QRiftWindow {
   Q_OBJECT
 protected:
@@ -824,20 +832,22 @@ private slots:
 
   void onNewShaderFilepath(const QString & shaderPath) {
     QDir newDir(shaderPath);
-    qDebug() << newDir;
-    qDebug() << newDir.absolutePath();
     QUrl url = QUrl::fromLocalFile(newDir.absolutePath());
-    qDebug() << url;
 //    setItemProperty("userPresetsModel", "folder", url);
     auto qmlContext = uiWindow->m_qmlEngine->rootContext();
     qmlContext->setContextProperty("userPresetsFolder", url);
   }
   
   void onNewShaderHighlighted(const QString & shaderPath) {
+    qDebug() << "New shader highlighted " << shaderPath;
     QString previewPath = shaderPath;
     previewPath.replace(QRegularExpression("\\.(json|xml)$"), ".jpg");
-    qDebug() << "New shader highlighted " << previewPath;
     setItemProperty("previewImage", "source", QFile::exists(previewPath) ? QUrl::fromLocalFile(previewPath) : QUrl());
+    if (shaderPath.endsWith(".json")) {
+      setItemProperty("loadRoot", "activeShaderString", readFileToString(shaderPath));
+    } else {
+      setItemProperty("loadRoot", "activeShaderString", "");
+    }
   }
 
   void onSaveShaderXml(const QString & shaderPath) {
@@ -1224,13 +1234,10 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
   LOG_FILE->flush();
 }
 
-
 class ShadertoyApp : public QApplication {
   Q_OBJECT
 
-  // A timer for updating the UI
   QWidget desktopWindow;
-  shadertoy::Shader activeShader;
 
 public:
   ShadertoyApp(int argc, char ** argv) : QApplication(argc, argv) {
@@ -1268,8 +1275,6 @@ private:
     desktopWindow.show();
   }
 };
-
-QFile loggingFile;
 
 MAIN_DECL { 
   try {
@@ -1350,10 +1355,7 @@ bool nativeEventFilter(const QByteArray & eventType, void * message, long * resu
   }
   return false;
 }
-#endif
 
-
-#if 0
 SpwRetVal result = SiInitialize();
 int cnt = SiGetNumDevices();
 SiDevID devId = SiDeviceIndex(0);
@@ -1361,7 +1363,9 @@ SiOpenData siData;
 SiOpenWinInit(&siData, (HWND)riftRenderWidget.effectiveWinId());
 si = SiOpen("app", devId, SI_NO_MASK, SI_EVENT, &siData);
 installNativeEventFilter(this);
+
 #endif
+
 
 
 /* 
