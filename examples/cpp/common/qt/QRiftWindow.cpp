@@ -58,7 +58,12 @@ QRiftWindow::QRiftWindow() {
     }
   }
 #else
+#ifdef _DEBUG    
   setFramePosition(QPoint(0, -1080));
+#else
+  setFramePosition(QPoint(0, 0));
+#endif
+
   // FIXME iterate through all screens and move the window to the best one
   resize(1920, 1080);
 #endif

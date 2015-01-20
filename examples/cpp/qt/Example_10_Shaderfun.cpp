@@ -20,10 +20,18 @@
 #endif
 
 #include "TrackerbirdConfig.h"
+#include "BuildConfig.h"
+#include "ShadertoyConfig.h"
 
 const char * ORG_NAME = "Oculus Rift in Action";
 const char * ORG_DOMAIN = "oculusriftinaction.com";
 const char * APP_NAME = "ShadertoyVR";
+
+QDir CONFIG_DIR;
+QSharedPointer<QFile> LOG_FILE;
+QtMessageHandler ORIGINAL_MESSAGE_HANDLER;
+static const QString SHADERTOY_API_URL = "https://www.shadertoy.com/api/v1/shaders";
+static const QString SHADERTOY_MEDIA_URL = "https://www.shadertoy.com/media/shaders/";
 
 using namespace oglplus;
 
@@ -226,16 +234,15 @@ protected:
       });
     }
 
-    if (activeUniforms.count(shadertoy::UNIFORM_POSITION)) {
 #ifdef USE_RIFT
+    if (activeUniforms.count(shadertoy::UNIFORM_POSITION)) {
       uniformLambdas.push_back([&] {
-//        if (!uiVisible) {
           Uniform<vec3>(*shadertoyProgram, shadertoy::UNIFORM_POSITION).Set(
             (ovr::toGlm(getEyePose().Position) + position) * eyePosScale);
-//        }
       });
-#endif
     }
+#endif
+
     for (int i = 0; i < 4; ++i) {
       if (activeUniforms.count(UNIFORM_CHANNELS[i]) && channels[i].texture) {
         uniformLambdas.push_back([=] {
@@ -381,41 +388,36 @@ signals:
   void compileSuccess();
 };
 
+
+
 class ShadertoyFetcher : public QObject {
   Q_OBJECT
 
   QQueue<QString> shadersToFetch;
   QNetworkAccessManager qnam;
-
-public:
+  QTimer timer;
+  int currentNetworkRequests{ 0 };
 
   virtual void fetchUrl(QUrl url, std::function<void(QByteArray)> f) {
     QNetworkRequest request(url);
+    qDebug() << "Requesting url " << url;
     request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, "ShadertoyVR/1.0");
+    ++currentNetworkRequests;
     QNetworkReply * netReply = qnam.get(request);
-    connect(netReply, &QNetworkReply::finished, this, [&, f, netReply] {
+    connect(netReply, static_cast<void (QNetworkReply::*)(QNetworkReply::NetworkError)>(&QNetworkReply::error),
+      this, [&, url](QNetworkReply::NetworkError code) {
+      qWarning() << "Got error " << code << " fetching url " << url;
+    });
+    connect(netReply, &QNetworkReply::finished, this, [&, f, netReply, url] {
+      --currentNetworkRequests;
+      qDebug() << "Got response for url " << url;
       QByteArray replyBuffer = netReply->readAll();
       f(replyBuffer);
     });
   }
 
-  virtual void fetchNetworkShaders() {
-    static QUrl url("https://www.shadertoy.com/api/v1/shaders?key=Nt8tw7");
-    fetchUrl(url, [&](const QByteArray & replyBuffer) {
-      QJsonDocument jsonResponse = QJsonDocument::fromJson(replyBuffer);
-      QJsonObject jsonObject = jsonResponse.object();
-      QJsonArray shaders = jsonObject["Results"].toArray();
-      for (int i = 0; i < shaders.count(); ++i) {
-        QString shaderId = shaders.at(i).toString();
-        shadersToFetch.push_back(shaderId);
-      }
-      fetchNextShader();
-    });
-  }
-
   void fetchFile(const QUrl & url, const QString & path) {
     fetchUrl(url, [&, path](const QByteArray & replyBuffer) {
-      qDebug() << replyBuffer;
       QFile outputFile(path);
       outputFile.open(QIODevice::WriteOnly);
       outputFile.write(replyBuffer);
@@ -424,22 +426,18 @@ public:
   }
 
   virtual void fetchNextShader() {
-    if (shadersToFetch.empty()) {
-      return;
-    }
-    static const QString BASE_URL = "https://www.shadertoy.com/api/v1/shaders";
-    static const QString URL_KEY = "?key=Nt8tw7";
-    static const QString BASE_MEDIA_URL = "https://www.shadertoy.com/media/shaders/";
-    QDir configPath = QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
-    configPath.mkpath("shadertoy");
-    while (!shadersToFetch.empty()) {
+    while (!shadersToFetch.empty() && currentNetworkRequests <= 4) {
       QString nextShaderId = shadersToFetch.front();
       shadersToFetch.pop_front();
-      QString shaderFile = configPath.absoluteFilePath("shadertoy/" + nextShaderId + ".json");
-      QString shaderPreviewFile = configPath.absoluteFilePath("shadertoy/" + nextShaderId + ".jpg");
+      QString shaderFile = CONFIG_DIR.absoluteFilePath("shadertoy/" + nextShaderId + ".json");
+      QString shaderPreviewFile = CONFIG_DIR.absoluteFilePath("shadertoy/" + nextShaderId + ".jpg");
+      if (QFile(shaderFile).exists() && QFile(shaderPreviewFile).exists()) {
+        continue;
+      }
+
       if (!QFile(shaderFile).exists()) {
-        QUrl url = QUrl(BASE_URL + "/" + nextShaderId + URL_KEY);
-        qDebug() << "Fetching shader from " << url;
+        qDebug() << "Fetching shader " << nextShaderId;
+        QUrl url(SHADERTOY_API_URL + QString().sprintf("/%s?key=%s", nextShaderId.toLocal8Bit().constData(), SHADERTOY_API_KEY));
         fetchUrl(url, [&, shaderFile](const QByteArray & replyBuffer) {
           QFile outputFile(shaderFile);
           outputFile.open(QIODevice::WriteOnly);
@@ -447,14 +445,40 @@ public:
           outputFile.close();
         });
       }
+
       if (!QFile(shaderPreviewFile).exists()) {
-        QUrl url = QUrl(BASE_MEDIA_URL + nextShaderId + ".jpg");
-        qDebug() << "Fetching shader preview from " << url;
-        fetchFile(url, shaderPreviewFile);
+        fetchFile(QUrl(SHADERTOY_MEDIA_URL + nextShaderId + ".jpg"), shaderPreviewFile);
       }
+    }
+
+    if (shadersToFetch.isEmpty()) {
+      timer.stop();
+      return;
     }
   }
 
+public:
+  ShadertoyFetcher() {
+    connect(&timer, &QTimer::timeout, this, [&] {
+      fetchNextShader();
+    });
+    CONFIG_DIR.mkpath("shadertoy");
+  }
+
+  virtual void fetchNetworkShaders() {
+    qDebug() << "Fetching shader list";
+    QUrl url(SHADERTOY_API_URL + QString().sprintf("?key=%s", SHADERTOY_API_KEY));
+    fetchUrl(url, [&](const QByteArray & replyBuffer) {
+      QJsonDocument jsonResponse = QJsonDocument::fromJson(replyBuffer);
+      QJsonObject jsonObject = jsonResponse.object();
+      QJsonArray shaders = jsonObject["Results"].toArray();
+      for (int i = 0; i < shaders.count(); ++i) {
+        QString shaderId = shaders.at(i).toString();
+        shadersToFetch.push_back(shaderId);
+      }
+      timer.start(1000);
+    });
+  }
 };
 
 class ShadertoyWindow : public ShadertoyRenderer {
@@ -547,6 +571,7 @@ public:
       shaderFramebuffer.reset();
       uiProgram.reset();
       uiShape.reset();
+      uiFramebuffer.reset();
       mouseTexture.reset();
       mouseShape.reset();
       uiFramebuffer.reset();
@@ -580,31 +605,18 @@ private:
     plane = oria::loadPlane(planeProgram, 1.0);
 
     mouseTexture = loadCursor(Resource::IMAGES_CURSOR_PNG);
-    Platform::addShutdownHook([&] {
-      mouseTexture.reset();
-    });
-
     mouseShape = oria::loadPlane(uiProgram, UI_INVERSE_ASPECT);
-    Platform::addShutdownHook([&] {
-      mouseShape.reset();
-    });
 
     uiFramebuffer = FramebufferWrapperPtr(new FramebufferWrapper());
     uiFramebuffer->init(UI_SIZE);
-    Platform::addShutdownHook([&] {
-      uiFramebuffer.reset();
-    });
 
     shaderFramebuffer = FramebufferWrapperPtr(new FramebufferWrapper());
     shaderFramebuffer->init(textureSize());
-    Platform::addShutdownHook([&] {
-      shaderFramebuffer.reset();
-    });
+
     DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
   }
 
   void setupOffscreenUi() {
-    
 #ifdef USE_RIFT
     this->endFrameLock = &uiWindow->renderLock;
 #endif
@@ -683,6 +695,8 @@ private:
       this, SLOT(onRestartShader()));
     QObject::connect(uiWindow->m_rootItem, SIGNAL(newShaderFilepath(QString)),
       this, SLOT(onNewShaderFilepath(QString)));
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(newShaderHighlighted(QString)),
+      this, SLOT(onNewShaderHighlighted(QString)));
 
     QObject::connect(this, &ShadertoyWindow::compileSuccess, this, [&] {
       setItemProperty("errorFrame", "height", 0);
@@ -796,6 +810,13 @@ private slots:
     qmlContext->setContextProperty("userPresetsFolder", url);
   }
   
+  void onNewShaderHighlighted(const QString & shaderPath) {
+    QString previewPath = shaderPath;
+    previewPath.replace(QRegularExpression("\\.(json|xml)$"), ".jpg");
+    qDebug() << "New shader highlighted " << previewPath;
+    setItemProperty("previewImage", "source", QFile::exists(previewPath) ? QUrl::fromLocalFile(previewPath) : QUrl());
+  }
+
   void onSaveShaderXml(const QString & shaderPath) {
     Q_ASSERT(!shaderPath.isEmpty());
     //shadertoy::saveShaderXml(activeShader);
@@ -1088,6 +1109,7 @@ private:
     // Render the shadertoy effect into a framebuffer, possibly at a 
     // smaller resolution than recommended
     shaderFramebuffer->Bound([&] {
+      Context::Clear().ColorBuffer();
       oria::viewport(renderSize());
       renderShadertoy();
     });
@@ -1155,6 +1177,31 @@ signals:
   void fpsUpdated(float);
 };
 
+
+
+void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
+  ORIGINAL_MESSAGE_HANDLER(type, context, msg);
+  QByteArray localMsg = msg.toLocal8Bit();
+  QString now = QDateTime::currentDateTime().toString("yyyy.dd.MM_hh:mm:ss");
+  switch (type) {
+  case QtDebugMsg:
+    LOG_FILE->write(QString().sprintf("%s Debug:    %s (%s:%u, %s)\n", now.toLocal8Bit().constData(), localMsg.constData(), context.file, context.line, context.function).toLocal8Bit());
+    break;
+  case QtWarningMsg:
+    LOG_FILE->write(QString().sprintf("%s Warning:  %s (%s:%u, %s)\n", now.toLocal8Bit().constData(), localMsg.constData(), context.file, context.line, context.function).toLocal8Bit());
+    break;
+  case QtCriticalMsg:
+    LOG_FILE->write(QString().sprintf("%s Critical: %s (%s:%u, %s)\n", now.toLocal8Bit().constData(), localMsg.constData(), context.file, context.line, context.function).toLocal8Bit());
+    break;
+  case QtFatalMsg:
+    LOG_FILE->write(QString().sprintf("%s Fatal:    %s (%s:%u, %s)\n", now.toLocal8Bit().constData(), localMsg.constData(), context.file, context.line, context.function).toLocal8Bit());
+    LOG_FILE->flush();
+    abort();
+  }
+  LOG_FILE->flush();
+}
+
+
 class ShadertoyApp : public QApplication {
   Q_OBJECT
 
@@ -1164,14 +1211,32 @@ class ShadertoyApp : public QApplication {
 
 public:
   ShadertoyApp(int argc, char ** argv) : QApplication(argc, argv) {
+    Q_INIT_RESOURCE(Resource);
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
-    QCoreApplication::setApplicationVersion("0.2");
-//    setupDesktopWindow();
+    QCoreApplication::setApplicationVersion(APP_VERSION);
+    CONFIG_DIR = QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
+    QString currentLogName = CONFIG_DIR.absoluteFilePath("ShadertoyVR.log");
+    qDebug() << currentLogName;
+    LOG_FILE = QSharedPointer<QFile>(new QFile(currentLogName));
+    QString now = QDateTime::currentDateTime().toString("yyyy.dd.MM_hh:mm:ss");
+    if (LOG_FILE->exists()) {
+      QString newName = CONFIG_DIR.absoluteFilePath("ShadertoyVR_" + QDateTime::currentDateTime().toString("yyyy.dd.MM_hh.mm.ss") + ".log");
+      qDebug() << newName;
+      bool rename = QFile::rename(currentLogName, newName);
+      qDebug() << rename;
+    }
+    qDebug() << LOG_FILE;
+    if (!LOG_FILE->open(QIODevice::WriteOnly | QIODevice::Append)) {
+      qWarning() << "Could not open log file";
+    }
+    ORIGINAL_MESSAGE_HANDLER = qInstallMessageHandler(myMessageOutput);
   }
 
   virtual ~ShadertoyApp() {
+    qInstallMessageHandler(ORIGINAL_MESSAGE_HANDLER);
+    LOG_FILE->close();
   }
 
 private:
@@ -1183,22 +1248,23 @@ private:
   }
 };
 
+QFile loggingFile;
+
 MAIN_DECL { 
   try {
-
-
 #ifdef USE_RIFT
     ovr_Initialize();
 #endif
+
 #ifndef _DEBUG
     tbCreateConfig(purl, pproduct_id, pproduct_version, pproduct_build_number, pmulti_session_enabled);
     tbStart();
-    //SetCurrentDirectoryA("F:\\shadertoy");
     qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins"); 
     qputenv("QML_IMPORT_PATH", "./qml");
 #endif
+
     QT_APP_WITH_ARGS(ShadertoyApp);
-    Q_INIT_RESOURCE(Resource);
+
     ShadertoyWindow * riftRenderWidget;
     riftRenderWidget = new ShadertoyWindow();
     riftRenderWidget->start();
@@ -1283,6 +1349,13 @@ Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/Shader
 Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ld2GRz.json"
 Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldSGRW.json"
 Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldfGzr.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/4slGzn.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldj3Dm.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/lsl3W2.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/lts3Wn.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/XdBSzd.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/MsBGRh.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/4ds3zn.json"
 
 maybe:
 
@@ -1290,5 +1363,16 @@ Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/Shader
 Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/Xsl3Rl.json"
 Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldSGzR.json"
 Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldX3Ws.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldsGWB.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/lsBXD1.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/Xds3zN.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/4sl3zn.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/4sjXzG.json"
+
+debug:
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/ldjXD3.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/XdfXDB.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/Msl3Rr.json"
+Loading shader from  "c:/Users/bdavis/AppData/Local/Oculus Rift in Action/ShadertoyVR/shadertoy/4sXGDs.json"
 
 */
