@@ -31,7 +31,6 @@ limitations under the License.
 #include <QNetworkAccessManager>
 #include <QtNetwork>
 #include <QDeclarativeEngine>
-#include <Trackerbird.h>
 
 #ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
@@ -41,6 +40,10 @@ limitations under the License.
 
 #include "TrackerbirdConfig.h"
 #include "ShadertoyConfig.h"
+
+#ifdef TRACKERBIRD_PRODUCT_ID
+#include <Trackerbird.h>
+#endif
 
 const char * ORG_NAME = "Oculus Rift in Action";
 const char * ORG_DOMAIN = "oculusriftinaction.com";
@@ -405,7 +408,6 @@ signals:
 };
 
 
-
 class ShadertoyFetcher : public QObject {
   Q_OBJECT
 
@@ -442,6 +444,7 @@ class ShadertoyFetcher : public QObject {
   }
 
   virtual void fetchNextShader() {
+#ifdef SHADERTOY_API_KEY
     while (!shadersToFetch.empty() && currentNetworkRequests <= 4) {
       QString nextShaderId = shadersToFetch.front();
       shadersToFetch.pop_front();
@@ -471,6 +474,7 @@ class ShadertoyFetcher : public QObject {
       timer.stop();
       return;
     }
+#endif
   }
 
 public:
@@ -482,6 +486,7 @@ public:
   }
 
   virtual void fetchNetworkShaders() {
+#ifdef SHADERTOY_API_KEY
     qDebug() << "Fetching shader list";
     QUrl url(SHADERTOY_API_URL + QString().sprintf("?key=%s", SHADERTOY_API_KEY));
     fetchUrl(url, [&](const QByteArray & replyBuffer) {
@@ -494,6 +499,7 @@ public:
       }
       timer.start(1000);
     });
+#endif
   }
 };
 
@@ -564,6 +570,7 @@ class ShadertoyWindow : public ShadertoyRenderer {
   }
 
   ShadertoyFetcher fetcher;
+
 public:
   ShadertoyWindow() {
     // Fixes an occasional crash caused by a race condition between the Rift 
@@ -1231,7 +1238,9 @@ public:
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
-    QCoreApplication::setApplicationVersion(QString::fromWCharArray(pproduct_version));
+#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
+    QCoreApplication::setApplicationVersion(QString::fromWCharArray(TRACKERBIRD_PRODUCT_VERSION));
+#endif
     CONFIG_DIR = QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
     QString currentLogName = CONFIG_DIR.absoluteFilePath("ShadertoyVR.log");
     LOG_FILE = QSharedPointer<QFile>(new QFile(currentLogName));
@@ -1268,8 +1277,10 @@ MAIN_DECL {
     ovr_Initialize();
 #endif
 
-#ifndef _DEBUG
-    tbCreateConfig(purl, pproduct_id, pproduct_version, pproduct_build_number, pmulti_session_enabled);
+#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
+    tbCreateConfig(TRACKERBIRD_URL, TRACKERBIRD_PRODUCT_ID, 
+      TRACKERBIRD_PRODUCT_VERSION, TRACKERBIRD_BUILD_NUMBER, 
+      TRACKERBIRD_MULTISESSION_ENABLED);
     tbStart();
     qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins"); 
     qputenv("QML_IMPORT_PATH", "./qml");
@@ -1283,7 +1294,7 @@ MAIN_DECL {
     riftRenderWidget->requestActivate();
     int result = app.exec(); 
 
-#ifndef _DEBUG
+#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
     tbStop(TRUE);
 #endif
 
