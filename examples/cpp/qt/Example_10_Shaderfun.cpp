@@ -1,3 +1,22 @@
+/************************************************************************************
+
+Authors     :   Bradley Austin Davis <bdavis@saintandreas.org>
+Copyright   :   Copyright Bradley Austin Davis. All Rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+************************************************************************************/
+
 #ifdef _DEBUG
 #define BRAD_DEBUG 1
 #endif
@@ -13,6 +32,7 @@
 #include <QtNetwork>
 #include <QDeclarativeEngine>
 #include <Trackerbird.h>
+
 #ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
 #else
@@ -20,7 +40,6 @@
 #endif
 
 #include "TrackerbirdConfig.h"
-#include "BuildConfig.h"
 #include "ShadertoyConfig.h"
 
 const char * ORG_NAME = "Oculus Rift in Action";
@@ -35,12 +54,9 @@ static const QString SHADERTOY_MEDIA_URL = "https://www.shadertoy.com/media/shad
 
 using namespace oglplus;
 
-#define UI_X 1280
-#define UI_Y 720
-
 static const float ROOT_2 = sqrt(2.0f);
 static const float INV_ROOT_2 = 1.0f / ROOT_2;
-static uvec2 UI_SIZE(UI_X, UI_Y);
+static uvec2 UI_SIZE(1280, 720);
 static float UI_ASPECT = aspect(vec2(UI_SIZE));
 static float UI_INVERSE_ASPECT = 1.0f / UI_ASPECT;
 
@@ -1215,19 +1231,15 @@ public:
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
-    QCoreApplication::setApplicationVersion(APP_VERSION);
+    QCoreApplication::setApplicationVersion(QString::fromWCharArray(pproduct_version));
     CONFIG_DIR = QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
     QString currentLogName = CONFIG_DIR.absoluteFilePath("ShadertoyVR.log");
-    qDebug() << currentLogName;
     LOG_FILE = QSharedPointer<QFile>(new QFile(currentLogName));
-    QString now = QDateTime::currentDateTime().toString("yyyy.dd.MM_hh:mm:ss");
     if (LOG_FILE->exists()) {
-      QString newName = CONFIG_DIR.absoluteFilePath("ShadertoyVR_" + QDateTime::currentDateTime().toString("yyyy.dd.MM_hh.mm.ss") + ".log");
-      qDebug() << newName;
-      bool rename = QFile::rename(currentLogName, newName);
-      qDebug() << rename;
+      QFile::rename(currentLogName, 
+        CONFIG_DIR.absoluteFilePath("ShadertoyVR_" + 
+          QDateTime::currentDateTime().toString("yyyy.dd.MM_hh.mm.ss") + ".log"));
     }
-    qDebug() << LOG_FILE;
     if (!LOG_FILE->open(QIODevice::WriteOnly | QIODevice::Append)) {
       qWarning() << "Could not open log file";
     }

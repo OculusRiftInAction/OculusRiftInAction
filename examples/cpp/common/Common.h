@@ -21,7 +21,7 @@
 
 #include "Config.h"
 
-#define USE_RIFT 1
+//#define USE_RIFT 1
 
 #include <algorithm>
 #include <array>
@@ -59,7 +59,7 @@
 #pragma warning( default : 4244 4267 4065 4101)
 #pragma clang diagnostic pop
 
-#ifdef HAVE_QT
+#if (HAVE_QT) || (Q_MOC_RUN)
 #include <QtCore>
 #endif
 
