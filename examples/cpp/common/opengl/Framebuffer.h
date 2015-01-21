@@ -80,6 +80,10 @@ struct FramebufferWrapper {
     f();
     oglplus::Framebuffer::Bind(target, oldFbo);
   }
+
+  void BindColor(oglplus::Texture::Target target = oglplus::Texture::Target::_2D) {
+    color.Bind(target);
+  }
 };
 
 typedef std::shared_ptr<FramebufferWrapper> FramebufferWrapperPtr;

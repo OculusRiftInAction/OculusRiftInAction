@@ -20,6 +20,8 @@
 #pragma once
 
 typedef oglplus::Uniform<mat4> Mat4Uniform;
+typedef std::shared_ptr<oglplus::VertexShader> VertexShaderPtr;
+typedef std::shared_ptr<oglplus::FragmentShader> FragmentShaderPtr;
 typedef std::shared_ptr<oglplus::Program> ProgramPtr;
 typedef std::map<std::string, GLuint> UniformMap;
 

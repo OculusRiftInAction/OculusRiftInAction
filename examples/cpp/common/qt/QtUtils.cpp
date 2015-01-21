@@ -59,6 +59,7 @@ namespace oria {
       return QString::fromUtf8(data.data(), data.size());
     }
 
+
     QImage loadImageResource(Resource res) {
       QImage image;
       image.loadFromData(toByteArray(res));
@@ -78,94 +79,6 @@ namespace oria {
       return result;
     }
   }
-}
-ForwardingGraphicsView::ForwardingGraphicsView(QWidget * filterTarget)  {
-  if (filterTarget) {
-    install(filterTarget);
-  }
-}
-
-void ForwardingGraphicsView::install(QWidget * filterTarget) {
-  if (filterTarget == this->filterTarget) {
-    return;
-  }
-  if (this->filterTarget) {
-    remove(this->filterTarget);
-  }
-
-  this->filterTarget = filterTarget;
-
-  if (this->filterTarget) {
-    this->filterTarget->installEventFilter(this);
-  }
-}
-
-void ForwardingGraphicsView::remove(QWidget * filterTarget) {
-  if (!filterTarget || filterTarget != this->filterTarget) {
-    return;
-  }
-
-  if (filterTarget) {
-    filterTarget->removeEventFilter(this);
-    this->filterTarget = nullptr;
-  }
-}
-
-void ForwardingGraphicsView::resizeEvent(QResizeEvent *event) {
-  if (scene())
-    scene()->setSceneRect(QRect(QPoint(0, 0), event->size()));
-  QGraphicsView::resizeEvent(event);
-}
-
-void ForwardingGraphicsView::forwardMouseEvent(QMouseEvent * event) {
-  // Translate the incoming coordinates to the target window coordinates
-  vec2 scaleFactor = oria::qt::toGlm(size()) / oria::qt::toGlm(filterTarget->size());
-  vec2 sourceHit = oria::qt::toGlm(event->localPos());
-  QPointF targetHit = oria::qt::pointFromGlm(sourceHit * scaleFactor);
-  QPointF screenHit = mapToGlobal(targetHit.toPoint());
-  
-  // Build a new event
-  QMouseEvent newEvent(event->type(),
-    targetHit, targetHit, screenHit,
-    event->button(), event->buttons(), event->modifiers());
-  viewportEvent(&newEvent);
-}
-
-void ForwardingGraphicsView::forwardKeyEvent(QKeyEvent * event) {
-  viewportEvent(event);
-}
-
-bool ForwardingGraphicsView::eventFilter(QObject *object, QEvent *event) {
-  if (object == filterTarget) {
-    switch (event->type()) {
-    case QEvent::MouseMove:
-      forwardMouseEvent((QMouseEvent *)event);
-      break;
-
-    case QEvent::MouseButtonRelease:
-    case QEvent::MouseButtonDblClick:
-    case QEvent::MouseButtonPress:
-      forwardMouseEvent((QMouseEvent *)event);
-      break;
-
-    case QEvent::Wheel:
-      viewportEvent((QWheelEvent *)event);
-      break;
-
-    case QEvent::KeyPress:
-      keyPressEvent((QKeyEvent*)event);
-      break;
-
-    case QEvent::KeyRelease:
-      keyReleaseEvent((QKeyEvent*)event);
-      break;
-
-    default:
-      break;
-    }
-    return false;
-  }
-  return QGraphicsView::eventFilter(object, event);
 }
 
 typedef std::list<QString> List;
@@ -242,58 +155,130 @@ static Map createGlslMap() {
   return finalMap;
 }
 
-OffscreenUiWindow::OffscreenUiWindow() {
-  // Create a QQuickWindow that is associated with out render control. Note that this
-  // window never gets created or shown, meaning that it will never get an underlying
-  // native (platform) window.
-  m_quickWindow = new QQuickWindow(this);
 
-  // When Quick says there is a need to render, we will not render immediately. Instead,
-  // a timer with a small interval is used to get better performance.
-  //m_updateTimer.setSingleShot(true);
-  //m_updateTimer.setInterval(5);
-  //connect(&m_updateTimer, &QTimer::timeout, this, &OffscreenUiWindow::updateQuick);
 
-  // Now hook up the signals. For simplicy we don't differentiate between
-  // renderRequested (only render is needed, no sync) and sceneChanged (polish and sync
-  // is needed too).
-  connect(this, &QQuickRenderControl::renderRequested, this, [&] {
-    qDebug() << "Render only " << Platform::elapsedMillis();
-    renderSceneToFbo();
-    qDebug() << "Render only done" << Platform::elapsedMillis();
-  });
-  connect(this, &QQuickRenderControl::sceneChanged, this, [&] {
-    if (!m_fbo) {
-      return;
-    }
-    // Polish, synchronize and render the next frame (into our fbo).  In this example
-    // everything happens on the same thread and therefore all three steps are performed
-    // in succession from here. In a threaded setup the render() call would happen on a
-    // separate thread.
-    static bool inUpdate = false;
-    if (inUpdate) {
-      return;
-    }
-    qDebug() << "Update " << Platform::elapsedMillis();
+QOffscreenUi::QOffscreenUi() {
+}
 
-    inUpdate = true;
-    polishItems();
-    sync();
-    renderSceneToFbo();
-    inUpdate = false;
+QOffscreenUi::~QOffscreenUi() {
+  // Make sure the context is current while doing cleanup. Note that we use the
+  // offscreen surface here because passing 'this' at this point is not safe: the
+  // underlying platform window may already be destroyed. To avoid all the trouble, use
+  // another surface that is valid for sure.
+  m_context->makeCurrent(m_offscreenSurface);
 
-    qDebug() << "Update done " << Platform::elapsedMillis();
-  });
+  // Delete the render control first since it will free the scenegraph resources.
+  // Destroy the QQuickWindow only afterwards.
+  delete m_renderControl;
+
+  delete m_qmlComponent;
+  delete m_quickWindow;
+  delete m_qmlEngine;
+
+  m_context->doneCurrent();
+
+  delete m_offscreenSurface;
+  delete m_context;
 }
 
 
 
-void OffscreenUiWindow::setupScene(const QSize & size, QOpenGLContext * context, QQmlComponent* qmlComponent) {
-  m_qmlComponent = qmlComponent;
+void QOffscreenUi::setup(const QSize & size, QOpenGLContext * shareContext) {
+  m_size = size;
+
+  QSurfaceFormat format;
+  // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
+  format.setDepthBufferSize(16);
+  format.setStencilBufferSize(8);
+  format.setMajorVersion(3);
+  format.setMinorVersion(3);
+  format.setProfile(QSurfaceFormat::OpenGLContextProfile::CoreProfile);
+  m_context->setFormat(format);
+  if (nullptr != shareContext) {
+    m_context->setShareContext(shareContext);
+  }
+  m_context->create();
+
+  // Pass m_context->format(), not format. Format does not specify and color buffer
+  // sizes, while the context, that has just been created, reports a format that has
+  // these values filled in. Pass this to the offscreen surface to make sure it will be
+  // compatible with the context's configuration.
+  m_offscreenSurface->setFormat(m_context->format());
+  m_offscreenSurface->create();
+
+  m_context->makeCurrent(m_offscreenSurface);
+//  m_fbo = new QOpenGLFramebufferObject(size, QOpenGLFramebufferObject::CombinedDepthStencil);
+//  m_quickWindow->setRenderTarget(m_fbo);
+
+  // Create a QQuickWindow that is associated with out render control. Note that this
+  // window never gets created or shown, meaning that it will never get an underlying
+  // native (platform) window.
+  QQuickWindow::setDefaultAlphaBuffer(true);
+  m_quickWindow = new QQuickWindow(m_renderControl);
+  m_quickWindow->setColor(QColor(255, 255, 255, 0));
+  m_quickWindow->setFlags(m_quickWindow->flags() | static_cast<Qt::WindowFlags>(Qt::WA_TranslucentBackground));
+  // Create a QML engine.
+  m_qmlEngine = new QQmlEngine;
+  if (!m_qmlEngine->incubationController())
+    m_qmlEngine->setIncubationController(m_quickWindow->incubationController());
+  m_qmlEngine->addImageProvider(QLatin1String("resources"), new QResourceImageProvider());
+
+  // When Quick says there is a need to render, we will not render immediately. Instead,
+  // a timer with a small interval is used to get better performance.
+  m_updateTimer.setSingleShot(true);
+  m_updateTimer.setInterval(5);
+  connect(&m_updateTimer, &QTimer::timeout, this, &QOffscreenUi::updateQuick);
+
+  // Now hook up the signals. For simplicy we don't differentiate between
+  // renderRequested (only render is needed, no sync) and sceneChanged (polish and sync
+  // is needed too).
+  connect(m_renderControl, &QQuickRenderControl::renderRequested, this, &QOffscreenUi::requestRender);
+  connect(m_renderControl, &QQuickRenderControl::sceneChanged, this, &QOffscreenUi::requestUpdate);
+
+  m_qmlComponent = new QQmlComponent(m_qmlEngine);
+
+  // Update item and rendering related geometries.
+  m_quickWindow->setGeometry(0, 0, m_size.width(), m_size.height());
+
+  // Initialize the render control and our OpenGL resources.
+  m_context->makeCurrent(m_offscreenSurface);
+  m_renderControl->initialize(m_context);
+
+}
+
+QQmlContext * QOffscreenUi::qmlContext() {
+  if (nullptr == m_rootItem) {
+    return m_qmlComponent->creationContext();
+  }
+  return QQmlEngine::contextForObject(m_rootItem);
+}
+
+void QOffscreenUi::loadQml(const QUrl & qmlSource, std::function<void(QQmlContext*)> f) {
+  m_qmlComponent->loadUrl(qmlSource);
+  if (m_qmlComponent->isLoading())
+    connect(m_qmlComponent, &QQmlComponent::statusChanged, this, &QOffscreenUi::run);
+  else
+    run();
+}
+
+void QOffscreenUi::requestUpdate() {
+  m_polish = true;
+  if (!m_updateTimer.isActive())
+    m_updateTimer.start();
+}
+
+void QOffscreenUi::requestRender() {
+  if (!m_updateTimer.isActive())
+    m_updateTimer.start();
+}
+
+void QOffscreenUi::run() {
+  disconnect(m_qmlComponent, SIGNAL(statusChanged(QQmlComponent::Status)), this, SLOT(run()));
   if (m_qmlComponent->isError()) {
     QList<QQmlError> errorList = m_qmlComponent->errors();
     foreach(const QQmlError &error, errorList)
       qWarning() << error.url() << error.line() << error;
+    return;
   }
 
   QObject *rootObject = m_qmlComponent->create();
@@ -304,7 +289,6 @@ void OffscreenUiWindow::setupScene(const QSize & size, QOpenGLContext * context,
     return;
   }
 
-  QQuickItem *m_rootItem{ nullptr };
   m_rootItem = qobject_cast<QQuickItem *>(rootObject);
   if (!m_rootItem) {
     qWarning("run: Not a QQuickItem");
@@ -314,30 +298,80 @@ void OffscreenUiWindow::setupScene(const QSize & size, QOpenGLContext * context,
 
   // The root item is ready. Associate it with the window.
   m_rootItem->setParentItem(m_quickWindow->contentItem());
+  m_rootItem->setWidth(m_size.width());
+  m_rootItem->setHeight(m_size.height());
 
-  // Update item and rendering related geometries.
-  m_quickWindow->setGeometry(0, 0, size.width(), size.height());
-
-  // Initialize the render control and our OpenGL resources.
-  initialize(context);
-
-  m_fbo = new QOpenGLFramebufferObject(size, QOpenGLFramebufferObject::CombinedDepthStencil);
-  m_quickWindow->setRenderTarget(m_fbo);
-  emit sceneChanged();
+  SAY("Finished setting up QML");
 }
 
-void OffscreenUiWindow::renderSceneToFbo() {
-  if (!m_fbo) {
+void QOffscreenUi::lockTexture(int texture) {
+  Q_ASSERT(m_fboMap.count(texture));
+  if (!m_fboLocks.count(texture)) {
+    Q_ASSERT(m_readyFboQueue.front()->texture() == texture);
+    m_readyFboQueue.pop_front();
+    m_fboLocks[texture] = 1;
+  } else {
+    m_fboLocks[texture]++;
+  }
+}
+
+void QOffscreenUi::releaseTexture(int texture) {
+  Q_ASSERT(m_fboMap.count(texture));
+  Q_ASSERT(m_fboLocks.count(texture));
+  int newLockCount = --m_fboLocks[texture];
+  if (!newLockCount) {
+    m_readyFboQueue.push_back(m_fboMap[texture].data());
+    m_fboLocks.remove(texture);
+  }
+}
+
+QOpenGLFramebufferObject* QOffscreenUi::getReadyFbo() {
+  QOpenGLFramebufferObject* result = nullptr;
+  if (m_readyFboQueue.empty()) {
+    qDebug() << "Building new offscreen FBO number " << m_fboMap.size() + 1;
+    result = new QOpenGLFramebufferObject(m_size, QOpenGLFramebufferObject::CombinedDepthStencil);
+    m_fboMap[result->texture()] = QSharedPointer<QOpenGLFramebufferObject>(result);
+    m_readyFboQueue.push_back(result);
+  }
+  return m_readyFboQueue.front();
+}
+
+void QOffscreenUi::updateQuick() {
+  if (m_paused) {
     return;
   }
-  m_fbo->bind();
-  render();
+  if (!m_context->makeCurrent(m_offscreenSurface))
+    return;
+
+  // Polish, synchronize and render the next frame (into our fbo).  In this example
+  // everything happens on the same thread and therefore all three steps are performed
+  // in succession from here. In a threaded setup the render() call would happen on a
+  // separate thread.
+  if (m_polish) {
+    m_renderControl->polishItems();
+    m_renderControl->sync();
+    m_polish = false;
+  }
+
+  QOpenGLFramebufferObject* fbo;
+  
+  {
+    std::unique_lock<std::mutex> Lock(renderLock);
+    fbo = getReadyFbo();
+  }
+
+  m_quickWindow->setRenderTarget(fbo);
+  fbo->bind();
+  m_renderControl->render();
   m_quickWindow->resetOpenGLState();
   QOpenGLFramebufferObject::bindDefault();
-  glFlush();
-  GLuint oldTexture = m_currentTexture.exchange(m_fbo->takeTexture());
-  if (oldTexture) {
-    glDeleteTextures(1, &oldTexture);
-  }
-  emit offscreenTextureUpdated();
+  glFinish();
+
+  emit textureUpdated(fbo->texture());
 }
+
+//void QOffscreenUi::deleteOldTextures(const std::vector<GLuint> & oldTextures) {
+//  if (!m_context->makeCurrent(m_offscreenSurface))
+//    return;
+//  m_context->functions()->glDeleteTextures(oldTextures.size(), &oldTextures[0]);
+//}

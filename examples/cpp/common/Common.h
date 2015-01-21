@@ -21,6 +21,8 @@
 
 #include "Config.h"
 
+//#define USE_RIFT 1
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -42,6 +44,7 @@
 
 #include <GL/glew.h>
 #define OGLPLUS_USE_GLEW 1
+#define OGLPLUS_USE_GLCOREARB_H 0
 #include <oglplus/gl.hpp>
 #pragma warning(disable : 4068)
 #pragma clang diagnostic push
@@ -56,8 +59,8 @@
 #pragma warning( default : 4244 4267 4065 4101)
 #pragma clang diagnostic pop
 
-#ifdef HAVE_QT
-#include <QtWidgets>
+#if (HAVE_QT) || (Q_MOC_RUN)
+#include <QtCore>
 #endif
 
 #include <glm/glm.hpp>
@@ -142,7 +145,7 @@ typedef std::list<Lambda> LambdaList;
 
 #if (HAVE_QT) || (Q_MOC_RUN)
 #include "qt/QtUtils.h"
-#include "qt/RiftQtApp.h"
+#include "qt/QRiftWindow.h"
 #include "qt/GlslEditor.h"
 #endif
 

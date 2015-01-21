@@ -18,40 +18,61 @@
  ************************************************************************************/
 
 #pragma once
-#include <QtOpenGL/QGLWidget>
 
-class QRiftWidget : public QGLWidget, public RiftRenderingApp {
+
+class QRiftWindow : 
+  public QWindow
+#ifdef USE_RIFT
+  , protected RiftRenderingApp 
+#endif
+{
   Q_OBJECT
   bool shuttingDown{ false };
   LambdaThread renderThread;
   TaskQueueWrapper tasks;
-
-  void paintGL();
-  virtual void * getRenderWindow();
+  QOpenGLContext * m_context;
 
 public:
-  static QGLFormat & getFormat();
 
-  explicit QRiftWidget(QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
+  QRiftWindow();
+  virtual ~QRiftWindow();
 
-  explicit QRiftWidget(QGLContext *context, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
+  QOpenGLContext * context() {
+    return m_context;
+  }
 
-  explicit QRiftWidget(const QGLFormat& format, QWidget* parent = 0, const QGLWidget* shareWidget = 0, Qt::WindowFlags f = 0);
-
-  virtual ~QRiftWidget();
+  void makeCurrent() {
+    m_context->makeCurrent(this);
+  }
 
   void start();
 
   // Should only be called from the primary thread
-  void stop();
+  virtual void stop();
 
   void queueRenderThreadTask(Lambda task);
 
-private:
-  void initWidget();
+  void * getNativeWindow() {
+    return (void*)winId();
+  }
 
+private:
   virtual void renderLoop();
+  virtual void drawFrame();
+
 
 protected:
   virtual void setup();
+
+#ifndef USE_RIFT
+  virtual void updateFps(float fps) {
+  }
+
+  virtual void perFrameRender() {
+
+  }
+
+  virtual void renderScene() = 0;
+#endif
+
 };

@@ -18,9 +18,6 @@
  ************************************************************************************/
 
 #pragma once
-#include <QtWidgets>
-#include <QOpenGLWidget>
-#include <QPixmap>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QOpenGLFramebufferObject>
@@ -30,6 +27,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QQuickRenderControl>
+#include <QQuickImageProvider>
 
 
 namespace oria { namespace qt {
@@ -49,86 +47,106 @@ namespace oria { namespace qt {
  * OpenGl window with controls rendered inside it) and have the resulting
  * click reflected on the scene displayed in this view.
  */
-class ForwardingGraphicsView : public QGraphicsView {
-  QWidget * filterTarget{ nullptr };
 
+class QResourceImageProvider : public QQuickImageProvider {
+  std::map<QString, Resource> map;
 public:
-  ForwardingGraphicsView(QWidget * filterTarget = nullptr);
-
-  void install(QWidget * filterTarget);
-  void remove(QWidget * filterTarget);
-
-protected:
-  void forwardMouseEvent(QMouseEvent * event);
-  void forwardKeyEvent(QKeyEvent * event);
-  void resizeEvent(QResizeEvent *event);
-  bool eventFilter(QObject *object, QEvent *event);
-};
-
-
-class PaintlessOpenGLWidget : public QOpenGLWidget {
-protected:
-  bool event(QEvent * e) {
-    if (QEvent::Paint == e->type()) {
-      return true;
+  QResourceImageProvider() : QQuickImageProvider(QQmlImageProviderBase::Image) {
+    for (int i = 0; Resources::RESOURCE_MAP_VALUES[i].first != NO_RESOURCE; ++i) {
+      const Resources::Pair & r = Resources::RESOURCE_MAP_VALUES[i];
+      map[r.second.c_str()] = r.first;
     }
-    return QOpenGLWidget::event(e);
   }
 
-public:
-  explicit PaintlessOpenGLWidget() : QOpenGLWidget() {
-  }
-};
+  virtual QImage	requestImage(const QString & id, QSize * size, const QSize & requestedSize) {
+    qDebug() << "Requested image " << id << " " << requestedSize;
+    QImage image;
 
+    if (map.count(id)) {
+      if (size) {
+        *size = QSize(128, 128);
+      }
+      image.loadFromData(oria::qt::toByteArray(map[id]));
+      image = image.scaled(QSize(128, 128));
+    }
 
-class DelegatingOpengGLWindow : public PaintlessOpenGLWidget {
-  typedef std::function<void()> Callback;
-  typedef std::function<void(int, int)> ResizeCallback;
-
-
-  Callback paintCallback;
-  Callback initCallback;
-  ResizeCallback resizeCallback;
-
-protected:
-  void initializeGL() {
-    initCallback();
-  }
-
-  void resizeGL(int w, int h) {
-    resizeCallback(w, h);
-  }
-
-  void paintGL() {
-    paintCallback();
-    update();
-  }
-
-public:
-  explicit DelegatingOpengGLWindow(
-    Callback paint, Callback init = []{}, ResizeCallback resize = [](int, int){}) :
-    PaintlessOpenGLWidget(), paintCallback(paint), initCallback(init), resizeCallback(resize) {
+    return image;
   }
 };
 
+class QMyQuickRenderControl : public QQuickRenderControl {
+public:
+  QWindow * m_renderWindow{ nullptr };
 
-class OffscreenUiWindow : public QQuickRenderControl {
+  QWindow * renderWindow(QPoint * offset) Q_DECL_OVERRIDE{
+    if (nullptr == m_renderWindow) {
+      return QQuickRenderControl::renderWindow(offset);
+    }
+    if (nullptr != offset) {
+      offset->rx() = offset->ry() = 0;
+    }
+    return m_renderWindow;
+  }
+
+};
+
+
+class QOffscreenUi : public QObject {
   Q_OBJECT
-  QQuickWindow *m_quickWindow{ nullptr };
-protected:
-  QOpenGLFramebufferObject *m_fbo{ nullptr };
-  QQmlComponent *m_qmlComponent{ nullptr };
 
+  bool m_paused;
 public:
-  std::atomic<GLuint> m_currentTexture;
+  QOffscreenUi();
+  ~QOffscreenUi();
+  void setup(const QSize & size, QOpenGLContext * context);
+  void loadQml(const QUrl & qmlSource, std::function<void(QQmlContext*)> f = [](QQmlContext*){});
+  QQmlContext * qmlContext();
 
-public:
-  OffscreenUiWindow();
-  void setupScene(const QSize & size, QOpenGLContext * context, QQmlComponent* qmlComponent);
-  void renderSceneToFbo();
+  void pause() {
+    m_paused = true;
+  }
+
+  void resume() {
+    m_paused = false;
+    requestRender();
+  }
+
+  void setProxyWindow(QWindow * window) {
+    m_renderControl->m_renderWindow = window;
+  }
+
+private slots:
+  void updateQuick();
+  void run();
+
+public slots:
+  void requestUpdate();
+  void requestRender();
+  void lockTexture(int texture);
+  void releaseTexture(int texture);
 
 signals:
-  void offscreenTextureUpdated();
+  void textureUpdated(int texture);
+
+private:
+  QMap<int, QSharedPointer<QOpenGLFramebufferObject>> m_fboMap;
+  QMap<int, int> m_fboLocks;
+  QQueue<QOpenGLFramebufferObject*> m_readyFboQueue;
+  
+  QOpenGLFramebufferObject* getReadyFbo();
+
+public:
+  QOpenGLContext *m_context{ new QOpenGLContext };
+  QOffscreenSurface *m_offscreenSurface{ new QOffscreenSurface };
+  QMyQuickRenderControl  *m_renderControl{ new QMyQuickRenderControl };
+  QQuickWindow *m_quickWindow{ nullptr };
+  QQmlEngine *m_qmlEngine{ nullptr };
+  QQmlComponent *m_qmlComponent{ nullptr };
+  QQuickItem * m_rootItem{ nullptr };
+  QTimer m_updateTimer;
+  QSize m_size;
+  bool m_polish{ true };
+  std::mutex renderLock;
 };
 
 class LambdaThread : public QThread {
