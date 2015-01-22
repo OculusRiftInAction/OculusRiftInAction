@@ -29,7 +29,10 @@ protected:
   ovrVector3f eyeOffsets[2];
   ovrTexture eyeTextures[2];
   glm::mat4 projections[2];
+
   bool eyePerFrameMode{ false };
+  ovrEyeType lastEyeRendered{ ovrEye_Count };
+
   std::mutex * endFrameLock{ nullptr };
 
 private:
@@ -45,24 +48,11 @@ protected:
     return eyePoses[currentEye];
   }
 
-  virtual void updateFps(float fps) {
-  }
-
+  virtual void updateFps(float fps) { }
   virtual void initializeRiftRendering();
-  virtual void drawRiftFrame();
-  virtual void perFrameRender() {
-    
-  };
-  virtual void renderScene() = 0;
-
-  void toggleOvrFlag(ovrHmdCaps flag) {
-    int caps = ovrHmd_GetEnabledCaps(hmd);
-    if (caps & flag) {
-      ovrHmd_SetEnabledCaps(hmd, caps & ~flag);
-    } else {
-      ovrHmd_SetEnabledCaps(hmd, caps | flag);
-    }
-  }
+  virtual void drawRiftFrame() final;
+  virtual void perFrameRender() {};
+  virtual void perEyeRender() {};
 
 public:
   RiftRenderingApp();

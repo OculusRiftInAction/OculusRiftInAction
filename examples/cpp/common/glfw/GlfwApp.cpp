@@ -96,7 +96,7 @@ int GlfwApp::run() {
       finishFrame();
       fpsCounter.increment();
       if (fpsCounter.elapsed() >= 2.0f) {
-        float fps = fpsCounter.getRate();
+        fps = fpsCounter.getRate();
         SAY("FPS: %0.2f", fps);
         fpsCounter.reset();
       }

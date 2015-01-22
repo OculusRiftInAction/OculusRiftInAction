@@ -217,7 +217,7 @@ protected:
   }
 
   void renderShadertoy() {
-    using namespace oglplus;
+    Context::Clear().ColorBuffer();
     if (!shadertoyProgram) {
       return;
     }
@@ -880,6 +880,17 @@ private slots:
     });
   }
 
+  void onModifyTextureResolution(double scale) {
+    float newRes = scale * texRes;
+    newRes = std::max(0.1f, std::min(1.0f, newRes));
+    if (newRes != texRes) {
+      queueRenderThreadTask([&, newRes] {
+        texRes = newRes;
+      });
+      setItemText("res", QString().sprintf("%0.2f", newRes));
+    }
+  }
+
   void onRecenterPosition() {
 #ifdef USE_RIFT
     queueRenderThreadTask([&] {
@@ -1073,6 +1084,11 @@ private:
   // Rendering functionality
   // 
   void perFrameRender() {
+    Context::Enable(Capability::Blend);
+    Context::BlendFunc(BlendFunction::SrcAlpha, BlendFunction::OneMinusSrcAlpha);
+    Context::Disable(Capability::ScissorTest);
+    Context::Disable(Capability::DepthTest);
+    Context::Disable(Capability::CullFace);
     if (uiVisible) {
       static GLuint lastUiTexture = 0;
       static GLsync lastUiSync;
@@ -1132,13 +1148,7 @@ private:
     }
   }
 
-  void renderScene() {
-    Context::Enable(Capability::Blend);
-    Context::BlendFunc(BlendFunction::SrcAlpha, BlendFunction::OneMinusSrcAlpha);
-    Context::Disable(Capability::ScissorTest);
-    Context::Disable(Capability::DepthTest);
-    Context::Disable(Capability::CullFace);
-
+  void perEyeRender() {
     // Render the shadertoy effect into a framebuffer, possibly at a 
     // smaller resolution than recommended
     shaderFramebuffer->Bound([&] {

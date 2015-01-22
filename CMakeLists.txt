@@ -195,7 +195,6 @@ else()
     message(WARNING "Qt framework not found") 
 endif()
 
-
 include_directories(libraries/trackerbird)
 find_library(TRACKERBIRD Trackerbird
 	PATHS libraries/trackerbird)

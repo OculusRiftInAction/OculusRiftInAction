@@ -3,6 +3,30 @@
 
 #ifdef HAVE_QT
 
+inline QRect getSecondaryScreenGeometry(const uvec2 & size) {
+  QDesktopWidget desktop;
+  const int primary = desktop.primaryScreen();
+  int monitorCount = desktop.screenCount();
+  int best = -1;
+  QRect bestSize;
+  for (int i = 0; i < monitorCount; ++i) {
+    if (primary == i) {
+      continue;
+    }
+    QRect geometry = desktop.screenGeometry(i);
+    QSize screenSize = geometry.size();
+    if (best < 0 && (screenSize.width() >= size.x  && screenSize.height() >= size.y)) {
+      best = i;
+      bestSize = geometry;
+    }
+  }
+
+  if (best < 0) {
+    best = primary;
+  }
+  return desktop.screenGeometry(best);
+}
+
 QRiftWindow::QRiftWindow() {
   setSurfaceType(QSurface::OpenGLSurface);
 
@@ -36,21 +60,16 @@ QRiftWindow::QRiftWindow() {
   setFlags(Qt::FramelessWindowHint);
   show();
 
-
 #ifdef USE_RIFT
   if (directHmdMode) {
-#ifdef _DEBUG    
-    // FIXME iterate through all screens and move the window to the best one
-    setFramePosition(QPoint(0, -1080));
-#else
-    setFramePosition(QPoint(0, 0));
-#endif
+    QRect geometry = getSecondaryScreenGeometry(ovr::toGlm(hmd->Resolution));
+    setFramePosition(geometry.topLeft());
   } else {
     setFramePosition(QPoint(hmd->WindowsPos.x, hmd->WindowsPos.y));
   }
   resize(hmd->Resolution.w, hmd->Resolution.h);
 
-  // If we're in direct mode, attach to the window, then hide it
+  // If we're in direct mode, attach to the window
   if (directHmdMode) {
     void * nativeWindowHandle = (void*)(size_t)winId();
     if (nullptr != nativeWindowHandle) {
@@ -58,16 +77,10 @@ QRiftWindow::QRiftWindow() {
     }
   }
 #else
-#ifdef _DEBUG    
-  setFramePosition(QPoint(0, -1080));
-#else
-  setFramePosition(QPoint(0, 0));
+  QRect geometry = getSecondaryScreenGeometry(uvec2(1920, 1080));
+  setFramePosition(geometry.topLeft());
+  resize(geometry.size());
 #endif
-
-  // FIXME iterate through all screens and move the window to the best one
-  resize(1920, 1080);
-#endif
-
 }
 
 QRiftWindow::~QRiftWindow() {
@@ -112,27 +125,25 @@ void QRiftWindow::drawFrame() {
 #endif
 }
 
-static RateCounter rateCounter;
-
 void QRiftWindow::renderLoop() {
   m_context->makeCurrent(this);
   setup();
-  QCoreApplication* app = QCoreApplication::instance();
+
   while (!shuttingDown) {
-    m_context->makeCurrent(this);
-    // Process the Qt message pump to run the standard window controls
-    if (app->hasPendingEvents())
-      app->processEvents();
+    if (QCoreApplication::hasPendingEvents())
+      QCoreApplication::processEvents();
     tasks.drainTaskQueue();
+
+    m_context->makeCurrent(this);
     drawFrame();
 #ifndef USE_RIFT
     m_context->swapBuffers(this);
-    rateCounter.increment();
-    if (rateCounter.count() > 60) {
-      float fps = rateCounter.getRate();
-      updateFps(fps);
-      rateCounter.reset();
-    }
+    //rateCounter.increment();
+    //if (rateCounter.count() > 60) {
+    //  float fps = rateCounter.getRate();
+    //  updateFps(fps);
+    //  rateCounter.reset();
+    //}
 #endif
   }
   m_context->doneCurrent();
