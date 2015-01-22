@@ -77,7 +77,6 @@ void RiftRenderingApp::drawRiftFrame() {
   
   ovrPosef fetchPoses[2];
   ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, fetchPoses, nullptr);
-  static ovrEyeType lastEyeRendered = ovrEye_Count;
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
     // Force us to alternate eyes if we aren't keeping up with the required framerate
@@ -93,7 +92,6 @@ void RiftRenderingApp::drawRiftFrame() {
       // Set up the per-eye projection matrix
       pr.top() = projections[eye];
 
-
       // Set up the per-eye modelview matrix
       // Apply the head pose
       glm::mat4 eyePose = ovr::toGlm(eyePoses[eye]);
@@ -101,7 +99,7 @@ void RiftRenderingApp::drawRiftFrame() {
 
       // Render the scene to an offscreen buffer
       eyeFramebuffers[eye]->Bind();
-      renderScene();
+      perEyeRender();
     });
     
     if (eyePerFrameMode) {

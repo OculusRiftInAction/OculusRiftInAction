@@ -1,3 +1,22 @@
+/************************************************************************************
+
+Authors     :   Bradley Austin Davis <bdavis@saintandreas.org>
+Copyright   :   Copyright Bradley Austin Davis. All Rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+************************************************************************************/
+
 namespace shadertoy {
   const int MAX_CHANNELS = 4;
 
@@ -49,6 +68,7 @@ namespace shadertoy {
     Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_XML, "Elevated"),
     Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_XML, "Voronoi Rocks"),
     Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_XML, "Morning City"),
+    Preset(Resource::SHADERTOY_SHADERS_4SX3R2_JSON, "Monster"),
 
 #ifdef OS_WIN
     Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_XML, "Steel Cubes"),
@@ -72,8 +92,8 @@ namespace shadertoy {
   public:
 
     ResourceCounter(T * ts, std::function<bool(const T &)> endCondition =
-      [](const T & t)->bool { return true;  }
-      ) {
+        [](const T & t)->bool { return true; }
+    ) {
       while (!endCondition(ts[count])) {
         ++count;
       }
@@ -121,34 +141,13 @@ namespace shadertoy {
   };
   const int MAX_CUBEMAPS = 6;
 
-  static std::string getChannelInputName(ChannelInputType type, int index) {
-    switch (type) {
-    case ChannelInputType::TEXTURE:
-      return Platform::format("Tex%02d", index);
-    case ChannelInputType::CUBEMAP:
-      return Platform::format("Cube%02d", index);
-    default:
-      return "";
-    }
-  }
-
-  static Resource getChannelInputResource(ChannelInputType type, int index) {
-    if (index < 0) {
-      return NO_RESOURCE;
-    }
-    switch (type) {
-    case ChannelInputType::TEXTURE:
-      if (index >= MAX_TEXTURES) {
-        return NO_RESOURCE;
-      }
-      return TEXTURES[index];
-    case ChannelInputType::CUBEMAP:
-      if (index >= MAX_CUBEMAPS) {
-        return NO_RESOURCE;
-      }
-      return CUBEMAPS[index];
-    default:
-      return NO_RESOURCE;
-    }
-  }
+  struct Shader {
+    bool vrSupport{ true };
+    std::string id;
+    std::string url;
+    std::string name;
+    std::string fragmentSource;
+    ChannelInputType channelTypes[MAX_CHANNELS];
+    std::string channelTextures[MAX_CHANNELS];
+  };
 }
