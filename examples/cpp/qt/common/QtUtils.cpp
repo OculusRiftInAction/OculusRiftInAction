@@ -1,7 +1,7 @@
 /************************************************************************************
 
  Authors     :   Bradley Austin Davis <bdavis@saintandreas.org>
- Copyright   :   Copyright Brad Davis. All Rights reserved.
+ Copyright   :   Copyright Bradley Austin Davis. All Rights reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@
 
  ************************************************************************************/
 
-#include "Common.h"
+#include "QtCommon.h"
 
 #include <QDomDocument>
+#include <QImage>
 
 
 namespace oria {
@@ -59,25 +60,11 @@ namespace oria {
       return QString::fromUtf8(data.data(), data.size());
     }
 
-
-    QImage loadImageResource(Resource res) {
-      QImage image;
-      image.loadFromData(toByteArray(res));
-      return image;
-    }
-
-    QPixmap loadXpmResource(Resource res) {
-      QString cursorXpmStr = oria::qt::toString(res);
-      QStringList list = cursorXpmStr.split(QRegExp("\\n|\\r\\n|\\r"));
-      std::vector<QByteArray> bv;
-      std::vector<const char*> v;
-      foreach(QString line, list) {
-        bv.push_back(line.toLocal8Bit());
-        v.push_back(*bv.rbegin());
-      }
-      QPixmap result = QPixmap(&v[0]);
-      return result;
-    }
+    //QImage loadImageResource(Resource res) {
+    //  QImage image;
+    //  image.loadFromData(toByteArray(res));
+    //  return image;
+    //}
   }
 }
 

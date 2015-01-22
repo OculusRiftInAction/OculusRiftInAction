@@ -21,7 +21,8 @@ limitations under the License.
 #define BRAD_DEBUG 1
 #endif
 
-#include "Common.h"
+#include "QtCommon.h"
+
 #include "Shadertoy.h"
 #include "ShadertoyQt.h"
 
@@ -57,9 +58,6 @@ static const float INV_ROOT_2 = 1.0f / ROOT_2;
 static uvec2 UI_SIZE(1280, 720);
 static float UI_ASPECT = aspect(vec2(UI_SIZE));
 static float UI_INVERSE_ASPECT = 1.0f / UI_ASPECT;
-
-typedef std::shared_ptr<oglplus::VertexShader> VertexShaderPtr;
-typedef std::shared_ptr<oglplus::FragmentShader> FragmentShaderPtr;
 
 static ImagePtr loadImageWithAlpha(const std::vector<uint8_t> & data, bool flip) {
   using namespace oglplus;
@@ -154,7 +152,7 @@ protected:
     QRiftWindow::setup();
     initTextureCache();
 
-    setShaderSourceInternal(oria::qt::toString(Resource::SHADERTOY_SHADERS_DEFAULT_FS));
+    setShaderSourceInternal(readFileToString(":/shaders/default.fs"));
     assert(shadertoyProgram);
     skybox = oria::loadSkybox(shadertoyProgram);
 
@@ -295,8 +293,10 @@ protected:
     try {
       position = vec3();
       if (!vertexShader) {
+        QString vertexShaderSource = readFileToString(":/shaders/default.vs").toLocal8Bit().constData();
+        qDebug() << "contents: " << vertexShaderSource;
         vertexShader = VertexShaderPtr(new VertexShader());
-        vertexShader->Source(Platform::getResourceString(Resource::SHADERTOY_SHADERS_DEFAULT_VS));
+        vertexShader->Source(vertexShaderSource.toLocal8Bit().constData());
         vertexShader->Compile();
       }
 
@@ -1235,7 +1235,7 @@ class ShadertoyApp : public QApplication {
 
 public:
   ShadertoyApp(int argc, char ** argv) : QApplication(argc, argv) {
-    Q_INIT_RESOURCE(Resource);
+    Q_INIT_RESOURCE(ShadertoyVR);
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
@@ -1315,7 +1315,7 @@ MAIN_DECL {
 
 
 
-#include "Example_10_Shaderfun.moc"
+#include "ShadertoyVR.moc"
 
 
 

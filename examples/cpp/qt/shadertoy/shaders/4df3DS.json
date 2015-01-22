@@ -1,0 +1,65 @@
+{
+	"Shader": 
+	[
+		{
+			"ver": "0.1",
+			"info": 
+			{
+				"id": "4df3DS",
+				"date": "1377824874",
+				"viewed": 3566,
+				"name": "Infinite City",
+				"username": "TekF",
+				"description": "Use a fast 2D voronoi-based pattern to build an isosurface that looks like a city. Based on some POV-Ray images I made a few years ago: http:\/\/evilsuperbrain.com\/gallery\/misc\/inc.php?file=gallery.php&filter=crackle",
+				"likes": 49,
+				"published": 3,
+				"tags": 
+				[
+					"voronoi"
+				],
+
+				"hasliked": 0
+			},
+
+			"renderpass": 
+			[
+				{
+					"inputs": 
+					[
+						{
+							"id": 7,
+							"src": "\/presets\/tex06.jpg",
+							"ctype": "texture",
+							"channel": 1
+						},
+
+						{
+							"id": 30,
+							"src": "\/presets\/tex16.png",
+							"ctype": "texture",
+							"channel": 0
+						}
+					],
+
+					"outputs": 
+					[
+						{
+							"channel": "0",
+							"dst": "-1"
+						},
+
+						{
+							"channel": "0",
+							"dst": "-1"
+						}
+					],
+
+					"code": "\/\/ Ininite City\n\/\/ Ben Weston - 2013\n\/\/ License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n\n\n\/\/ slightly shaky street-level view!\n\/\/#define FIRST_PERSON\n\n\nvec2 Rand( vec2 pos )\n{\n\treturn texture2D( iChannel0, (pos+.5)\/256.0, -100.0 ).xz;\n}\n\nvec3 VoronoiPoint(vec2 pos, vec2 delta )\n{\n\tconst float randScale = .8; \/\/ reduce this to remove axis-aligned hard edged errors\n\t\n\tvec2 p = floor(pos)+delta;\n\tvec2 r = (Rand(p)-.5)*randScale;\n\tvec2 c = p+.5+r;\n\t\n\t\/\/ various length calculations for different patterns\n\t\/\/float l = length(c-pos);\n\t\/\/float l = length(vec3(c-pos,.1));\n\tfloat l = abs(c.x-pos.x)+abs(c.y-pos.y); \/\/ more interesting shapes\n\t\n\treturn vec3(c,l);\n}\n\n\/\/ For building height I want to know which voronoi point I used\n\/\/ For side-walls I want difference between distance of closest 2 points\nvec3 Voronoi( vec2 pos )\n{\n\t\/\/ find closest & second closest points\n\tvec3 delta = vec3(-1,0,1);\n\n\t\/\/ sample surrounding points on the distorted grid\n\t\/\/ could get 2 samples for the price of one using a rotated (17,37) grid...\n\tvec3 point[9];\n\tpoint[0] = VoronoiPoint( pos, delta.xx );\n\tpoint[1] = VoronoiPoint( pos, delta.yx );\n\tpoint[2] = VoronoiPoint( pos, delta.zx );\n\tpoint[3] = VoronoiPoint( pos, delta.xy );\n\tpoint[4] = VoronoiPoint( pos, delta.yy );\n\tpoint[5] = VoronoiPoint( pos, delta.zy );\n\tpoint[6] = VoronoiPoint( pos, delta.xz );\n\tpoint[7] = VoronoiPoint( pos, delta.yz );\n\tpoint[8] = VoronoiPoint( pos, delta.zz );\n\n\tvec3 closest;\n\tclosest.z =\n\t\tmin(\n\t\t\tmin(\n\t\t\t\tmin(\n\t\t\t\t\tmin( point[0].z, point[1].z ),\n\t\t\t\t\tmin( point[2].z, point[3].z )\n\t\t\t\t), min(\n\t\t\t\t\tmin( point[4].z, point[5].z ),\n\t\t\t\t\tmin( point[6].z, point[7].z )\n\t\t\t\t)\n\t\t\t), point[8].z\n\t\t);\n\t\n\t\/\/ find second closest\n\t\/\/ maybe there's a better way to do this\n\tclosest.xy = point[8].xy;\n\tfor ( int i=0; i < 8; i++ )\n\t{\n\t\tif ( closest.z == point[i].z )\n\t\t{\n\t\t\tclosest = point[i];\n\t\t\tpoint[i] = point[8];\n\t\t}\n\t}\n\t\t\n\tfloat t;\n\tt = min(\n\t\t\tmin(\n\t\t\t\tmin( point[0].z, point[1].z ),\n\t\t\t\tmin( point[2].z, point[3].z )\n\t\t\t), min(\n\t\t\t\tmin( point[4].z, point[5].z ),\n\t\t\t\tmin( point[6].z, point[7].z )\n\t\t\t)\n\t\t);\n\n\t\/*slower:\n\tfloat t2 = 9.0;\n\tvec3 closest = point[8];\n\tfor ( int i=0; i < 8; i++ )\n\t{\n\t\tif ( point[i].z < closest.z )\n\t\t{\n\t\t\tt2 = closest.z;\n\t\t\tclosest = point[i];\n\t\t}\n\t\telse if ( point[i].z < t2 )\n\t\t{\n\t\t\tt2 = point[i].z;\n\t\t}\n\t}*\/\n\t\n\treturn vec3( closest.xy, t-closest.z );\n}\n\n\nfloat DistanceField( vec3 pos, float dist )\n{\n\tvec3 v = Voronoi(pos.xz);\n\tvec2 r = Rand(v.xy*4.0); \/\/ per-building seed\n\t\n\tfloat f = (.2+.3*r.y-v.z)*.5; \/\/.7071; \/\/ correct for max gradient of voronoi x+z distance calc\n\t\n\t\/\/ random height\n\tfloat h = r.x; \/\/ v.xy is position of cell centre, use it as random seed\n\th = mix(.2,2.0,pow(h,2.0));\n\th = pos.y-h;\n\n\t\/\/ we get precision problems caused by the discontinuity in height\n\t\/\/ so clamp it near to the surface and then apply a plane at max height\t\n\th = max( min( h, .008*dist ), pos.y-2.0 );\n\n\/\/\tf = max( f, h );\n\tif ( f > 0.0 && h > 0.0 )\n\t\tf = sqrt(f*f+h*h); \/\/ better distance computation, to reduce errors\n\telse\n\t\tf = max(f,h);\n\t\n\tf = min( f, pos.y ); \/\/ ground plane\n\t\n\treturn f;\n}\n\nfloat DistanceField( vec3 pos )\n{\n\treturn DistanceField( pos, 10.0 );\n}\n\n\/\/ normal\n\/\/ could do this analytically, by looking at the maths when comupting voronoi value\n\/\/ but the lions share of the cost is in the trace, not this, so I shalln't worry\nvec3 GetNormal( vec3 pos )\n{\n\tvec3 n;\n\tvec2 delta = vec2(0,1);\n\n\t\/\/ allow a slight curve so it looks more interesting\n\t#ifdef FIRST_PERSON\n\t\tdelta *= .004;\n\t#else\n\t\tdelta *= .04;\n\t#endif\n\t\n\tn.x = DistanceField( pos+delta.yxx ) - DistanceField( pos-delta.yxx );\n\tn.y = DistanceField( pos+delta.xyx ) - DistanceField( pos-delta.xyx );\n\tn.z = DistanceField( pos+delta.xxy ) - DistanceField( pos-delta.xxy );\n\n\t\/\/ we get some black on surfaces because of flat spots in the voronoi\n\t\/\/ fix that by giving it an arbitrary (and incorrect) normal\n\tif ( dot(n,n) == 0.0 )\n\t\tn.y += 1.0;\n\n\treturn normalize(n);\n}\n\n\nvoid main(void)\n{\n\/*\tfloat f = Voronoi(gl_FragCoord.xy\/40.0).z;\n\tgl_FragColor = vec4( vec3(f), 1.0 );*\/\n\t\n\tvec2 mouse = iMouse.xy\/iResolution.xy;\n\n\tfloat h;\n\t#ifdef FIRST_PERSON\n\t\tvec2 rot = vec2(-.2,.0)+vec2(6.28,-1.5)*mouse;\n\t\t\n\t\/\/\tvec3 rayStart = vec3(.1,.03,.1);\/\/vec3(0,10,0) + vec3(1,0,1)*iGlobalTime + vec3(0,-8,0)*mouse.y;\n\t\/\/\trayStart += -10.0*vec3(sin(rot.x),0,cos(rot.x));\n\t\n\t\tvec3 rayStart = vec3(0,.03,0) + iGlobalTime*vec3(-.02,0,.02);\n\t\t\/\/ find closest road to the right\n\t\th = 1.0;\n\t\tfor ( int i=0; i < 20; i++ )\n\t\t{\n\t\t\tif ( h < .01 )\n\t\t\t\tbreak;\n\t\t\th = Voronoi( rayStart.xz ).z*.3;\n\t\t\trayStart.xz += h;\n\t\t}\n\t\n\t\tfloat zoom = .7;\n\t#else\n\t\tvec2 rot = vec2(-.2,.28)+vec2(1.6,.5)*mouse;\n\t\t\n\t\tvec3 rayStart = vec3(0,5,0) + vec3(1,0,1)*iGlobalTime + vec3(0,6,0)*mouse.y;\n\t\trayStart += -10.0*vec3(sin(rot.x),0,cos(rot.x));\n\n\t\tfloat zoom = 1.0;\n\t#endif\n\t\n\tvec3 rayDir = normalize( vec3( gl_FragCoord.xy-iResolution.xy*.5, iResolution.x * zoom ) );\n\trayDir.yz = rayDir.yz*cos(rot.y)+rayDir.zy*sin(rot.y)*vec2(-1,1);\n\trayDir.xz = rayDir.xz*cos(rot.x)+rayDir.zx*sin(rot.x)*vec2(1,-1);\n\n\t\/\/ trace\n\tfloat t = 0.0;\n\th = 1.0;\n\tfor ( int i=0; i < 100; i++ )\n\t{\n\t\tif ( h < .003 )\n\t\t\tbreak;\n\t\t\n\t\th = DistanceField(rayStart+rayDir*t, t);\n\t\tt += h;\n\t}\n\t\n\t\/\/ shade\n\tvec3 pos = rayStart+rayDir*t;\n\tvec3 norm = GetNormal(pos);\n\tvec3 v = Voronoi(pos.xz);\n\t\n\tvec2 r = Rand( v.xy ).xy;\n\tvec4 albedo = mix( mix( vec4(.4,.2,.0,0), vec4(1,1,1,0), r.x ),\n\t\t\t\t\t   mix( vec4(0,.2,.6,1), vec4(0,0,0,1), r.x ),\n\t\t\t\t\t   r.y );\n\t\n\t\/\/ floors\n\tif ( fract(pos.y*8.0) < .4 )\n\t\talbedo = mix( vec4(0,0,0,0), vec4(1,1,1,0), r.x );\n\n\t\/\/ remove reflection on rooves!\n\talbedo.w = mix ( albedo.w, 0.0, step( .2, norm.y ) );\n\t\n\t\/\/ roads\n\talbedo = mix( vec4(.05,.05,.05,0), albedo, step( .07, abs(v.z-.08) ) );\n\t\n\tvec3 lighting = max(0.0,dot(norm,normalize(vec3(-2,3,-1))))*vec3(1,.9,.8);\n\tlighting += vec3(.2); \/\/ambient\n\t\n\tvec3 result = albedo.xyz * lighting;\n\t\n\t\/\/ reflections\n\tfloat fresnel = pow(1.0+dot(norm,rayDir),5.0);\n\tif ( fresnel > 1.0 ) fresnel = 0.0;\n\tfresnel = mix( .2, 1.0, fresnel );\n\t\n\tvec3 reflection = texture2D( iChannel1, reflect(rayDir,norm).xz\/8.0 ).rgb*3.0;\n\t\n\tresult = mix( result, reflection, fresnel*albedo.w );\n\n\tif ( h > .01 )\/\/&& rayDir.y > 0.0 )\n\t{\n\t\t\/\/ sky\n\t\tresult = mix( vec3(.3), vec3(.85,1.0,1.2), smoothstep( -.1,.1,rayDir.y ) );\n\t}\n\t\n\t\/\/ fake ambient occlusion\n\tresult *= mix( .2, 1.0, smoothstep( 0.0, .7, pos.y ) );\n\t\n\t\/\/ fog\n\t\/\/result = mix( vec3(.85,1.0,1.2), result, exp(-t*.02) );\n\t\/\/More realistic fog\n\tresult *= pow( vec3(.7,.57,.3), vec3(t*.02) ); \/\/ absorb more blue on distant things\n\tresult += vec3(.7,.9,1.2)*(1.0-exp(-t*.02));\n\t\n\tgl_FragColor = vec4(result,1);\n}",
+					"name": "",
+					"description": "",
+					"type": "image"
+				}
+			]
+		}
+	]
+}
