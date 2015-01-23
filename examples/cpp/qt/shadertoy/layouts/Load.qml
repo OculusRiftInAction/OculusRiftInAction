@@ -77,6 +77,12 @@ Item {
                 }
             }
             model: presetsModel
+
+            onCurrentItemChanged: {
+				if (presets.currentIndex != -1) {
+                    root.newPresetHighlighted(presets.currentIndex);
+				} 
+            }
         }
     }
 

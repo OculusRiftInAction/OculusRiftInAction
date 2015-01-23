@@ -24,13 +24,14 @@ typedef std::shared_ptr<oglplus::images::Image> ImagePtr;
 
 namespace oria {
   ImagePtr loadImage(const std::vector<uint8_t> & data, bool flip = true);
-  ImagePtr loadImage(Resource resource, bool flip = true);
   TexturePtr load2dTextureFromPngData(std::vector<uint8_t> & data);
   TexturePtr load2dTexture(const std::vector<uint8_t> & data);
   TexturePtr load2dTexture(const std::vector<uint8_t> & data, uvec2 & outSize);
+  TexturePtr loadCubemapTexture(std::function<ImagePtr(int)> dataLoader);
+
+  ImagePtr loadImage(Resource resource, bool flip = true);
   TexturePtr load2dTexture(Resource resource);
   TexturePtr load2dTexture(Resource resource, uvec2 & outSize);
   TexturePtr loadCubemapTexture(Resource firstResource, int resourceOrder[6], bool flip = true);
   TexturePtr loadCubemapTexture(Resource firstResource, bool flip = true);
-
 }

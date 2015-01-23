@@ -29,28 +29,28 @@ Item {
             anchors.leftMargin: 256
             Row {
                 spacing: 24
-                TextureIcon { path: "presets/tex00.jpg" }
-                TextureIcon { path: "presets/tex01.jpg" }
-                TextureIcon { path: "presets/tex02.jpg" }
-                TextureIcon { path: "presets/tex03.jpg" }
-                TextureIcon { path: "presets/tex04.jpg" }
-                TextureIcon { path: "presets/tex05.jpg" }
+                TextureIcon { source: "qrc:/presets/tex00.jpg" }
+                TextureIcon { source: "qrc:/presets/tex01.jpg" }
+                TextureIcon { source: "qrc:/presets/tex02.jpg" }
+                TextureIcon { source: "qrc:/presets/tex03.jpg" }
+                TextureIcon { source: "qrc:/presets/tex04.jpg" }
+                TextureIcon { source: "qrc:/presets/tex05.jpg" }
             }
             Row {
                 spacing: 24
-                TextureIcon { path: "presets/tex06.jpg" }
-                TextureIcon { path: "presets/tex07.jpg" }
-                TextureIcon { path: "presets/tex08.jpg" }
-                TextureIcon { path: "presets/tex09.jpg" }
-                TextureIcon { path: "presets/tex10.png" }
-                TextureIcon { path: "presets/tex11.png" }
+                TextureIcon { source: "qrc:/presets/tex06.jpg" }
+                TextureIcon { source: "qrc:/presets/tex07.jpg" }
+                TextureIcon { source: "qrc:/presets/tex08.jpg" }
+                TextureIcon { source: "qrc:/presets/tex09.jpg" }
+                TextureIcon { source: "qrc:/presets/tex10.png" }
+                TextureIcon { source: "qrc:/presets/tex11.png" }
             }
             Row {
                 spacing: 24
-                TextureIcon { path: "presets/tex12.png" }
-                TextureIcon { path: "presets/tex14.png" }
-                TextureIcon { path: "presets/tex15.png" }
-                TextureIcon { path: "presets/tex16.png" }
+                TextureIcon { source: "qrc:/presets/tex12.png" }
+                TextureIcon { source: "qrc:/presets/tex14.png" }
+                TextureIcon { source: "qrc:/presets/tex15.png" }
+                TextureIcon { source: "qrc:/presets/tex16.png" }
                 CustomButton {
                     id: browse
                     width: 256 + 24
@@ -86,12 +86,12 @@ Item {
             anchors.left: parent.left
             spacing: 24
             anchors.leftMargin: 256
-            TextureIcon { channelType: 1; path: "presets/cube00_0.jpg" }
-            TextureIcon { channelType: 1; path: "presets/cube01_0.png" }
-            TextureIcon { channelType: 1; path: "presets/cube02_0.jpg" }
-            TextureIcon { channelType: 1; path: "presets/cube03_0.png" }
-            TextureIcon { channelType: 1; path: "presets/cube04_0.png" }
-            TextureIcon { channelType: 1; path: "presets/cube05_0.png" }
+            TextureIcon { channelType: 1; source: "qrc:/presets/cube00_0.jpg" }
+            TextureIcon { channelType: 1; source: "qrc:/presets/cube01_0.png" }
+            TextureIcon { channelType: 1; source: "qrc:/presets/cube02_0.jpg" }
+            TextureIcon { channelType: 1; source: "qrc:/presets/cube03_0.png" }
+            TextureIcon { channelType: 1; source: "qrc:/presets/cube04_0.png" }
+            TextureIcon { channelType: 1; source: "qrc:/presets/cube05_0.png" }
         }
     }
 

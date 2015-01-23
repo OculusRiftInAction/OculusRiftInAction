@@ -41,6 +41,24 @@ namespace oria { namespace qt {
   QPixmap loadXpmResource(Resource res);
 
 } } // namespaces
+
+
+inline QByteArray readFileToByteArray(const QString & fileName) {
+  QFile f(fileName);
+  f.open(QFile::ReadOnly);
+  return f.readAll();
+}
+
+inline std::vector<uint8_t> readFileToVector(const QString & fileName) {
+  QByteArray ba = readFileToByteArray(fileName);
+  return std::vector<uint8_t>(ba.constData(), ba.constData() + ba.size());
+}
+
+inline QString readFileToString(const QString & fileName) {
+  return QString(readFileToByteArray(fileName));
+}
+
+
 /**
  * Forwards mouse and keyboard input from the specified widget to the
  * graphics view, allowing the user to click on one widget (like an

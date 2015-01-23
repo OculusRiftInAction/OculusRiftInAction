@@ -27,6 +27,12 @@ namespace shadertoy {
   const char * UNIFORM_RESOLUTION = "iResolution";
   const char * UNIFORM_GLOBALTIME = "iGlobalTime";
   const char * UNIFORM_CHANNEL_TIME = "iChannelTime";
+  const char * UNIFORM_CHANNEL_RESOLUTIONS[4] = {
+    "iChannelResolution[0]",
+    "iChannelResolution[1]",
+    "iChannelResolution[2]",
+    "iChannelResolution[3]",
+  };
   const char * UNIFORM_CHANNEL_RESOLUTION = "iChannelResolution";
   const char * UNIFORM_MOUSE_COORDS = "iMouse";
   const char * UNIFORM_DATE = "iDate";
@@ -60,94 +66,61 @@ namespace shadertoy {
     Preset(Resource res, const char * name) : res(res), name(name) {};
   };
 
-  Preset PRESETS[] {
-    //Preset(Resource::SHADERTOY_SHADERS_DEFAULT_XML, "Default"),
-    //Preset(Resource::SHADERTOY_SHADERS_LSS3WS_RELENTLESS_XML, "Relentless"),
-    //Preset(Resource::SHADERTOY_SHADERS_4DFGZS_VOXEL_EDGES_XML, "Voxel Edges"),
-    //Preset(Resource::SHADERTOY_SHADERS_4SBGD1_FAST_BALLS_XML, "Fast Balls"),
-    //Preset(Resource::SHADERTOY_SHADERS_MDX3RR_ELEVATED_XML, "Elevated"),
-    //Preset(Resource::SHADERTOY_SHADERS_MSXGZM_VORONOI_ROCKS_XML, "Voronoi Rocks"),
-    //Preset(Resource::SHADERTOY_SHADERS_XSBSRG_MORNING_CITY_XML, "Morning City"),
-    //Preset(Resource::SHADERTOY_SHADERS_4SX3R2_JSON, "Monster"),
+  const QStringList PRESETS({
+    ":/shaders/default.xml",
+    ":/shaders/4df3DS.json",
+    ":/shaders/4dfGzs.json",
+    ":/shaders/4djGWR.json",
+//    ":/shaders/4dXGRM_flying_steel_cubes.xml",
+    ":/shaders/4sBGD1.json",
+    ":/shaders/4sX3R2.json",
+//    ":/shaders/4sXGRM_oceanic.xml",
+//    ":/shaders/ld23DG_crazy.xml",
+    ":/shaders/ldl3zr_mobius_balls.xml",
+    ":/shaders/lss3WS_relentless.xml",
+    ":/shaders/MdX3Rr.json",
+//    ":/shaders/MsSGD1_hand_drawn_sketch.xml",
+    ":/shaders/MsXGz4.json",
+    ":/shaders/MsXGzM.json",
+//    ":/shaders/MtfGR8_snowglobe.xml",
+    ":/shaders/XsBSRG_morning_city.xml",
+    ":/shaders/XsSSRW.json"
+  });
 
-//#ifdef OS_WIN
-//    Preset(Resource::SHADERTOY_SHADERS_4DXGRM_FLYING_STEEL_CUBES_XML, "Steel Cubes"),
-//    Preset(Resource::SHADERTOY_SHADERS_4DF3DS_INFINITE_CITY_XML, "Infinite City"),
-//    Preset(Resource::SHADERTOY_SHADERS_4SXGRM_OCEANIC_XML, "Oceanic"),
-//    Preset(Resource::SHADERTOY_SHADERS_MSXGZ4_CUBEMAP_XML, "Cubemap"),
-//#endif
+  const QStringList TEXTURES({
+    "/presets/tex00.jpg",
+    "/presets/tex01.jpg",
+    "/presets/tex02.jpg",
+    "/presets/tex03.jpg",
+    "/presets/tex04.jpg",
+    "/presets/tex05.jpg",
+    "/presets/tex06.jpg",
+    "/presets/tex07.jpg",
+    "/presets/tex08.jpg",
+    "/presets/tex09.jpg",
+    "/presets/tex10.png",
+    "/presets/tex11.png",
+    "/presets/tex12.png",
+    "/presets/tex14.png",
+    "/presets/tex15.png",
+    "/presets/tex16.png"
+  });
 
-#if 0
-    Preset(Resource::SHADERTOY_SHADERS_XSSSRW_ABANDONED_BASE_XML, "Abandoned Base"),
-    Preset(Resource::SHADERTOY_SHADERS_4DJGWR_ROUNDED_VOXELS_XML, "Rounded Voxels"),
-    Preset(Resource::SHADERTOY_SHADERS_MSSGD1_HAND_DRAWN_SKETCH_XML, "Hand Drawn"),
-#endif
-
-    Preset(Resource::NO_RESOURCE, nullptr),
-  };
-
-  template <typename T>
-  class ResourceCounter {
-    int count{ 0 };
-  public:
-
-    ResourceCounter(T * ts, std::function<bool(const T &)> endCondition =
-        [](const T & t)->bool { return true; }
-    ) {
-      while (!endCondition(ts[count])) {
-        ++count;
-      }
-    }
-
-    int counted() {
-      return count;
-    }
-  };
-
-  const int MAX_PRESETS = ResourceCounter<Preset>(PRESETS, [] (const Preset & p){
-    return p.res == NO_RESOURCE;
-  }).counted();
-
-  const Resource TEXTURES[] = {
-    //Resource::SHADERTOY_TEXTURES_TEX00_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX01_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX02_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX03_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX04_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX05_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX06_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX07_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX08_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX09_JPG,
-    //Resource::SHADERTOY_TEXTURES_TEX10_PNG,
-    //Resource::SHADERTOY_TEXTURES_TEX11_PNG,
-    //Resource::SHADERTOY_TEXTURES_TEX12_PNG,
-    //NO_RESOURCE,
-    //Resource::SHADERTOY_TEXTURES_TEX14_PNG,
-    //Resource::SHADERTOY_TEXTURES_TEX15_PNG,
-    //Resource::SHADERTOY_TEXTURES_TEX16_PNG,
-    NO_RESOURCE,
-  };
-  const int MAX_TEXTURES = 17;
-
-  const Resource CUBEMAPS[] = {
-    //Resource::SHADERTOY_CUBEMAPS_CUBE00_0_JPG,
-    //Resource::SHADERTOY_CUBEMAPS_CUBE01_0_PNG,
-    //Resource::SHADERTOY_CUBEMAPS_CUBE02_0_JPG,
-    //Resource::SHADERTOY_CUBEMAPS_CUBE03_0_PNG,
-    //Resource::SHADERTOY_CUBEMAPS_CUBE04_0_PNG,
-    //Resource::SHADERTOY_CUBEMAPS_CUBE05_0_PNG,
-    NO_RESOURCE,
-  };
-  const int MAX_CUBEMAPS = 6;
+  const QStringList CUBEMAPS({
+    "/presets/cube00_%1.jpg",
+    "/presets/cube01_%1.png",
+    "/presets/cube02_%1.jpg",
+    "/presets/cube03_%1.png",
+    "/presets/cube04_%1.png",
+    "/presets/cube05_%1.png",
+  });
 
   struct Shader {
-    bool vrSupport{ true };
-    std::string id;
-    std::string url;
-    std::string name;
-    std::string fragmentSource;
+    QString id;
+    QString url;
+    QString name;
+    QString fragmentSource;
     ChannelInputType channelTypes[MAX_CHANNELS];
-    std::string channelTextures[MAX_CHANNELS];
+    QString channelTextures[MAX_CHANNELS];
   };
 }

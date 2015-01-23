@@ -79,7 +79,6 @@ namespace shadertoy {
 
   Shader parseShaderJson(const QByteArray & shaderJson) {
     Shader result;
-    result.vrSupport = false;
     QJsonDocument jsonResponse = QJsonDocument::fromJson(shaderJson);
     QJsonObject jsonObject = jsonResponse.object();
     QJsonObject info = path(jsonResponse.object(), { "Shader", 0, "info" }).toObject();
@@ -107,11 +106,11 @@ namespace shadertoy {
     for (int i = 0; i < children.count(); ++i) {
       auto child = children.at(i);
       if (child.nodeName() == "url") {
-        result.url = std::string(child.firstChild().nodeValue().toLocal8Bit());
+        result.url = child.firstChild().nodeValue();
       } if (child.nodeName() == XML_FRAGMENT_SOURCE) {
-        result.fragmentSource = std::string(child.firstChild().nodeValue().toLocal8Bit());
+        result.fragmentSource = child.firstChild().nodeValue();
       } if (child.nodeName() == XML_NAME) {
-        result.name = std::string(child.firstChild().nodeValue().toLocal8Bit());
+        result.name = child.firstChild().nodeValue();
       } else if (child.nodeName() == XML_CHANNEL) {
         auto attributes = child.attributes();
         int channelIndex = -1;
@@ -133,33 +132,38 @@ namespace shadertoy {
             continue;
           }
           result.channelTypes[channelIndex] = channelTypeFromString(re.cap(1));
-          result.channelTextures[channelIndex] = std::string(("preset://" + re.cap(1) + "/" + re.cap(2)).toLocal8Bit());
+          result.channelTextures[channelIndex] = ("preset://" + re.cap(1) + "/" + re.cap(2));
           continue;
         }
 
         if (attributes.contains(XML_CHANNEL_ATTR_TYPE)) {
           result.channelTypes[channelIndex] = channelTypeFromString(attributes.namedItem(XML_CHANNEL_ATTR_SOURCE).nodeValue());
-          result.channelTextures[channelIndex] = std::string(child.firstChild().nodeValue().toLocal8Bit());
+          result.channelTextures[channelIndex] = child.firstChild().nodeValue();
         }
       }
     }
     return result;
   }
 
-  Shader loadShaderXml(Resource res) {
-    QByteArray presetData = oria::qt::toByteArray(res);
-    QBuffer buffer(&presetData);
-    return loadShaderXml(buffer);
-  }
-
-  Shader loadShaderJson(Resource res) {
-    QByteArray json = oria::qt::toByteArray(res);
+  Shader loadShaderJson(const QString & shaderPath) {
+    QByteArray json = readFileToByteArray(shaderPath);
     return parseShaderJson(json);
   }
 
   Shader loadShaderXml(const QString & fileName) {
     QFile file(fileName);
     return loadShaderXml(file);
+  }
+
+  Shader loadShaderFile(const QString & shaderPath) {
+    if (shaderPath.endsWith(".xml", Qt::CaseInsensitive)) {
+      return shadertoy::loadShaderXml(shaderPath);
+    } else if (shaderPath.endsWith(".json", Qt::CaseInsensitive)) {
+      return shadertoy::loadShaderJson(shaderPath);
+    } else {
+      qWarning() << "Don't know how to parse path " << shaderPath;
+    }
+    return Shader();
   }
 
   QByteArray readFile(const QString & filename) {
@@ -170,12 +174,6 @@ namespace shadertoy {
     return result;
   }
 
-  Shader loadShaderJson(const QString & fileName) {
-    QByteArray data = readFile(fileName);
-    return parseShaderJson(data);
-  }
-
-
   // FIXME no error handling.  
   QDomDocument writeShaderXml(const Shader & shader) {
     QDomDocument result;
@@ -183,19 +181,19 @@ namespace shadertoy {
     result.appendChild(root);
 
     for (int i = 0; i < MAX_CHANNELS; ++i) {
-      if (!shader.channelTextures[i].empty()) {
+      if (!shader.channelTextures[i].isEmpty()) {
         QDomElement channelElement = result.createElement(XML_CHANNEL);
         channelElement.setAttribute(XML_CHANNEL_ATTR_ID, i);
         channelElement.setAttribute(XML_CHANNEL_ATTR_TYPE, shader.channelTypes[i] == ChannelInputType::CUBEMAP ? "cube" : "tex");
-        channelElement.appendChild(result.createTextNode(shader.channelTextures[i].c_str()));
+        channelElement.appendChild(result.createTextNode(shader.channelTextures[i]));
         root.appendChild(channelElement);
       }
     }
     root.appendChild(result.createElement(XML_FRAGMENT_SOURCE)).
-      appendChild(result.createCDATASection(shader.fragmentSource.c_str()));
-    if (!shader.name.empty()) {
+      appendChild(result.createCDATASection(shader.fragmentSource));
+    if (!shader.name.isEmpty()) {
       root.appendChild(result.createElement(XML_NAME)).
-        appendChild(result.createCDATASection(shader.name.c_str()));
+        appendChild(result.createCDATASection(shader.name));
     }
     return result;
   }

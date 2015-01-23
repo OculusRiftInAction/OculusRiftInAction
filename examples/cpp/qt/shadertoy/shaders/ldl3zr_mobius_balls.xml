@@ -1,13 +1,13 @@
 <shadertoy>
-    <channel id="0" source="tex16"/>
-    <channel id="1" source="tex06"/>
+    <channel id="0" source="cube04"/>
+    <channel id="1" source="tex01"/>
+    <channel id="2" source="tex09"/>
     <name>Mobius Balls</name>
-    <fragmentSource><![CDATA[
+    <fragmentSource>
+      <![CDATA[
+
 #pragma vr
 // https://www.shadertoy.com/view/ldl3zr
-// @channel0 cube04
-// @channel1 tex01
-// @channel2 tex09
 
 float pi = 3.141592;
 
@@ -208,15 +208,15 @@ float ao(vec3 v, vec3 n)
 
 void main()
 {
-    gl_FragColor.xyz = vec3(0);
-    
+    gl_FragColor = vec4(vec3(0), 1);
     vec3 q = vec3((gl_FragCoord.xy / iResolution.xy - 0.5), 1.0); 
     q.x *= iResolution.x / iResolution.y;
-    vec3 p = vec3(0, 0.0, -10.0);
-    q = normalize(q);
+    vec3 p = vec3(0, 0.0, 10.0);
+    q = normalize(iDir);
 
-    p.xz = r(p.xz, 0.05*iGlobalTime);
-    q.xz = r(q.xz, 0.05*iGlobalTime);
+
+//    p.xz = r(p.xz, 0.05*iGlobalTime);
+//    q.xz = r(q.xz, 0.05*iGlobalTime);
 
     const int reflectionCount = 3;
     const int raymarchingSteps = 80;

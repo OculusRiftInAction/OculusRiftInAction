@@ -50,7 +50,9 @@ Rectangle {
                 anchors.centerIn: parent
                 height: 128
                 width: 128
-                source: "image://resources/shadertoy/tex_none.png"
+                onSourceChanged: {
+                    console.log(channel0.source);
+                }
             }
             MouseArea {
                 anchors.fill: parent
@@ -68,7 +70,6 @@ Rectangle {
                 anchors.centerIn: parent
                 height: 128
                 width: 128
-                source: "image://resources/shadertoy/tex_none.png"
             }
             MouseArea {
                 anchors.fill: parent
@@ -86,7 +87,6 @@ Rectangle {
                 anchors.centerIn: parent
                 height: 128
                 width: 128
-                source: "image://resources/shadertoy/tex_none.png"
             }
             MouseArea {
                 anchors.fill: parent
@@ -107,7 +107,6 @@ Rectangle {
                 anchors.topMargin: 12
                 height: 128
                 width: 128
-                source: "image://resources/shadertoy/tex_none.png"
             }
             MouseArea {
                 anchors.fill: parent

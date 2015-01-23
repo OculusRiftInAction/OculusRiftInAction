@@ -67,5 +67,39 @@
         <file>layouts/CustomTextEdit.qml</file>
         <file>layouts/IconControl.qml</file>
         <file>fonts/fontawesome-webfont.ttf</file>
+        <file>layouts/CustomTextArea.qml</file>
+        <file>shaders/4df3DS.jpg</file>
+        <file>shaders/4df3DS.json</file>
+        <file>shaders/4dfGzs.jpg</file>
+        <file>shaders/4dfGzs.json</file>
+        <file>shaders/4djGWR.jpg</file>
+        <file>shaders/4djGWR.json</file>
+        <file>shaders/4dXGRM_flying_steel_cubes.xml</file>
+        <file>shaders/4sBGD1.jpg</file>
+        <file>shaders/4sBGD1.json</file>
+        <file>shaders/4sX3R2.jpg</file>
+        <file>shaders/4sX3R2.json</file>
+        <file>shaders/4sXGRM_oceanic.xml</file>
+        <file>shaders/default.xml</file>
+        <file>shaders/ld23DG_crazy.xml</file>
+        <file>shaders/ldl3zr_mobius_balls.xml</file>
+        <file>shaders/lss3WS_relentless.xml</file>
+        <file>shaders/MdX3Rr.jpg</file>
+        <file>shaders/MdX3Rr.json</file>
+        <file>shaders/MsSGD1_hand_drawn_sketch.xml</file>
+        <file>shaders/MsXGz4.jpg</file>
+        <file>shaders/MsXGz4.json</file>
+        <file>shaders/MsXGzM.jpg</file>
+        <file>shaders/MsXGzM.json</file>
+        <file>shaders/MtfGR8_snowglobe.xml</file>
+        <file>shaders/XsBSRG_morning_city.xml</file>
+        <file>shaders/XsSSRW.jpg</file>
+        <file>shaders/XsSSRW.json</file>
+        <file>shaders/4sXGRM.jpg</file>
+        <file>shaders/ld23DG_crazy.jpg</file>
+        <file>shaders/ldl3zr_mobius_balls.jpg</file>
+        <file>shaders/lss3WS_relentless.jpg</file>
+        <file>shaders/MsSGD1.jpg</file>
+        <file>shaders/MtfGR8.jpg</file>
     </qresource>
 </RCC>

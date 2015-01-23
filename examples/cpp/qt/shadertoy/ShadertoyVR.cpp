@@ -96,14 +96,6 @@ static TexturePtr loadCursor(Resource res) {
   return texture;
 }
 
-QString readFileToString(const QString & fileName) {
-  QFile f(fileName);
-  f.open(QFile::ReadOnly);
-  QByteArray ba = f.readAll();
-  return QString(ba);
-}
-
-
 class ShadertoyRenderer : public QRiftWindow {
   Q_OBJECT
 protected:
@@ -117,14 +109,14 @@ protected:
     uvec2 size;
   };
 
-  typedef std::map<QUrl, TextureData> TextureMap;
-  typedef std::map<QUrl, QUrl> CanonicalUrlMap;
-  CanonicalUrlMap canonicalUrlMap;
+  typedef std::map<QString, TextureData> TextureMap;
+  typedef std::map<QString, QString> CanonicalPathMap;
+  CanonicalPathMap canonicalPathMap;
   TextureMap textureCache;
 
   // The currently active input channels
   Channel channels[4];
-  QUrl channelSources[4];
+  QString channelSources[4];
   bool vrMode{ false };
 
   // The shadertoy rendering resolution scale.  1.0 means full resolution 
@@ -167,46 +159,60 @@ protected:
 
   void initTextureCache() {
     using namespace shadertoy;
+    QRegExp re("(tex|cube)(\\d+)(_0)?\\.(png|jpg)");
 
-    for (int i = 0; i < MAX_TEXTURES; ++i) {
-      Resource res = TEXTURES[i];
-      if (NO_RESOURCE == res) {
-        continue;
-      }
-      QString path = QString(Resources::getResourceMnemonic(res).c_str());
+    for (int i = 0; i < TEXTURES.size(); ++i) {
+      QString path = TEXTURES.at(i);
       QString fileName = path.split("/").back();
-      QUrl url(QString("qrc:/") + path);
-      TextureData & cacheEntry = textureCache[url];
-      cacheEntry.tex = oria::load2dTexture(res, cacheEntry.size);
+      qDebug() << "Loading texture from " << path;
+      TextureData & cacheEntry = textureCache[path];
+      cacheEntry.tex = oria::load2dTexture(readFileToVector(":" + path), cacheEntry.size);
+      canonicalPathMap["qrc:" + path] = path;
 
       // Backward compatibility
-      canonicalUrlMap[QUrl(QString().sprintf("preset://tex/%d", i))] = url;
-      canonicalUrlMap[QUrl(QString().sprintf("preset://tex/%02d", i))] = url;
-      canonicalUrlMap[QUrl("/presets/" + fileName)] = url;
-    }
-    for (int i = 0; i < MAX_CUBEMAPS; ++i) {
-      Resource res = CUBEMAPS[i];
-      if (NO_RESOURCE == res) {
-        continue;
+      if (re.exactMatch(fileName)) {
+        int textureId = re.cap(2).toInt();
+
+        QString alias = QString("preset://tex/%1").arg(textureId);
+        qDebug() << "Adding alias for " << path << " to " << alias;
+        canonicalPathMap[alias] = path;
+
+        alias = QString("preset://tex/%1").arg(textureId, 2, 10, QChar('0'));
+        qDebug() << "Adding alias for " << path << " to " << alias;
+        canonicalPathMap[alias] = path;
       }
-      static int resourceOrder[] = {
-        0, 1, 2, 3, 4, 5
-      };
-      QString path = QString(Resources::getResourceMnemonic(res).c_str());
+    }
+
+    for (int i = 0; i < CUBEMAPS.size(); ++i) {
+      QString pathTemplate = CUBEMAPS.at(i);
+      QString path = pathTemplate.arg(0);
       QString fileName = path.split("/").back();
-      QUrl url(QString("qrc:/") + path);
-      uvec2 size;
-      TextureData & cacheEntry = textureCache[url];
-      cacheEntry.tex = oria::loadCubemapTexture(res, resourceOrder, false);
+      qDebug() << "Processing path " << path;
+      TextureData & cacheEntry = textureCache[path];
+      cacheEntry.tex = oria::loadCubemapTexture([&](int i){
+        QString texturePath = pathTemplate.arg(i);
+        ImagePtr image = oria::loadImage(readFileToVector(":" + texturePath), false);
+        cacheEntry.size = uvec2(image->Width(), image->Height());
+        return image;
+      });
+      canonicalPathMap["qrc:" + path] = path;
 
       // Backward compatibility
-      canonicalUrlMap[QUrl(QString().sprintf("preset://cube/%d", i))] = url;
-      canonicalUrlMap[QUrl(QString().sprintf("preset://cube/%02d", i))] = url;
-      canonicalUrlMap[QUrl("/presets/" + fileName)] = url;
+      if (re.exactMatch(fileName)) {
+        int textureId = re.cap(2).toInt();
+        QString alias = QString("preset://cube/%1").arg(textureId);
+        qDebug() << "Adding alias for " << path << " to " << alias;
+        canonicalPathMap[alias] = path;
+
+        alias = QString("preset://cube/%1").arg(textureId, 2, 10, QChar('0'));
+        qDebug() << "Adding alias for " << path << " to " << alias;
+        canonicalPathMap[alias] = path;
+      }
     }
-    //std::for_each(canonicalUrlMap.begin(), canonicalUrlMap.end(), [&](CanonicalUrlMap::const_reference & entry) {
-    //  qDebug() << entry.second << "\t" << entry.first;
-    //});
+    
+    std::for_each(canonicalPathMap.begin(), canonicalPathMap.end(), [&](CanonicalPathMap::const_reference & entry) {
+      qDebug() << entry.second << "\t" << entry.first;
+    });
   }
 
   void renderShadertoy() {
@@ -229,13 +235,20 @@ protected:
 
   void updateUniforms() {
     using namespace shadertoy;
-    std::map<std::string, GLuint> activeUniforms = oria::getActiveUniforms(shadertoyProgram);
+    typedef std::map<std::string, GLuint> Map;
+    Map activeUniforms = oria::getActiveUniforms(shadertoyProgram);
     shadertoyProgram->Bind();
     //    UNIFORM_DATE;
     for (int i = 0; i < 4; ++i) {
       const char * uniformName = shadertoy::UNIFORM_CHANNELS[i];
       if (activeUniforms.count(uniformName)) {
         context()->functions()->glUniform1i(activeUniforms[uniformName], i);
+      }
+      if (channels[i].texture) {
+        if (activeUniforms.count(UNIFORM_CHANNEL_RESOLUTIONS[i])) {
+          Uniform<vec3>(*shadertoyProgram, UNIFORM_CHANNEL_RESOLUTIONS[i]).Set(channels[i].resolution);
+        }
+        
       }
     }
     NoProgram().Bind();
@@ -294,7 +307,6 @@ protected:
       position = vec3();
       if (!vertexShader) {
         QString vertexShaderSource = readFileToString(":/shaders/default.vs").toLocal8Bit().constData();
-        qDebug() << "contents: " << vertexShaderSource;
         vertexShader = VertexShaderPtr(new VertexShader());
         vertexShader->Source(vertexShaderSource.toLocal8Bit().constData());
         vertexShader->Compile();
@@ -311,6 +323,7 @@ protected:
       FragmentShaderPtr newFragmentShader(new FragmentShader());
       vrMode = source.contains("#pragma vr");
       source.
+        replace(QRegExp("\\t"), "  ").
         replace(QRegExp("\\bgl_FragColor\\b"), "FragColor").
         replace(QRegExp("\\btexture2D\\b"), "texture").
         replace(QRegExp("\\btextureCube\\b"), "texture");
@@ -340,26 +353,25 @@ protected:
     return true;
   }
 
-  virtual TexturePtr loadTexture(const QUrl & source) {
+  virtual TextureData loadTexture(QString source) {
     qDebug() << "Looking for texture " << source;
-    QUrl url = source;
-    while (canonicalUrlMap.count(url)) {
-      url = canonicalUrlMap[url];
+    while (canonicalPathMap.count(source)) {
+      source = canonicalPathMap[source];
     }
 
-    if (!textureCache.count(url)) {
+    if (!textureCache.count(source)) {
       qWarning() << "Texture " << source << " not found, loading";
-      // FIXME
-      QFile f(source.toLocalFile());
-      f.open(QFile::ReadOnly);
-      QByteArray ba = f.readAll();
-      std::vector<uint8_t> v;  v.assign(ba.constData(), ba.constData() + ba.size());
-      textureCache[url].tex = oria::load2dTexture(v);
+      std::vector<uint8_t> textureData = readFileToVector(source);
+      if (!textureData.empty()) {
+        textureCache[source].tex = oria::load2dTexture(textureData, textureCache[source].size);
+      } else {
+        qWarning() << "Could not load texture";
+      }
     }
-    return textureCache[url].tex;
+    return textureCache[source];
   }
 
-  virtual void setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, const QUrl & textureSource) {
+  virtual void setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, const QString & textureSource) {
     using namespace oglplus;
     if (textureSource == channelSources[channel]) {
       return;
@@ -375,15 +387,17 @@ protected:
 
     Channel newChannel;
     uvec2 size;
+    auto texData = loadTexture(textureSource);
+    newChannel.texture = texData.tex;
     switch (type) {
     case shadertoy::ChannelInputType::TEXTURE:
-      newChannel.texture = loadTexture(textureSource);
       newChannel.target = Texture::Target::_2D;
+      newChannel.resolution = vec3(texData.size, 0);
       break;
 
     case shadertoy::ChannelInputType::CUBEMAP:
-      newChannel.texture = loadTexture(textureSource);
       newChannel.target = Texture::Target::CubeMap;
+      newChannel.resolution = vec3(texData.size.x);
       break;
 
     case shadertoy::ChannelInputType::VIDEO:
@@ -400,16 +414,15 @@ protected:
 
   virtual void setShaderInternal(const shadertoy::Shader & shader) {
     for (int i = 0; i < shadertoy::MAX_CHANNELS; ++i) {
-      setChannelTextureInternal(i, shader.channelTypes[i], QString(shader.channelTextures[i].c_str()));
+      setChannelTextureInternal(i, shader.channelTypes[i], shader.channelTextures[i]);
     }
-    setShaderSourceInternal(shader.fragmentSource.c_str());
+    setShaderSourceInternal(shader.fragmentSource);
   }
 
 signals:
   void compileError(const QString & source);
   void compileSuccess();
 };
-
 
 class ShadertoyFetcher : public QObject {
   Q_OBJECT
@@ -505,6 +518,7 @@ public:
 #endif
   }
 };
+
 
 class ShadertoyWindow : public ShadertoyRenderer {
   Q_OBJECT
@@ -651,8 +665,9 @@ private:
     uiWindow->setup(QSize(UI_SIZE.x, UI_SIZE.y), context());
     {
       QStringList dataList;
-      for (int i = 0; i < shadertoy::MAX_PRESETS; ++i) {
-        dataList.append(shadertoy::PRESETS[i].name);
+      foreach(const QString path, shadertoy::PRESETS) {
+        shadertoy::Shader shader = shadertoy::loadShaderFile(path);
+        dataList.append(shader.name);
       }
       auto qmlContext = uiWindow->m_qmlEngine->rootContext();
       qmlContext->setContextProperty("presetsModel", QVariant::fromValue(dataList));
@@ -661,14 +676,9 @@ private:
     }
     uiWindow->setProxyWindow(this);
 
-#ifdef _DEBUG
-    //	QUrl qml = QUrl::fromLocalFile("/Users/bradd/git/OculusRiftInAction/resources/shadertoy/Combined.qml");
-    QUrl qml = QUrl::fromLocalFile("C:\\Users\\bdavis\\Git\\OculusRiftExamples\\resources\\shadertoy\\Combined.qml");
-#else
-    QUrl qml = QUrl("qrc:/shadertoy/Combined.qml");
-    uiWindow->m_qmlEngine->addImportPath("./qml");
+    QUrl qml = QUrl("qrc:/layouts/Combined.qml");
+    uiWindow->m_qmlEngine->addImportPath("./layouts");
     uiWindow->m_qmlEngine->addImportPath(".");
-#endif
     uiWindow->loadQml(qml);
     connect(uiWindow, &QOffscreenUi::textureUpdated, this, [&](int textureId) {
       uiWindow->lockTexture(textureId);
@@ -723,6 +733,8 @@ private:
       this, SLOT(onNewShaderFilepath(QString)));
     QObject::connect(uiWindow->m_rootItem, SIGNAL(newShaderHighlighted(QString)),
       this, SLOT(onNewShaderHighlighted(QString)));
+    QObject::connect(uiWindow->m_rootItem, SIGNAL(newPresetHighlighted(int)),
+      this, SLOT(onNewPresetHighlighted(int)));
 
     QObject::connect(this, &ShadertoyWindow::compileSuccess, this, [&] {
       setItemProperty("errorFrame", "height", 0);
@@ -790,7 +802,8 @@ private slots:
   }
 
   void onLoadNextPreset() {
-    int newPreset = (activePresetIndex + 1) % shadertoy::MAX_PRESETS;
+    static const int PRESETS_SIZE = shadertoy::PRESETS.size();
+    int newPreset = (activePresetIndex + 1) % PRESETS_SIZE;
     onLoadPreset(newPreset);
   }
 
@@ -799,21 +812,14 @@ private slots:
   }
 
   void onLoadPreviousPreset() {
-    int newPreset = (activePresetIndex + shadertoy::MAX_PRESETS - 1) % shadertoy::MAX_PRESETS;
+    static const int PRESETS_SIZE = shadertoy::PRESETS.size();
+    int newPreset = (activePresetIndex + PRESETS_SIZE - 1) % PRESETS_SIZE;
     onLoadPreset(newPreset);
   }
 
   void onLoadPreset(int index) {
     activePresetIndex = index;
-    auto preset = shadertoy::PRESETS[index];
-    QString shaderPath = Resources::getResourceMnemonic(preset.res).c_str();
-    if (shaderPath.endsWith(".xml", Qt::CaseInsensitive)) {
-      loadShader(shadertoy::loadShaderXml(preset.res));
-    } else if (shaderPath.endsWith(".json", Qt::CaseInsensitive)) {
-      loadShader(shadertoy::loadShaderJson(preset.res));
-    } else {
-      qWarning() << "Don't know how to parse path " << shaderPath; 
-    }
+    loadShader(shadertoy::loadShaderFile(shadertoy::PRESETS.at(index)));
   }
 
   void onLoadShaderFile(const QString & shaderPath) {
@@ -845,6 +851,23 @@ private slots:
     }
   }
 
+  void onNewPresetHighlighted(int presetId) {
+    if (-1 != presetId && presetId < shadertoy::PRESETS.size()) {
+      QString path = shadertoy::PRESETS.at(presetId);
+      QString previewPath = path;
+      previewPath.replace(QRegularExpression("\\.(json|xml)$"), ".jpg");
+      setItemProperty("previewImage", "source", "qrc" + previewPath);
+      qDebug() << previewPath;
+    }
+    //previewPath.replace(QRegularExpression("\\.(json|xml)$"), ".jpg");
+    //setItemProperty("previewImage", "source", QFile::exists(previewPath) ? QUrl::fromLocalFile(previewPath) : QUrl());
+    //if (shaderPath.endsWith(".json")) {
+    //  setItemProperty("loadRoot", "activeShaderString", readFileToString(shaderPath));
+    //} else {
+    //  setItemProperty("loadRoot", "activeShaderString", "");
+    //}
+  }
+
   void onSaveShaderXml(const QString & shaderPath) {
     Q_ASSERT(!shaderPath.isEmpty());
     //shadertoy::saveShaderXml(activeShader);
@@ -858,12 +881,14 @@ private slots:
   }
 
   void onChannelTextureChanged(const int & channelIndex, const int & channelType, const QString & texturePath) {
+    qDebug() << "Requesting texture from path " << texturePath;
     queueRenderThreadTask([&, channelIndex, channelType, texturePath] {
+      qDebug() << texturePath;
       activeShader.channelTypes[channelIndex] = (shadertoy::ChannelInputType)channelType;
       activeShader.channelTextures[channelIndex] = texturePath.toLocal8Bit();
       setChannelTextureInternal(channelIndex, 
         (shadertoy::ChannelInputType)channelType, 
-        QUrl(texturePath));
+        texturePath);
       updateUniforms();
     });
   }
@@ -957,16 +982,17 @@ private slots:
 
 private:
   void loadShader(const shadertoy::Shader & shader) {
-    assert(!shader.fragmentSource.empty());
+    assert(!shader.fragmentSource.isEmpty());
     activeShader = shader;
-    setItemText("shaderTextEdit", QString(shader.fragmentSource.c_str()));
-    setItemText("shaderName", QString(shader.name.c_str()));
+    setItemText("shaderTextEdit", QString(shader.fragmentSource).replace(QString("\t"), QString("  ")));
+    setItemText("shaderName", shader.name);
     for (int i = 0; i < 4; ++i) {
-      QUrl url = QString(activeShader.channelTextures[i].c_str());
-      while (canonicalUrlMap.count(url)) {
-        url = canonicalUrlMap[url];
+      QString texturePath = activeShader.channelTextures[i];
+      while (canonicalPathMap.count(texturePath)) {
+        texturePath = canonicalPathMap[texturePath];
       }
-      setItemProperty(QString().sprintf("channel%d", i), "source",  url);
+      qDebug() << "Setting channel " << i << " to texture " << texturePath;
+      setItemProperty(QString().sprintf("channel%d", i), "source", "qrc:" + texturePath);
     }
     // FIXME update the channel texture buttons
     queueRenderThreadTask([&, shader] {

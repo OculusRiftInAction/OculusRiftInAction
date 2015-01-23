@@ -72,7 +72,8 @@ protected:
 
   }
 
-  virtual void renderScene() = 0;
+  virtual void perEyeRender() {
+  }
 #endif
 
 };

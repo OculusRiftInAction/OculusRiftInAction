@@ -27,6 +27,7 @@ Item {
     signal modifyPositionScale(double scale)
     signal newShaderFilepath(string newPath);
     signal newShaderHighlighted(string newPath);
+    signal newPresetHighlighted(int newPreset);
 
     signal toggleUi()
     signal toggleEyePerFrame()
@@ -132,9 +133,9 @@ Item {
         editor.visible = false;
     }
 
-    function channelTextureSelected(type, textureUrl) {
-        editor.setChannelIcon(activeChannel, textureUrl);
-        channelTextureChanged(activeChannel, type, textureUrl);
+    function channelTextureSelected(type, texturePath) {
+        editor.setChannelIcon(activeChannel, texturePath);
+        channelTextureChanged(activeChannel, type, texturePath);
         channelSelect.visible = false;
         editor.visible = true;
     }

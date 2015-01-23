@@ -52,7 +52,7 @@ QRiftWindow::QRiftWindow() {
   // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
   format.setDepthBufferSize(16);
   format.setStencilBufferSize(8);
-  format.setVersion(3, 3);
+  format.setVersion(4, 3);
   format.setProfile(QSurfaceFormat::OpenGLContextProfile::CoreProfile);
   setFormat(format);
 
@@ -138,7 +138,7 @@ void QRiftWindow::drawFrame() {
     // Set up the per-eye projection matrix
     float aspect = (float)size().width() / (float)size().height();
     pr.top() = glm::perspective(PI / 3.0f, aspect, 0.01f, 10000.0f);
-    renderScene();
+    perEyeRender();
   });
 #endif
 }
@@ -156,12 +156,13 @@ void QRiftWindow::renderLoop() {
     drawFrame();
 #ifndef USE_RIFT
     m_context->swapBuffers(this);
-    //rateCounter.increment();
-    //if (rateCounter.count() > 60) {
-    //  float fps = rateCounter.getRate();
-    //  updateFps(fps);
-    //  rateCounter.reset();
-    //}
+    static RateCounter rateCounter;
+    rateCounter.increment();
+    if (rateCounter.count() > 60) {
+      float fps = rateCounter.getRate();
+      updateFps(fps);
+      rateCounter.reset();
+    }
 #endif
   }
   m_context->doneCurrent();
