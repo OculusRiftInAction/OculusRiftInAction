@@ -287,10 +287,10 @@ void Font::renderString(
   }
 
   MatrixStack & mv = Stacks::modelview();
-  size_t mvDepth = mv.size();
-
-  glm::vec4 aspectTest = Stacks::projection().top() * glm::vec4(1, 1, 0, 1);
-  float aspect = std::abs(aspectTest.x / aspectTest.y);
+  // FIXME?
+//  size_t mvDepth = mv.size();
+//  glm::vec4 aspectTest = Stacks::projection().top() * glm::vec4(1, 1, 0, 1);
+//  float aspect = std::abs(aspectTest.x / aspectTest.y);
   std::vector<std::wstring> tokens = Tokenize(str);
 
   using namespace oglplus;

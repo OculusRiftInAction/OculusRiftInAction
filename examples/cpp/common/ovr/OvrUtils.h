@@ -125,7 +125,7 @@ protected:
   glm::ivec2 hmdDesktopPosition;
 
 public:
-  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK1) {
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
     hmd = ovrHmd_Create(0);
     if (nullptr == hmd) {
       hmd = ovrHmd_CreateDebug(defaultHmdType);
@@ -137,8 +137,10 @@ public:
   }
 
   virtual ~RiftManagerApp() {
-    ovrHmd_Destroy(hmd);
-    hmd = nullptr;
+    if (hmd) {
+      ovrHmd_Destroy(hmd);
+      hmd = nullptr;
+    }
   }
 
   int getEnabledCaps() {

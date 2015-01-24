@@ -129,27 +129,39 @@ namespace oria {
     return load2dTexture(resource, size);
   }
 
+  TexturePtr loadCubemapTexture(std::function<ImagePtr(int)> dataLoader) {
+    using namespace oglplus;
+    TexturePtr result = TexturePtr(new Texture());
+    Context::Bound(TextureTarget::CubeMap, *result)
+      .MagFilter(TextureMagFilter::Linear)
+      .MinFilter(TextureMinFilter::Linear)
+      .WrapS(TextureWrap::ClampToEdge)
+      .WrapT(TextureWrap::ClampToEdge)
+      .WrapR(TextureWrap::ClampToEdge);
+
+    glm::uvec2 size;
+    for (int i = 0; i < 6; ++i) {
+      ImagePtr image = dataLoader(i);
+      if (!image) {
+        continue;
+      }
+      Texture::Image2D(Texture::CubeMapFace(i), *image);
+    }
+    return result;
+  }
+
   TexturePtr loadCubemapTexture(Resource firstResource, int resourceOrder[6], bool flip) {
     const TextureInfo & texInfo = loadOrPopulate(getTextureMap(), firstResource, [&] {
-      using namespace oglplus;
       TextureInfo result;
-      result.tex = TexturePtr(new Texture());
-      Context::Bound(TextureTarget::CubeMap, *result.tex)
-        .MagFilter(TextureMagFilter::Linear)
-        .MinFilter(TextureMinFilter::Linear)
-        .WrapS(TextureWrap::ClampToEdge)
-        .WrapT(TextureWrap::ClampToEdge)
-        .WrapR(TextureWrap::ClampToEdge);
-
-      glm::uvec2 size;
-      for (int i = 0; i < 6; ++i) {
-        Resource imageRes = static_cast<Resource>(firstResource + i);
-        int cubeMapFace = resourceOrder[i];
-        ImagePtr imageData = loadImage(imageRes, flip);
-        size.x = imageData->Width();
-        size.y = imageData->Height();
-        Texture::Image2D(Texture::CubeMapFace(cubeMapFace), *imageData);
-      }
+      result.tex = loadCubemapTexture([&](int i) {
+        Resource imageRes = NO_RESOURCE;
+        for (int j = 0; j < 6; ++j) {
+          if (resourceOrder[j] == i) {
+            return loadImage(static_cast<Resource>(firstResource + resourceOrder[j]), flip);
+          }
+        }
+        return ImagePtr();
+      });
       return result;
     });
     return texInfo.tex;

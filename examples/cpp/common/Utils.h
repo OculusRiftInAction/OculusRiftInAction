@@ -34,42 +34,33 @@ public:
 
 
 class RateCounter {
-  unsigned int count{ 0 };
-  float start{ -1 };
+  std::vector<float> times;
 
 public:
   void reset() {
-    count = 0;
-    start = -1;
+    times.clear();
   }
 
-  unsigned int getCount() const {
-    return count;
+  unsigned int count() const {
+    return times.size() - 1;
   }
 
-  void startCounter() {
-    if (0 == count) {
-      this->start = Platform::elapsedSeconds();
+  float elapsed() const {
+    if (times.size() < 1) {
+      return 0.0f;
     }
-  }
-
-  float elapsed() {
-    if (count <= 0) {
-      return 0;
-    }
-    return Platform::elapsedSeconds() - start;
+    float elapsed = *times.rbegin() - *times.begin();
+    return elapsed;
   }
 
   void increment() {
-    if (start < 0) {
-      start = Platform::elapsedSeconds();
-    } else {
-      ++count;
-    }
+    times.push_back(Platform::elapsedSeconds());
   }
 
   float getRate() const {
-    float elapsed = Platform::elapsedSeconds() - start;
-    return (float)count / elapsed;
+    if (elapsed() == 0.0f) {
+      return NAN;
+    }
+    return (float)count() / elapsed();
   }
 };

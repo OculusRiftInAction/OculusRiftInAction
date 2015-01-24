@@ -1,23 +1,18 @@
 #include "Common.h"
 
-
-void RiftRenderingApp::initGl() {
-    glewExperimental = true;
-    glewInit();
-    glGetError();
-    //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-
+void RiftRenderingApp::initializeRiftRendering() {
     ovrGLConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.BackBufferSize = ovr::fromGlm(hmdNativeResolution);
     cfg.OGL.Header.Multisample = 1;
+
     ON_WINDOWS([&]{
-      cfg.OGL.Window = (HWND)getRenderWindow();
+      cfg.OGL.Window = (HWND)getNativeWindow();
     });
 
-    int distortionCaps =
-      ovrDistortionCap_Chromatic
+    int distortionCaps = 0
+      | ovrDistortionCap_Chromatic
       | ovrDistortionCap_Vignette
       | ovrDistortionCap_Overdrive
       | ovrDistortionCap_TimeWarp;
@@ -26,10 +21,10 @@ void RiftRenderingApp::initGl() {
       distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
     });
 
+    ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
     assert(configResult);
-    renderingConfigured = configResult;
 
     for_each_eye([&](ovrEyeType eye){
       const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
@@ -70,23 +65,18 @@ RiftRenderingApp::RiftRenderingApp() {
 RiftRenderingApp::~RiftRenderingApp() {
 }
 
-bool RiftRenderingApp::isRenderingConfigured() {
-  return renderingConfigured;
-}
-
 static RateCounter rateCounter;
 
-void RiftRenderingApp::draw() {
+void RiftRenderingApp::drawRiftFrame() {
   ++frameCount;
-  onFrameStart();
-  rateCounter.startCounter();
   ovrHmd_BeginFrame(hmd, frameCount);
   MatrixStack & mv = Stacks::modelview();
   MatrixStack & pr = Stacks::projection();
 
+  perFrameRender();
+  
   ovrPosef fetchPoses[2];
   ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, fetchPoses, nullptr);
-  static ovrEyeType lastEyeRendered = ovrEye_Count;
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
     // Force us to alternate eyes if we aren't keeping up with the required framerate
@@ -102,7 +92,6 @@ void RiftRenderingApp::draw() {
       // Set up the per-eye projection matrix
       pr.top() = projections[eye];
 
-
       // Set up the per-eye modelview matrix
       // Apply the head pose
       glm::mat4 eyePose = ovr::toGlm(eyePoses[eye]);
@@ -110,38 +99,27 @@ void RiftRenderingApp::draw() {
 
       // Render the scene to an offscreen buffer
       eyeFramebuffers[eye]->Bind();
-      renderScene();
+      perEyeRender();
     });
     
     if (eyePerFrameMode) {
       break;
     }
   }
-  // Restore the default framebuffer
-  //oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
+
+  if (endFrameLock) {
+    endFrameLock->lock();
+  }
   ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
-  onFrameEnd();
+  if (endFrameLock) {
+    endFrameLock->unlock();
+  }
   rateCounter.increment();
   if (rateCounter.elapsed() > 2.0f) {
     float fps = rateCounter.getRate();
-    SAY("FPS: %0.2f", fps);
+    updateFps(fps);
     rateCounter.reset();
   }
 }
 
-
-//int framecount = 0;
-//long start = Platform::elapsedMillis();
-//while (!glfwWindowShouldClose(window)) {
-//  glfwPollEvents();
-//  ++frame;
-//  update();
-//  draw();
-//  finishFrame();
-//  long now = Platform::elapsedMillis();
-//  ++framecount;
-//  if ((now - start) >= 2000) {
-//  }
-//}
-//
 

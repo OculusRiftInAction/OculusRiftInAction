@@ -30,7 +30,7 @@ private:
 protected:
   float         windowAspect{ 1.0f };
   float         windowAspectInverse{ 1.0f };
-  //float         fps{ 0.0 };
+  float         fps{ 0 };
 
 public:
   GlfwApp();

@@ -169,7 +169,7 @@ endif()
 #
 # Qt can be found by setting a QT5_ROOT to the root of your 
 
-set(QT_COMPONENTS Core Widgets Gui QuickWidgets OpenGL Xml XmlPatterns)
+set(QT_COMPONENTS Core Gui QuickWidgets OpenGL Xml XmlPatterns Declarative)
 
 # Qt emits a ton of warnings which we're not interested in
 if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
@@ -184,7 +184,7 @@ if (Qt5Core_FOUND)
     set(CMAKE_INCLUDE_CURRENT_DIR ON)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-bCommon.h" "-fCommon.h")
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-bQtCommon.h" "-bCommon.h" )
    
 	foreach(qtc ${QT_COMPONENTS})
     	list(APPEND EXAMPLE_LIBS ${Qt5${qtc}_LIBRARIES})
@@ -194,7 +194,6 @@ if (Qt5Core_FOUND)
 else()
     message(WARNING "Qt framework not found") 
 endif()
-
 
 ######################################################
 # OGLplus provides object oriented OpenGL wrappers

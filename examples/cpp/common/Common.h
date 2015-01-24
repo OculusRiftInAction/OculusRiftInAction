@@ -21,6 +21,8 @@
 
 #include "Config.h"
 
+#define USE_RIFT 1
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -39,6 +41,27 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+
+#include <GL/glew.h>
+#define OGLPLUS_USE_GLEW 1
+#define OGLPLUS_USE_GLCOREARB_H 0
+#include <oglplus/gl.hpp>
+#pragma warning(disable : 4068)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+#pragma warning( disable : 4244 4267 4065 4101)
+#include <oglplus/all.hpp>
+#include <oglplus/interop/glm.hpp>
+#include <oglplus/bound/texture.hpp>
+#include <oglplus/bound/framebuffer.hpp>
+#include <oglplus/bound/renderbuffer.hpp>
+#include <oglplus/shapes/wrapper.hpp>
+#pragma warning( default : 4244 4267 4065 4101)
+#pragma clang diagnostic pop
+
+#if (HAVE_QT) || (Q_MOC_RUN)
+#include <QtCore>
+#endif
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -61,63 +84,26 @@ inline float aspect(const glm::vec2 & v) {
   return (float)v.x / (float)v.y;
 }
 
-#ifdef HAVE_QT
-#include <GL/glew.h>
-#else
-#include <GL/glew.h>
-#endif
-
-#define OGLPLUS_USE_GLEW 1
-
-#pragma warning(disable : 4068)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-#pragma warning( disable : 4244 4267 4065 4101)
-#include <oglplus/config/gl.hpp>
-#include <oglplus/all.hpp>
-#include <oglplus/interop/glm.hpp>
-#include <oglplus/bound/texture.hpp>
-#include <oglplus/bound/framebuffer.hpp>
-#include <oglplus/bound/renderbuffer.hpp>
-#include <oglplus/shapes/wrapper.hpp>
-#pragma warning( default : 4244 4267 4065 4101)
-#pragma clang diagnostic pop
-
-
 #include <GLFW/glfw3.h>
-// For some interaction with the Oculus SDK we'll need the native window 
-// handle from GLFW.  To get it we need to define a couple of macros 
-// (that depend on OS) and include an additional header 
-#if defined(OS_WIN)
-#define GLFW_EXPOSE_NATIVE_WIN32
-#define GLFW_EXPOSE_NATIVE_WGL
-#elif defined(OS_OSX)
-#define GLFW_EXPOSE_NATIVE_COCOA
-#define GLFW_EXPOSE_NATIVE_NSGL
-#elif defined(OS_LINUX)
-#define GLFW_EXPOSE_NATIVE_X11
-#define GLFW_EXPOSE_NATIVE_GLX
-#endif
-#include <GLFW/glfw3native.h>
-
 
 #include <Resources.h>
 
+typedef std::function<void()> Lambda;
+typedef std::list<Lambda> LambdaList;
+
 class Finally {
 private:
-  std::function<void()> function;
+  Lambda function;
 
 public:
-  Finally(std::function<void()> function) 
-    : function(function) { }
+  Finally(Lambda function)
+    : function(function) {
+  }
 
   virtual ~Finally() {
     function();
   }
 };
-
-typedef std::function<void()> Lambda;
-typedef std::list<Lambda> LambdaList;
 
 #include "Platform.h"
 #include "Utils.h"
@@ -134,7 +120,6 @@ typedef std::list<Lambda> LambdaList;
 #include "opengl/Shaders.h"
 #include "opengl/Framebuffer.h"
 #include "opengl/GlUtils.h"
-
 
 #include "glfw/GlfwUtils.h"
 #include "glfw/GlfwApp.h"
@@ -154,12 +139,6 @@ typedef std::list<Lambda> LambdaList;
 #include "ovr/RiftRenderingApp.h"
 #include "ovr/RiftGlfwApp.h"
 #include "ovr/RiftApp.h"
-
-#if (HAVE_QT) || (Q_MOC_RUN)
-#include "qt/QtUtils.h"
-#include "qt/RiftQtApp.h"
-#include "qt/GlslEditor.h"
-#endif
 
 #ifndef PI
 #define PI 3.14159265f

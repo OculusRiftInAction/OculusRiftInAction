@@ -7,14 +7,6 @@ foreach(dir rendering opengl glfw ovr)
     source_group(${dir} FILES ${MORE_FILES})
 endforeach()
 
-# Ideally we'd just ifdef out the contents of these files, but 
-# doing so interferes with AUTOMOC generation.
-if(HAVE_QT)
-    file(GLOB MORE_FILES qt/*)
-    source_group(qt FILES ${MORE_FILES})
-    list(APPEND SOURCE_FILES ${MORE_FILES})
-endif()
-
 configure_file(Config.h.in Config.h)
 list(APPEND SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/Config.h )
 source_group(core FILES ${CMAKE_CURRENT_BINARY_DIR}/Config.h)

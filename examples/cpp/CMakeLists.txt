@@ -8,21 +8,9 @@ set_target_properties(ExampleCommon PROPERTIES FOLDER "Examples/Shared")
 include_directories(common)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/common)
 
-
-function(make_example FILE PROJECT_FOLDER)
-    set(SOURCE_FILES ${FILE})
-    file(RELATIVE_PATH FILE ${CMAKE_CURRENT_SOURCE_DIR} ${FILE})
-    get_filename_component(NAME ${FILE} NAME_WE)
-    string(REGEX REPLACE "^([^_]+(_[0-9]+)+).*\\.cpp$" "\\1" ROOT ${FILE} )
-
-    file(GLOB EXAMPLE_SHADERS "../resources/shaders/${ROOT}*.vs" "../resources/shaders/${ROOT}*.fs")
-    list(APPEND SOURCE_FILES ${EXAMPLE_SHADERS})
-    source_group("Shaders" FILES ${EXAMPLE_SHADERS})
-
-    file(GLOB_RECURSE COMMON_SHADERS "../resources/shaders/*.vs" "../resources/shaders/*.fs")
-    list(APPEND SOURCE_FILES ${COMMON_SHADERS})
-    source_group("Common Shaders" FILES ${COMMON_SHADERS})
+function(make_example2 PROJECT_FOLDER NAME SOURCE_FILES) 
     set(EXECUTABLE "${NAME}")
+    message("Making executable ${NAME} in folder ${PROJECT_FOLDER}")
 
     if(WIN32)
         add_executable(${EXECUTABLE} WIN32 ${SOURCE_FILES})
@@ -47,7 +35,21 @@ function(make_example FILE PROJECT_FOLDER)
         set_property(TARGET ${EXECUTABLE} PROPERTY DEBUG_OUTPUT_NAME ${EXECUTABLE}_d)
     endif()
     set_target_properties(${EXECUTABLE} PROPERTIES FOLDER ${PROJECT_FOLDER})
-    
+endfunction()
+
+function(make_example FILE PROJECT_FOLDER)
+    set(SOURCE_FILES ${FILE})
+    file(RELATIVE_PATH FILE ${CMAKE_CURRENT_SOURCE_DIR} ${FILE})
+    get_filename_component(NAME ${FILE} NAME_WE)
+    string(REGEX REPLACE "^([^_]+(_[0-9]+)+).*\\.cpp$" "\\1" ROOT ${FILE} )
+
+    make_example2(${PROJECT_FOLDER} ${NAME} ${SOURCE_FILES} )
+#    file(GLOB EXAMPLE_SHADERS "../resources/shaders/${ROOT}*.vs" "../resources/shaders/${ROOT}*.fs")
+#    list(APPEND SOURCE_FILES ${EXAMPLE_SHADERS})
+#    source_group("Shaders" FILES ${EXAMPLE_SHADERS})
+#    file(GLOB_RECURSE COMMON_SHADERS "../resources/shaders/*.vs" "../resources/shaders/*.fs")
+#    list(APPEND SOURCE_FILES ${COMMON_SHADERS})
+#    source_group("Common Shaders" FILES ${COMMON_SHADERS})
 endfunction()
 
 function(make_examples GLOB PROJECT_FOLDER)
@@ -70,11 +72,8 @@ if (EXPERIMENTAL)
 endif()
 
 if (HAVE_QT)
-    set(CMAKE_INCLUDE_CURRENT_DIR ON)
-    set(CMAKE_AUTOMOC ON)
-    set(CMAKE_AUTORCC ON)
     message(STATUS "Creating Qt examples")
-    make_examples(qt/*.cpp "Examples/Qt")
+    add_subdirectory(qt)
 endif()
 
 
