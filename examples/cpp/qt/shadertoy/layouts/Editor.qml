@@ -239,7 +239,9 @@ Rectangle {
             CustomText { text: "EPS"; } CustomText { objectName: "eps"; text: "0" }
             CustomText { text: "EPF";  } Switch {
                 objectName: "epf";
-                onCheckedChanged: root.epfModeChanged(checked);
+                onCheckedChanged: {
+                    root.toggleEyePerFrame();
+                }
             }
             CustomText { text: "Font";  } Row {
                 IconControl {

@@ -156,7 +156,7 @@ Item {
         id: buttonRow
         height: 64
         layoutDirection: Qt.RightToLeft
-        anchors.right: parent.right
+        anchors.right: shaderInfoBorder.right
         anchors.rightMargin: 0
         anchors.left: parent.left
         anchors.leftMargin: 0
