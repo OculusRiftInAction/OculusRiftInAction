@@ -84,28 +84,26 @@ inline float aspect(const glm::vec2 & v) {
   return (float)v.x / (float)v.y;
 }
 
-
-
 #include <GLFW/glfw3.h>
-
 
 #include <Resources.h>
 
+typedef std::function<void()> Lambda;
+typedef std::list<Lambda> LambdaList;
+
 class Finally {
 private:
-  std::function<void()> function;
+  Lambda function;
 
 public:
-  Finally(std::function<void()> function) 
-    : function(function) { }
+  Finally(Lambda function)
+    : function(function) {
+  }
 
   virtual ~Finally() {
     function();
   }
 };
-
-typedef std::function<void()> Lambda;
-typedef std::list<Lambda> LambdaList;
 
 #include "Platform.h"
 #include "Utils.h"
@@ -122,7 +120,6 @@ typedef std::list<Lambda> LambdaList;
 #include "opengl/Shaders.h"
 #include "opengl/Framebuffer.h"
 #include "opengl/GlUtils.h"
-
 
 #include "glfw/GlfwUtils.h"
 #include "glfw/GlfwApp.h"
@@ -142,12 +139,6 @@ typedef std::list<Lambda> LambdaList;
 #include "ovr/RiftRenderingApp.h"
 #include "ovr/RiftGlfwApp.h"
 #include "ovr/RiftApp.h"
-
-#if (HAVE_QT) || (Q_MOC_RUN)
-#include "qt/QtUtils.h"
-#include "qt/QRiftWindow.h"
-#include "qt/GlslEditor.h"
-#endif
 
 #ifndef PI
 #define PI 3.14159265f

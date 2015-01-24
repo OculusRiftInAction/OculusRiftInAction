@@ -184,7 +184,7 @@ if (Qt5Core_FOUND)
     set(CMAKE_INCLUDE_CURRENT_DIR ON)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-bCommon.h" "-fCommon.h")
+    set(CMAKE_AUTOMOC_MOC_OPTIONS "-bQtCommon.h" "-bCommon.h" )
    
 	foreach(qtc ${QT_COMPONENTS})
     	list(APPEND EXAMPLE_LIBS ${Qt5${qtc}_LIBRARIES})
