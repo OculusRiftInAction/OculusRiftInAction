@@ -39,8 +39,10 @@ limitations under the License.
 #include <oglplus/images/png.hpp>
 #endif
 
+#ifndef _DEBUG
 #include "TrackerbirdConfig.h"
 #include "ShadertoyConfig.h"
+#endif
 
 #ifdef TRACKERBIRD_PRODUCT_ID
 #include <Trackerbird.h>
@@ -903,17 +905,6 @@ private slots:
       setShaderSourceInternal(shaderSource);
       updateUniforms();
     });
-  }
-
-  void onModifyTextureResolution(double scale) {
-    float newRes = scale * texRes;
-    newRes = std::max(0.1f, std::min(1.0f, newRes));
-    if (newRes != texRes) {
-      queueRenderThreadTask([&, newRes] {
-        texRes = newRes;
-      });
-      setItemText("res", QString().sprintf("%0.2f", newRes));
-    }
   }
 
   void onRecenterPosition() {
