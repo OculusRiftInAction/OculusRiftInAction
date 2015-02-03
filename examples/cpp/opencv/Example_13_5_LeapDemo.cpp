@@ -104,6 +104,7 @@ public:
     RiftApp::initGl();
     program = oria::loadProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
     sphere = oria::loadSphere({"Position", "Normal"}, program);
+    oria::bindLights(program);
   }
 
   virtual void update() {
@@ -181,9 +182,7 @@ public:
     mv.withPush([&]{
       mv.translate(pos);
       mv.scale(radius);
-      oria::renderGeometry(sphere, program, { [&] {
-        oria::bindLights(program);
-      } });
+      oria::renderGeometry(sphere, program);
     });
   }
 
