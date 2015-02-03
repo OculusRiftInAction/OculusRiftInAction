@@ -15,7 +15,8 @@
  Minimal demo of using the Leap Motion controller.
  Unlike other demos, this file relies on the Leap SDK which is not
  provided on our Github repo.  The Leap SDK evolves rapidly, so
- downloading it is left as an exercise for the reader.
+ downloading it and updating the three Leap-specific fields in your
+ CMake config is left as an exercise for the reader.
 */
 
 struct CaptureData {
