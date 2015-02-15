@@ -110,61 +110,80 @@ public:
 
 
 class QOffscreenUi : public QObject {
-  Q_OBJECT
+    Q_OBJECT
+        using ActomicMouse = std::atomic<vec2>;
 
-  bool m_paused;
+    bool m_paused;
+    ActomicMouse mousePosition;
+
 public:
-  QOffscreenUi();
-  ~QOffscreenUi();
-  void setup(const QSize & size, QOpenGLContext * context);
-  void loadQml(const QUrl & qmlSource, std::function<void(QQmlContext*)> f = [](QQmlContext*){});
-  QQmlContext * qmlContext();
+    QOffscreenUi();
+    ~QOffscreenUi();
+    void setup(const QSize & size, QOpenGLContext * context);
+    void loadQml(const QUrl & qmlSource, std::function<void(QQmlContext*)> f = [](QQmlContext*){});
+    QQmlContext * qmlContext();
 
-  void pause() {
-    m_paused = true;
-  }
+    void pause() {
+        m_paused = true;
+    }
 
-  void resume() {
-    m_paused = false;
-    requestRender();
-  }
+    void resume() {
+        m_paused = false;
+        requestRender();
+    }
 
-  void setProxyWindow(QWindow * window) {
-    m_renderControl->m_renderWindow = window;
-  }
+    void setProxyWindow(QWindow * window) {
+        m_renderControl->m_renderWindow = window;
+    }
+
+    void setSourceSize(const QSize & size) {
+        m_sourceSize = oria::qt::toGlm(size);
+    }
+
+    ActomicMouse  & getMousePosition() {
+        return mousePosition;
+    }
+
+    bool interceptEvent(QEvent * e);
+
+
+protected:
+    QPointF mapWindowToUi(const QPointF & p);
+    void mouseMoved(vec2 mp);
 
 private slots:
-  void updateQuick();
-  void run();
+    void updateQuick();
+    void run();
 
 public slots:
-  void requestUpdate();
-  void requestRender();
-  void lockTexture(int texture);
-  void releaseTexture(int texture);
+    void requestUpdate();
+    void requestRender();
+    void lockTexture(int texture);
+    void releaseTexture(int texture);
 
 signals:
-  void textureUpdated(int texture);
+    void textureUpdated(int texture);
 
 private:
-  QMap<int, QSharedPointer<QOpenGLFramebufferObject>> m_fboMap;
-  QMap<int, int> m_fboLocks;
-  QQueue<QOpenGLFramebufferObject*> m_readyFboQueue;
+    QMap<int, QSharedPointer<QOpenGLFramebufferObject>> m_fboMap;
+    QMap<int, int> m_fboLocks;
+    QQueue<QOpenGLFramebufferObject*> m_readyFboQueue;
   
-  QOpenGLFramebufferObject* getReadyFbo();
+    QOpenGLFramebufferObject* getReadyFbo();
 
 public:
-  QOpenGLContext *m_context{ new QOpenGLContext };
-  QOffscreenSurface *m_offscreenSurface{ new QOffscreenSurface };
-  QMyQuickRenderControl  *m_renderControl{ new QMyQuickRenderControl };
-  QQuickWindow *m_quickWindow{ nullptr };
-  QQmlEngine *m_qmlEngine{ nullptr };
-  QQmlComponent *m_qmlComponent{ nullptr };
-  QQuickItem * m_rootItem{ nullptr };
-  QTimer m_updateTimer;
-  QSize m_size;
-  bool m_polish{ true };
-  std::mutex renderLock;
+    QOpenGLContext *m_context{ new QOpenGLContext };
+    QOffscreenSurface *m_offscreenSurface{ new QOffscreenSurface };
+    QMyQuickRenderControl  *m_renderControl{ new QMyQuickRenderControl };
+    QQuickWindow *m_quickWindow{ nullptr };
+    QQmlEngine *m_qmlEngine{ nullptr };
+    QQmlComponent *m_qmlComponent{ nullptr };
+    QQuickItem * m_rootItem{ nullptr };
+    QTimer m_updateTimer;
+    vec2 m_sourceSize;
+    vec2 m_uiSize;
+    bool m_polish{ true };
+    std::mutex renderLock;
 };
 
 class LambdaThread : public QThread {
@@ -184,6 +203,8 @@ public:
   template <typename F>
   void setLambda(F f) { this->f = f; }
 };
+
+TexturePtr loadCursor(Resource res);
 
 
 #ifdef OS_WIN

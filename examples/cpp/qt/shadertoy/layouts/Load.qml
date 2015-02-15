@@ -53,6 +53,7 @@ Item {
 
         ListView {
             id: presets
+            clip: true
             anchors.rightMargin: 12
             anchors.leftMargin: 12
             anchors.bottomMargin: 12

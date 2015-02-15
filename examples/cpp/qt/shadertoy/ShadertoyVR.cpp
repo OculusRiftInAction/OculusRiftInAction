@@ -66,43 +66,6 @@ static uvec2 UI_SIZE(1280, 720);
 static float UI_ASPECT = aspect(vec2(UI_SIZE));
 static float UI_INVERSE_ASPECT = 1.0f / UI_ASPECT;
 
-static ImagePtr loadImageWithAlpha(const std::vector<uint8_t> & data, bool flip) {
-  using namespace oglplus;
-#ifdef HAVE_OPENCV
-  cv::Mat image = cv::imdecode(data, cv::IMREAD_UNCHANGED);
-  if (flip) {
-    cv::flip(image, image, 0);
-  }
-  ImagePtr result(new images::Image(image.cols, image.rows, 1, 4, image.data,
-    PixelDataFormat::BGRA, PixelDataInternalFormat::RGBA8));
-  return result;
-#else
-  std::stringstream stream(std::string((const char*)&data[0], data.size()));
-  return ImagePtr(new images::PNGImage(stream));
-#endif
-}
-static TexturePtr loadCursor(Resource res) {
-  using namespace oglplus;
-  TexturePtr texture(new Texture());
-  Context::Bound(TextureTarget::_2D, *texture)
-    .MagFilter(TextureMagFilter::Linear)
-    .MinFilter(TextureMinFilter::Linear);
-
-  ImagePtr image = loadImageWithAlpha(Platform::getResourceByteVector(res), true);
-  // FIXME detect alignment properly, test on both OpenCV and LibPNG
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  Texture::Storage2D(TextureTarget::_2D, 1, PixelDataInternalFormat::RGBA8, image->Width() * 2, image->Height() * 2);
-  {
-    size_t size = image->Width() * 2 * image->Height() * 2 * 4;
-    uint8_t * empty = new uint8_t[size]; memset(empty, 0, size);
-    images::Image blank(image->Width() * 2, image->Height() * 2, 1, 4, empty);
-    Texture::SubImage2D(TextureTarget::_2D, blank, 0, 0);
-  }
-  Texture::SubImage2D(TextureTarget::_2D, *image, image->Width(), 0);
-  DefaultTexture().Bind(TextureTarget::_2D);
-  return texture;
-}
-
 class ShadertoyRenderer : public QRiftWindow {
   Q_OBJECT
 protected:
@@ -566,6 +529,8 @@ class ShadertoyWindow : public ShadertoyRenderer {
   // The current mouse position as reported by the main thread
   ActomicVec2 mousePosition;
   bool uiVisible{ false };
+  QVariantAnimation animation;
+  float animationValue;
 
 
   // A wrapper for passing the UI texture from the app to the widget
@@ -684,6 +649,7 @@ private:
     uiWindow->setProxyWindow(this);
 
     QUrl qml = QUrl("qrc:/layouts/Combined.qml");
+    uiWindow->m_qmlEngine->addImportPath("./qml");
     uiWindow->m_qmlEngine->addImportPath("./layouts");
     uiWindow->m_qmlEngine->addImportPath(".");
     uiWindow->loadQml(qml);
@@ -757,6 +723,10 @@ private:
       setItemProperty("shaderTextFrame", "errorMargin", 8);
     });
 
+    QObject::connect(&animation, &QVariantAnimation::valueChanged, this, [&](const QVariant & val) {
+      animationValue = val.toFloat();
+    });
+
     connect(this, &ShadertoyWindow::fpsUpdated, this, [&](float fps) {
       setItemText("fps", QString().sprintf("%0.0f", fps));
     });
@@ -794,17 +764,31 @@ private:
     return getItemProperty(itemName, "text").toString();
   }
 
+
+
 private slots:
   void onToggleUi() {
 	  uiVisible = !uiVisible;
 	  setItemProperty("shaderTextEdit", "readOnly", !uiVisible);
 	  if (uiVisible) {
-		savedEyePosScale = eyePosScale;
-		eyePosScale = 0.0f;
-    uiWindow->resume();
+      animation.stop();
+      animation.setStartValue(0.0);
+      animation.setEndValue(1.0);
+      animation.setEasingCurve(QEasingCurve::OutBack);
+      animation.setDuration(500);
+      animation.start();
+		  savedEyePosScale = eyePosScale;
+		  eyePosScale = 0.0f;
+      uiWindow->resume();
 	  } else {
-		eyePosScale = savedEyePosScale;
-    uiWindow->pause();
+      animation.stop();
+      animation.setStartValue(1.0);
+      animation.setEndValue(0.0);
+      animation.setEasingCurve(QEasingCurve::InBack);
+      animation.setDuration(500);
+      animation.start();
+      eyePosScale = savedEyePosScale;
+      uiWindow->pause();
 	  }
   }
 
@@ -1212,12 +1196,13 @@ private:
     }
 #endif
 
-    if (uiVisible) {
+    if (animationValue > 0.0f) {
       MatrixStack & mv = Stacks::modelview();
       Texture::Active(0);
 //      oria::viewport(textureSize());
       mv.withPush([&] {
         mv.translate(vec3(0, 0, -1));
+        mv.scale(vec3(1.0f, animationValue, 1.0f));
         uiFramebuffer->BindColor();
         oria::renderGeometry(uiShape, uiProgram);
       });
@@ -1314,8 +1299,7 @@ MAIN_DECL {
       TRACKERBIRD_PRODUCT_VERSION, TRACKERBIRD_BUILD_NUMBER, 
       TRACKERBIRD_MULTISESSION_ENABLED);
     tbStart();
-    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins"); 
-    qputenv("QML_IMPORT_PATH", "./qml");
+    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins");
 #endif
 
     QT_APP_WITH_ARGS(ShadertoyApp);
@@ -1345,8 +1329,6 @@ MAIN_DECL {
   } 
   return -1; 
 } 
-
-
 
 #include "ShadertoyVR.moc"
 

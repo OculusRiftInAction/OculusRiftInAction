@@ -22,6 +22,12 @@
 #include <QDomDocument>
 #include <QImage>
 
+#ifdef HAVE_OPENCV
+#include <opencv2/opencv.hpp>
+#else
+#include <oglplus/images/png.hpp>
+#endif
+
 
 namespace oria {
   namespace qt {
@@ -171,7 +177,7 @@ QOffscreenUi::~QOffscreenUi() {
 
 
 void QOffscreenUi::setup(const QSize & size, QOpenGLContext * shareContext) {
-  m_size = size;
+  m_uiSize = oria::qt::toGlm(size);
 
   QSurfaceFormat format;
   // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
@@ -194,8 +200,6 @@ void QOffscreenUi::setup(const QSize & size, QOpenGLContext * shareContext) {
   m_offscreenSurface->create();
 
   m_context->makeCurrent(m_offscreenSurface);
-//  m_fbo = new QOpenGLFramebufferObject(size, QOpenGLFramebufferObject::CombinedDepthStencil);
-//  m_quickWindow->setRenderTarget(m_fbo);
 
   // Create a QQuickWindow that is associated with out render control. Note that this
   // window never gets created or shown, meaning that it will never get an underlying
@@ -225,7 +229,7 @@ void QOffscreenUi::setup(const QSize & size, QOpenGLContext * shareContext) {
   m_qmlComponent = new QQmlComponent(m_qmlEngine);
 
   // Update item and rendering related geometries.
-  m_quickWindow->setGeometry(0, 0, m_size.width(), m_size.height());
+  m_quickWindow->setGeometry(0, 0, m_uiSize.x, m_uiSize.y);
 
   // Initialize the render control and our OpenGL resources.
   m_context->makeCurrent(m_offscreenSurface);
@@ -285,8 +289,8 @@ void QOffscreenUi::run() {
 
   // The root item is ready. Associate it with the window.
   m_rootItem->setParentItem(m_quickWindow->contentItem());
-  m_rootItem->setWidth(m_size.width());
-  m_rootItem->setHeight(m_size.height());
+  m_rootItem->setWidth(m_uiSize.x);
+  m_rootItem->setHeight(m_uiSize.y);
 
   SAY("Finished setting up QML");
 }
@@ -316,7 +320,8 @@ QOpenGLFramebufferObject* QOffscreenUi::getReadyFbo() {
   QOpenGLFramebufferObject* result = nullptr;
   if (m_readyFboQueue.empty()) {
     qDebug() << "Building new offscreen FBO number " << m_fboMap.size() + 1;
-    result = new QOpenGLFramebufferObject(m_size, QOpenGLFramebufferObject::CombinedDepthStencil);
+    result = new QOpenGLFramebufferObject(QSize(m_uiSize.x, m_uiSize.y), 
+        QOpenGLFramebufferObject::CombinedDepthStencil);
     m_fboMap[result->texture()] = QSharedPointer<QOpenGLFramebufferObject>(result);
     m_readyFboQueue.push_back(result);
   }
@@ -355,6 +360,109 @@ void QOffscreenUi::updateQuick() {
   glFinish();
 
   emit textureUpdated(fbo->texture());
+}
+
+QPointF QOffscreenUi::mapWindowToUi(const QPointF & p) {
+    vec2 pos = vec2(p.x(), p.y());
+    pos /= m_sourceSize;
+    pos *= m_uiSize;
+    return QPointF(pos.x, pos.y);
+}
+
+
+///////////////////////////////////////////////////////
+//
+// Event handling customization
+// 
+void QOffscreenUi::mouseMoved(vec2 mp) {
+    // Interpret the mouse position as NDC coordinates
+    mp /= m_sourceSize;
+    mp *= 2.0f;
+    mp -= 1.0f;
+    mp.y *= -1.0f;
+    mousePosition.store(mp);
+}
+
+bool QOffscreenUi::interceptEvent(QEvent * e) {
+    static bool dismissedHmd = false;
+    switch (e->type()) {
+    case QEvent::KeyPress:
+    case QEvent::KeyRelease:
+    {
+        if (QApplication::sendEvent(m_quickWindow, e)) {
+            return true;
+        }
+    }
+    break;
+
+    case QEvent::Wheel:
+    {
+        QWheelEvent * we = (QWheelEvent*)e;
+        QWheelEvent mappedEvent(mapWindowToUi(we->pos()), we->delta(), we->buttons(), we->modifiers(), we->orientation());
+        QCoreApplication::sendEvent(m_quickWindow, &mappedEvent);
+        return true;
+    }
+    break;
+
+    case QEvent::MouseMove:
+    {
+        QMouseEvent * me = (QMouseEvent *)e;
+        mouseMoved(oria::qt::toGlm(me->localPos()));
+    }
+    // Fall through
+    case QEvent::MouseButtonDblClick:
+    case QEvent::MouseButtonPress:
+    case QEvent::MouseButtonRelease:
+    {
+        QMouseEvent * me = (QMouseEvent *)e;
+        QMouseEvent mappedEvent(e->type(), mapWindowToUi(me->localPos()), me->screenPos(), me->button(), me->buttons(), me->modifiers());
+        QCoreApplication::sendEvent(m_quickWindow, &mappedEvent);
+        return QObject::event(e);
+    }
+
+    default: break;
+    }
+
+    return false;
+}
+
+
+static ImagePtr loadImageWithAlpha(const std::vector<uint8_t> & data, bool flip) {
+  using namespace oglplus;
+#ifdef HAVE_OPENCV
+  cv::Mat image = cv::imdecode(data, cv::IMREAD_UNCHANGED);
+  if (flip) {
+    cv::flip(image, image, 0);
+  }
+  ImagePtr result(new images::Image(image.cols, image.rows, 1, 4, image.data,
+    PixelDataFormat::BGRA, PixelDataInternalFormat::RGBA8));
+  return result;
+#else
+  std::stringstream stream(std::string((const char*)&data[0], data.size()));
+  return ImagePtr(new images::PNGImage(stream));
+#endif
+}
+
+TexturePtr loadCursor(Resource res) {
+  using namespace oglplus;
+  TexturePtr texture(new Texture());
+  Context::Bound(TextureTarget::_2D, *texture)
+    .MagFilter(TextureMagFilter::Linear)
+    .MinFilter(TextureMinFilter::Linear);
+
+  ImagePtr image = loadImageWithAlpha(Platform::getResourceByteVector(res), true);
+  // FIXME detect alignment properly, test on both OpenCV and LibPNG
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  Texture::Storage2D(TextureTarget::_2D, 1, PixelDataInternalFormat::RGBA8, image->Width() * 2, image->Height() * 2);
+  {
+    size_t size = image->Width() * 2 * image->Height() * 2 * 4;
+    uint8_t * empty = new uint8_t[size]; memset(empty, 0, size);
+    images::Image blank(image->Width() * 2, image->Height() * 2, 1, 4, empty);
+    Texture::SubImage2D(TextureTarget::_2D, blank, 0, 0);
+  }
+  Texture::SubImage2D(TextureTarget::_2D, *image, image->Width(), 0);
+  DefaultTexture().Bind(TextureTarget::_2D);
+  return texture;
 }
 
 //void QOffscreenUi::deleteOldTextures(const std::vector<GLuint> & oldTextures) {

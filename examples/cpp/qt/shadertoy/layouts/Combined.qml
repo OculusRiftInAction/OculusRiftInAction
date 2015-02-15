@@ -2,8 +2,6 @@ import QtQuick 2.3
 import QtQuick.Controls 1.2
 import QtQuick.Window 2.2
 
-
-
 Item {
     id: root
     width: 1280
@@ -123,38 +121,6 @@ Item {
             recenterPose();
             event.accepted = true;
             break;
-        }
-    }
-
-    function channelSelect(channel) {
-        activeChannel = channel;
-        console.log(channel);
-        channelSelect.visible = true;
-        editor.visible = false;
-    }
-
-    function channelTextureSelected(type, texturePath) {
-        editor.setChannelIcon(activeChannel, texturePath);
-        channelTextureChanged(activeChannel, type, texturePath);
-        channelSelect.visible = false;
-        editor.visible = true;
-    }
-
-    function setUiMode(mode) {
-        editor.visible = false;
-        channelSelect.visible = false;
-        loader.visible = false;
-        saver.visible = false;
-        if (mode == "edit") {
-            editor.visible = true;
-        } else if (mode == "load") {
-            loader.visible = true;
-        } else if (mode == "save") {
-            saver.visible = true;
-        } else if (mode == "channelSelect") {
-            channelSelect.visible = true;
-        } else {
-            editor.visible = true;
         }
     }
 
