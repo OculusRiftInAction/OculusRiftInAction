@@ -305,6 +305,7 @@ vec3 cars(vec2 squarer, vec2 pos, float dist, float level) {
   }
   return color;
 }
+
 vec3 textureGround(vec2 squarer, vec2 pos, vec2 vert1, vec2 vert2, float dist) {
   vec3 color = (0.9 + 0.2 * noise(pos)) * vec3(0.1, 0.15, 0.1);
   float randB = rand(squarer * 2.0);
@@ -350,21 +351,12 @@ vec3 textureGround(vec2 squarer, vec2 pos, vec2 vert1, vec2 vert2, float dist) {
 }
 
 void main(void) {
-  vec2 pos = (gl_FragCoord.xy * 2.0 - iResolution.xy) / iResolution.y;
+  // vec2 pos = (gl_FragCoord.xy * 2.0 - iResolution.xy) / iResolution.y;
   float t = -iGlobalTime;
   float tt = -iGlobalTime - 0.5;
 
   vec3 camPos = vec3(5.0 + 12.0 * sin(t * 0.05), 5.0 + 7.0 * cos(t * 0.05), 1.9);
-
   vec3 camTarget = vec3(5.0 + 0.0, 5.0 + 7.0 * sin(t * 0.05), 0.0);
-  if (fract(t / 12.0) < 0.25) {
-    camPos = vec3(5. * t, 3.1 * t, 2.1);
-    camTarget = vec3(5. * tt, 3.1 * tt, 1.7);
-  }
-  if (fract(t / 12.0) > 0.75) {
-    camPos = vec3(35., 3.1, 1.);
-    camTarget = vec3(35. + sin(t / 10.0), 3.1 + cos(t / 10.0), 0.7);
-  }
   vec3 camDir = normalize(camTarget - camPos);
   vec3 camUp = normalize(vec3(0.0, 0.0, -1.0));
   vec3 camSide = cross(camDir, camUp);

@@ -72,7 +72,7 @@ namespace shadertoy {
     ":/shaders/4dfGzs.json",
     ":/shaders/4djGWR.json",
 //    ":/shaders/4dXGRM_flying_steel_cubes.xml",
-    ":/shaders/4sBGD1.json",
+//    ":/shaders/4sBGD1.json",
     ":/shaders/4sX3R2.json",
 //    ":/shaders/4sXGRM_oceanic.xml",
 //    ":/shaders/ld23DG_crazy.xml",
