@@ -355,7 +355,7 @@ void main(void) {
   float t = -iGlobalTime;
   float tt = -iGlobalTime - 0.5;
 
-  vec3 camPos = vec3(5.0 + 12.0 * sin(t * 0.05), 5.0 + 7.0 * cos(t * 0.05), 1.9);
+  vec3 camPos = iPos.xzy + vec3(5.0 + 12.0 * sin(t * 0.05), 5.0 + 7.0 * cos(t * 0.05), 1.9);
   vec3 camTarget = vec3(5.0 + 0.0, 5.0 + 7.0 * sin(t * 0.05), 0.0);
   vec3 camDir = normalize(camTarget - camPos);
   vec3 camUp = normalize(vec3(0.0, 0.0, -1.0));
