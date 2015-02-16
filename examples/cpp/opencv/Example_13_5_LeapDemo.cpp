@@ -15,7 +15,8 @@
  Minimal demo of using the Leap Motion controller.
  Unlike other demos, this file relies on the Leap SDK which is not
  provided on our Github repo.  The Leap SDK evolves rapidly, so
- downloading it is left as an exercise for the reader.
+ downloading it and updating the three Leap-specific fields in your
+ CMake config is left as an exercise for the reader.
 */
 
 struct CaptureData {
@@ -104,6 +105,7 @@ public:
     RiftApp::initGl();
     program = oria::loadProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
     sphere = oria::loadSphere({"Position", "Normal"}, program);
+    oria::bindLights(program);
   }
 
   virtual void update() {
@@ -181,9 +183,7 @@ public:
     mv.withPush([&]{
       mv.translate(pos);
       mv.scale(radius);
-      oria::renderGeometry(sphere, program, { [&] {
-        oria::bindLights(program);
-      } });
+      oria::renderGeometry(sphere, program);
     });
   }
 

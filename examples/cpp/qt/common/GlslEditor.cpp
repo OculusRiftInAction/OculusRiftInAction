@@ -163,8 +163,9 @@ GlslHighlighter::GlslHighlighter(bool nightMode, QTextDocument *parent)
 
   {
     HighlightingRule rule;
-    rule.format.setForeground(nightMode ? Qt::red : Qt::darkRed);
-    rule.format.setFontStrikeOut(true);
+    rule.format.setForeground(nightMode ? Qt::yellow : Qt::darkBlue);
+    rule.format.setFontWeight(QFont::Bold);
+    rule.format.setFontItalic(true);
     foreach(const QString &keyword, m["Reserved"]) {
       rule.pattern = QRegExp("\\b" + keyword + "\\b");
       highlightingRules.append(rule);
