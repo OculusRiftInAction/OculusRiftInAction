@@ -1,6 +1,6 @@
 UNITY PRO 4 EXAMPLES - README
 
-The scripts and Unity package in this directory are for use with Chapter 12 and 13 of “Oculus Rift in Action.”  Chapter 12 provides all of the instructions you need to build a simple Rift-compatible scene using Unity Pro 4.5.5 or later and the Oculus Integration package version 0.4.3. Chapter 13 builds on those examples by adding a simple GUI.
+The scripts and Unity package in this directory are for use with Chapter 12 and 13 of “Oculus Rift in Action.”  Chapter 12 provides all of the instructions you need to build a simple Rift-compatible scene using Unity Pro 4.6 or later and the Oculus Integration package version 0.4.4. Chapter 13 builds on those examples by adding a simple GUI.
 
 The scripts and a base scene are available in the OculusRiftinAction.unitypackage. 
 
@@ -28,23 +28,27 @@ GUI Scripts
 ——————————
 These scripts are used to create the same GUI for non-Rift application and a Rift application.
 
-GUI2d.cs
-GUI3d.cs
+ToggleMenu.cs
+UpdateTimer.cs
 
 
 Moving Objects Using Rift Head Tracking
 ———————————————————————————————————————
 These are the required scripts for creating the example in chapter 13 that allows you to create a Unity scene where head tracking is used to move objects.
 
-movegaze.js
-cubecollision.js
+Movegaze.cs
+Cubecollision.cs
 
 
 ————————————————
 OculusRiftinAction.unitypackage
 ———————————————
 
-The OculusRiftinAction.unitypackage package contains the scripts and the base scene for use with Chapters 12 and 13.
+The OculusRiftinAction.unitypackage package the base scene and the completed scenes:
+
+Beach - The base scene used for all examples
+Beach_OVRPlayerController - The base scene with the OVRPlayerController added
+Beach_OVRCameraRig - The base scene with using the OVRCameraRig with the Unity character controller, a simple GUI, and crates
 
 
 
