@@ -74,6 +74,23 @@ namespace oria {
   }
 }
 
+QJsonValue path(const QJsonValue & parent, std::initializer_list<QVariant> elements) {
+  QJsonValue current = parent;
+  std::for_each(elements.begin(), elements.end(), [&](const QVariant & element) {
+    if (current.isObject()) {
+      QString path = element.toString();
+      current = current.toObject().value(path);
+    } else if (current.isArray()) {
+      int offset = element.toInt();
+      current = current.toArray().at(offset);
+    } else {
+      qWarning() << "Unable to continue";
+      current = QJsonValue();
+    }
+  });
+  return current;
+}
+
 typedef std::list<QString> List;
 typedef std::map<QString, List> Map;
 typedef std::pair<QString, List> Pair;

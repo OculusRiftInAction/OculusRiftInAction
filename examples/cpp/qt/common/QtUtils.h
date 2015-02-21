@@ -59,6 +59,8 @@ inline QString readFileToString(const QString & fileName) {
 }
 
 
+QJsonValue path(const QJsonValue & parent, std::initializer_list<QVariant> elements);
+
 /**
  * Forwards mouse and keyboard input from the specified widget to the
  * graphics view, allowing the user to click on one widget (like an
@@ -204,7 +206,8 @@ public:
   void setLambda(F f) { this->f = f; }
 };
 
-TexturePtr loadCursor(Resource res);
+
+//TexturePtr loadCursor(Resource res);
 
 
 #ifdef OS_WIN

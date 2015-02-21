@@ -17,49 +17,42 @@ limitations under the License.
 
 ************************************************************************************/
 
+#pragma once
+
 namespace shadertoy {
-  const int MAX_CHANNELS = 4;
+  static const int MAX_CHANNELS = 4;
 
   enum class ChannelInputType {
     TEXTURE, CUBEMAP, AUDIO, VIDEO,
   };
 
-  const char * UNIFORM_RESOLUTION = "iResolution";
-  const char * UNIFORM_GLOBALTIME = "iGlobalTime";
-  const char * UNIFORM_CHANNEL_TIME = "iChannelTime";
-  const char * UNIFORM_CHANNEL_RESOLUTIONS[4] = {
-    "iChannelResolution[0]",
-    "iChannelResolution[1]",
-    "iChannelResolution[2]",
-    "iChannelResolution[3]",
+  extern const char * UNIFORM_RESOLUTION;
+  extern const char * UNIFORM_GLOBALTIME;
+  extern const char * UNIFORM_CHANNEL_TIME;
+  extern const char * UNIFORM_CHANNEL_RESOLUTIONS[MAX_CHANNELS];
+  extern const char * UNIFORM_CHANNEL_RESOLUTION;
+  extern const char * UNIFORM_MOUSE_COORDS;
+  extern const char * UNIFORM_DATE;
+  extern const char * UNIFORM_SAMPLE_RATE;
+  extern const char * UNIFORM_POSITION;
+  extern const char * UNIFORM_CHANNELS[MAX_CHANNELS];
+
+  extern const char * SHADER_HEADER;
+  extern const char * LINE_NUMBER_HEADER;
+
+  extern const QStringList TEXTURES;
+  extern const QStringList CUBEMAPS;
+
+  struct Shader {
+    QString id;
+    QString url;
+    QString name;
+    QString fragmentSource;
+    ChannelInputType channelTypes[MAX_CHANNELS];
+    QString channelTextures[MAX_CHANNELS];
   };
-  const char * UNIFORM_CHANNEL_RESOLUTION = "iChannelResolution";
-  const char * UNIFORM_MOUSE_COORDS = "iMouse";
-  const char * UNIFORM_DATE = "iDate";
-  const char * UNIFORM_SAMPLE_RATE = "iSampleRate";
-  const char * UNIFORM_POSITION = "iPos";
-  const char * UNIFORM_CHANNELS[4] = {
-    "iChannel0",
-    "iChannel1",
-    "iChannel2",
-    "iChannel3",
-  };
 
-  const char * SHADER_HEADER = "#version 330\n"
-    "uniform vec3      iResolution;           // viewport resolution (in pixels)\n"
-    "uniform float     iGlobalTime;           // shader playback time (in seconds)\n"
-    "uniform float     iChannelTime[4];       // channel playback time (in seconds)\n"
-    "uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)\n"
-    "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\n"
-    "uniform vec4      iDate;                 // (year, month, day, time in seconds)\n"
-    "uniform float     iSampleRate;           // sound sample rate (i.e., 44100)\n"
-    "uniform vec3      iPos; // Head position\n"
-    "in vec3 iDir; // Direction from viewer\n"
-    "out vec4 FragColor;\n";
-
-  const char * LINE_NUMBER_HEADER =
-    "#line 1\n";
-
+/*
   struct Preset {
     const Resource res;
     const char * name;
@@ -100,41 +93,6 @@ namespace shadertoy {
     ":/shaders/XslXW2.json",
     ":/shaders/XsSSRW.json"
   });
+*/
 
-  const QStringList TEXTURES({
-    "/presets/tex00.jpg",
-    "/presets/tex01.jpg",
-    "/presets/tex02.jpg",
-    "/presets/tex03.jpg",
-    "/presets/tex04.jpg",
-    "/presets/tex05.jpg",
-    "/presets/tex06.jpg",
-    "/presets/tex07.jpg",
-    "/presets/tex08.jpg",
-    "/presets/tex09.jpg",
-    "/presets/tex10.png",
-    "/presets/tex11.png",
-    "/presets/tex12.png",
-    "/presets/tex14.png",
-    "/presets/tex15.png",
-    "/presets/tex16.png"
-  });
-
-  const QStringList CUBEMAPS({
-    "/presets/cube00_%1.jpg",
-    "/presets/cube01_%1.png",
-    "/presets/cube02_%1.jpg",
-    "/presets/cube03_%1.png",
-    "/presets/cube04_%1.png",
-    "/presets/cube05_%1.png",
-  });
-
-  struct Shader {
-    QString id;
-    QString url;
-    QString name;
-    QString fragmentSource;
-    ChannelInputType channelTypes[MAX_CHANNELS];
-    QString channelTextures[MAX_CHANNELS];
-  };
 }

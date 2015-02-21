@@ -24,25 +24,7 @@ limitations under the License.
 #include <QJsonValue>
 #include <QJsonDocument>
 
-QJsonValue path(const QJsonValue & parent, std::initializer_list<QVariant> elements) {
-  QJsonValue current = parent;
-  std::for_each(elements.begin(), elements.end(), [&](const QVariant & element) {
-    if (current.isObject()) {
-      QString path = element.toString();
-      current = current.toObject().value(path);
-    } else if (current.isArray()) {
-      int offset = element.toInt();
-      current = current.toArray().at(offset);
-    } else {
-      qWarning() << "Unable to continue";
-      current = QJsonValue();
-    }
-  });
-  return current;
-}
-
 namespace shadertoy {
-
   static const char * CHANNEL_REGEX = "(\\w+)(\\d{2})";
   static const char * XML_ROOT_NAME = "shadertoy";
   static const char * XML_FRAGMENT_SOURCE = "fragmentSource";
