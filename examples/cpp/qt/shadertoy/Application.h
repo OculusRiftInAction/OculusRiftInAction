@@ -29,4 +29,5 @@ public:
 
 private:
   void setupDesktopWindow();
+  static void MessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 };

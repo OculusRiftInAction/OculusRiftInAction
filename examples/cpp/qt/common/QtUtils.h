@@ -207,7 +207,7 @@ public:
 };
 
 
-//TexturePtr loadCursor(Resource res);
+TexturePtr loadCursor(Resource res);
 
 
 #ifdef OS_WIN

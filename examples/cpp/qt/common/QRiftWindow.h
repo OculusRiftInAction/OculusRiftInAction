@@ -32,6 +32,10 @@ class QRiftWindow :
   TaskQueueWrapper tasks;
   QOpenGLContext * m_context;
 
+protected:
+  float texRes{ 1.0f };
+  float eyeOffsetScale{ 1.0f };
+
 public:
 
   QRiftWindow();
@@ -75,5 +79,17 @@ protected:
   virtual void perEyeRender() {
   }
 #endif
+
+  vec2 textureSize() {
+  #ifdef USE_RIFT
+      return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
+  #else
+      return vec2(size().width(), size().height());
+  #endif
+  }
+
+  uvec2 renderSize() {
+      return uvec2(texRes * textureSize());
+  }
 
 };

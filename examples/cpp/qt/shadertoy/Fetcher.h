@@ -22,16 +22,15 @@ limitations under the License.
 #include <QNetworkAccessManager>
 #include <QtNetwork>
 
-class ShadertoyFetcher : public QObject {
+class Fetcher : public QObject {
   Q_OBJECT
 public:
-  ShadertoyFetcher(QDir & configPath);
+  Fetcher();
   void fetchNetworkShaders();
 private:
   QQueue<QString> shadersToFetch;
   QNetworkAccessManager qnam;
   QTimer timer;
-  QDir root;
   int currentNetworkRequests{ 0 };
 
   virtual void fetchUrl(QUrl url, std::function<void(QByteArray)> f);

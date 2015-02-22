@@ -346,8 +346,8 @@ private:
     }
 
     bool event(QEvent * e) {
-        static bool dismissedHmd = false;
 #ifdef USE_RIFT
+        static bool dismissedHmd = false;
         switch (e->type()) {
         case QEvent::KeyPress:
             if (!dismissedHmd) {

@@ -18,6 +18,17 @@ limitations under the License.
 ************************************************************************************/
 
 #include "QtCommon.h"
+#include "Application.h"
+#include "MainWindow.h"
+
+#ifndef _DEBUG
+#include "TrackerbirdConfig.h"
+#endif
+
+#ifdef TRACKERBIRD_PRODUCT_ID
+#include <Trackerbird.h>
+#endif
+
 
 MAIN_DECL {
   try {
@@ -35,8 +46,7 @@ MAIN_DECL {
 
     QT_APP_WITH_ARGS(ShadertoyApp);
 
-    ShadertoyWindow * riftRenderWidget;
-    riftRenderWidget = new ShadertoyWindow();
+    MainWindow * riftRenderWidget = new MainWindow();
     riftRenderWidget->start();
     riftRenderWidget->requestActivate();
     int result = app.exec();
@@ -61,7 +71,6 @@ MAIN_DECL {
   return -1;
 }
 
-#include "ShadertoyVR.moc"
 
 
 

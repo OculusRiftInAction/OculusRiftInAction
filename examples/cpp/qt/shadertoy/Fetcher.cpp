@@ -19,13 +19,14 @@ limitations under the License.
 
 #include "QtCommon.h"
 #include "Fetcher.h"
+#include "Globals.h"
 
 #include "ShadertoyConfig.h"
 
 static const QString SHADERTOY_API_URL = "https://www.shadertoy.com/api/v1/shaders";
 static const QString SHADERTOY_MEDIA_URL = "https://www.shadertoy.com/media/shaders/";
 
-void ShadertoyFetcher::fetchUrl(QUrl url, std::function<void(QByteArray)> f) {
+void Fetcher::fetchUrl(QUrl url, std::function<void(QByteArray)> f) {
   QNetworkRequest request(url);
   qDebug() << "Requesting url " << url;
   request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, "ShadertoyVR/1.0");
@@ -43,7 +44,7 @@ void ShadertoyFetcher::fetchUrl(QUrl url, std::function<void(QByteArray)> f) {
   });
 }
 
-void ShadertoyFetcher::fetchFile(const QUrl & url, const QString & path) {
+void Fetcher::fetchFile(const QUrl & url, const QString & path) {
   fetchUrl(url, [&, path](const QByteArray & replyBuffer) {
     QFile outputFile(path);
     outputFile.open(QIODevice::WriteOnly);
@@ -52,13 +53,13 @@ void ShadertoyFetcher::fetchFile(const QUrl & url, const QString & path) {
   });
 }
 
-void ShadertoyFetcher::fetchNextShader() {
+void Fetcher::fetchNextShader() {
 #ifdef SHADERTOY_API_KEY
   while (!shadersToFetch.empty() && currentNetworkRequests <= 4) {
     QString nextShaderId = shadersToFetch.front();
     shadersToFetch.pop_front();
-    QString shaderFile = root.absoluteFilePath(nextShaderId + ".json");
-    QString shaderPreviewFile = root.absoluteFilePath(nextShaderId + ".jpg");
+    QString shaderFile = CONFIG_DIR.absoluteFilePath("shadertoy/" + nextShaderId + ".json");
+    QString shaderPreviewFile = CONFIG_DIR.absoluteFilePath("shadertoy/" + nextShaderId + ".jpg");
     if (QFile(shaderFile).exists() && QFile(shaderPreviewFile).exists()) {
       continue;
     }
@@ -86,15 +87,14 @@ void ShadertoyFetcher::fetchNextShader() {
 #endif
 }
 
-ShadertoyFetcher::ShadertoyFetcher(QDir & configPath) {
+Fetcher::Fetcher() {
   connect(&timer, &QTimer::timeout, this, [&] {
     fetchNextShader();
   });
-  configPath.mkpath("shadertoy");
-  root = QDir(configPath.absoluteFilePath("shadertoy"));
+  CONFIG_DIR.mkpath("shadertoy");
 }
 
-void ShadertoyFetcher::fetchNetworkShaders() {
+void Fetcher::fetchNetworkShaders() {
 #ifdef SHADERTOY_API_KEY
   qDebug() << "Fetching shader list";
   QUrl url(SHADERTOY_API_URL + QString().sprintf("?key=%s", SHADERTOY_API_KEY));

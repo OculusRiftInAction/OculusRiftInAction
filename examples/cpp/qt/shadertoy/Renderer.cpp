@@ -23,8 +23,8 @@ limitations under the License.
 
 using namespace oglplus;
 
-void ShadertoyRenderer::setup() {
-    QRiftWindow::setup();
+void Renderer::setup(QOpenGLContext * context) {
+    this->context = context;
     initTextureCache();
 
     setShaderSourceInternal(readFileToString(":/shaders/default.fs"));
@@ -40,7 +40,7 @@ void ShadertoyRenderer::setup() {
     });
 }
 
-void ShadertoyRenderer::initTextureCache() {
+void Renderer::initTextureCache() {
     using namespace shadertoy;
     QRegExp re("(tex|cube)(\\d+)(_0)?\\.(png|jpg)");
 
@@ -98,7 +98,7 @@ void ShadertoyRenderer::initTextureCache() {
     });
 }
 
-void ShadertoyRenderer::renderShadertoy() {
+void Renderer::render() {
     Context::Clear().ColorBuffer();
     if (!shadertoyProgram) {
         return;
@@ -116,7 +116,7 @@ void ShadertoyRenderer::renderShadertoy() {
     oglplus::Texture::Active(0);
 }
 
-void ShadertoyRenderer::updateUniforms() {
+void Renderer::updateUniforms() {
     using namespace shadertoy;
     typedef std::map<std::string, GLuint> Map;
     Map activeUniforms = oria::getActiveUniforms(shadertoyProgram);
@@ -125,7 +125,7 @@ void ShadertoyRenderer::updateUniforms() {
     for (int i = 0; i < 4; ++i) {
         const char * uniformName = shadertoy::UNIFORM_CHANNELS[i];
         if (activeUniforms.count(uniformName)) {
-            context()->functions()->glUniform1i(activeUniforms[uniformName], i);
+            context->functions()->glUniform1i(activeUniforms[uniformName], i);
         }
         if (channels[i].texture) {
             if (activeUniforms.count(UNIFORM_CHANNEL_RESOLUTIONS[i])) {
@@ -145,7 +145,7 @@ void ShadertoyRenderer::updateUniforms() {
 
     if (activeUniforms.count(UNIFORM_RESOLUTION)) {
         uniformLambdas.push_back([&] {
-            vec3 res = vec3(renderSize(), 0);
+            vec3 res = vec3(resolution, 0);
             Uniform<vec3>(*shadertoyProgram, UNIFORM_RESOLUTION).Set(res);
         });
     }
@@ -153,8 +153,7 @@ void ShadertoyRenderer::updateUniforms() {
 #ifdef USE_RIFT
     if (activeUniforms.count(shadertoy::UNIFORM_POSITION)) {
         uniformLambdas.push_back([&] {
-            Uniform<vec3>(*shadertoyProgram, shadertoy::UNIFORM_POSITION).Set(
-                (ovr::toGlm(getEyePose().Position) + position) * eyePosScale);
+            Uniform<vec3>(*shadertoyProgram, shadertoy::UNIFORM_POSITION).Set(position);
         });
     }
 #endif
@@ -171,19 +170,7 @@ void ShadertoyRenderer::updateUniforms() {
     }
 }
 
-vec2 ShadertoyRenderer::textureSize() {
-#ifdef USE_RIFT
-    return vec2(ovr::toGlm(eyeTextures[0].Header.TextureSize));
-#else
-    return vec2(size().width(), size().height());
-#endif
-}
-
-uvec2 ShadertoyRenderer::renderSize() {
-    return uvec2(texRes * textureSize());
-}
-
-bool ShadertoyRenderer::setShaderSourceInternal(QString source) {
+bool Renderer::setShaderSourceInternal(QString source) {
     try {
         position = vec3();
         if (!vertexShader) {
@@ -202,7 +189,6 @@ bool ShadertoyRenderer::setShaderSourceInternal(QString source) {
         }
         header += shadertoy::LINE_NUMBER_HEADER;
         FragmentShaderPtr newFragmentShader(new FragmentShader());
-        vrMode = source.contains("#pragma vr");
         source.
             replace(QRegExp("\\t"), "  ").
             replace(QRegExp("\\bgl_FragColor\\b"), "FragColor").
@@ -234,7 +220,7 @@ bool ShadertoyRenderer::setShaderSourceInternal(QString source) {
     return true;
 }
 
-ShadertoyRenderer::TextureData ShadertoyRenderer::loadTexture(QString source) {
+Renderer::TextureData Renderer::loadTexture(QString source) {
     qDebug() << "Looking for texture " << source;
     while (canonicalPathMap.count(source)) {
         source = canonicalPathMap[source];
@@ -252,7 +238,7 @@ ShadertoyRenderer::TextureData ShadertoyRenderer::loadTexture(QString source) {
     return textureCache[source];
 }
 
-void ShadertoyRenderer::setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, const QString & textureSource) {
+void Renderer::setChannelTextureInternal(int channel, shadertoy::ChannelInputType type, const QString & textureSource) {
     using namespace oglplus;
     if (textureSource == channelSources[channel]) {
         return;
@@ -293,7 +279,7 @@ void ShadertoyRenderer::setChannelTextureInternal(int channel, shadertoy::Channe
     channels[channel] = newChannel;
 }
 
-void ShadertoyRenderer::setShaderInternal(const shadertoy::Shader & shader) {
+void Renderer::setShaderInternal(const shadertoy::Shader & shader) {
     for (int i = 0; i < shadertoy::MAX_CHANNELS; ++i) {
         setChannelTextureInternal(i, shader.channelTypes[i], shader.channelTextures[i]);
     }

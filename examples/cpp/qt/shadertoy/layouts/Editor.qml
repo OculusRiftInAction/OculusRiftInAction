@@ -154,7 +154,7 @@ Rectangle {
 
         Rectangle {
             id: lineColumn
-            property int rowHeight: shaderTextEdit.font.pixelSize
+            property int rowHeight: shaderTextEdit.font.pixelSize + 1
             color: "#222"
             width: 48
             anchors.left: parent.left
