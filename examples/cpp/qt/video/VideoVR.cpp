@@ -30,10 +30,6 @@ limitations under the License.
 #include <QtNetwork>
 #include <QDeclarativeEngine>
 
-#ifdef TRACKERBIRD_PRODUCT_ID
-#include <Trackerbird.h>
-#endif
-
 const char * ORG_NAME = "Oculus Rift in Action";
 const char * ORG_DOMAIN = "oculusriftinaction.com";
 const char * APP_NAME = "VideoVR";
@@ -458,7 +454,7 @@ private:
         // Now re-render the shader output to the screen.
         vrFramebuffer->BindColor(Texture::Target::_2D);
 #ifdef USE_RIFT
-        if (vrMode) {
+        if (true) {
 #endif
             // In VR mode, we want to cover the entire surface
             Stacks::withIdentity([&] {
@@ -489,7 +485,7 @@ private:
                     oria::renderGeometry(plane, planeProgram);
                 });
                 }
-                }
+            }
 #endif
 
         if (animationValue > 0.0f) {
@@ -545,9 +541,6 @@ public:
         QCoreApplication::setOrganizationName(ORG_NAME);
         QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
         QCoreApplication::setApplicationName(APP_NAME);
-#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
-        QCoreApplication::setApplicationVersion(QString::fromWCharArray(TRACKERBIRD_PRODUCT_VERSION));
-#endif
         CONFIG_DIR = QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
         QString currentLogName = CONFIG_DIR.absoluteFilePath("ShadertoyVR.log");
         LOG_FILE = QSharedPointer<QFile>(new QFile(currentLogName));
@@ -582,14 +575,6 @@ MAIN_DECL {
         ovr_Initialize();
 #endif
 
-#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
-        tbCreateConfig(TRACKERBIRD_URL, TRACKERBIRD_PRODUCT_ID, 
-            TRACKERBIRD_PRODUCT_VERSION, TRACKERBIRD_BUILD_NUMBER, 
-            TRACKERBIRD_MULTISESSION_ENABLED);
-        tbStart();
-        qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins");
-#endif
-
         QT_APP_WITH_ARGS(App);
 
         MainWindow * riftRenderWidget;
@@ -597,10 +582,6 @@ MAIN_DECL {
         riftRenderWidget->start();
         riftRenderWidget->requestActivate();
         int result = app.exec(); 
-
-#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
-        tbStop(TRUE);
-#endif
 
         riftRenderWidget->stop();
         riftRenderWidget->makeCurrent();

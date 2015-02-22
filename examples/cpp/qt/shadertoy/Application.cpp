@@ -33,9 +33,6 @@ ShadertoyApp::ShadertoyApp(int argc, char ** argv) : QApplication(argc, argv) {
     QCoreApplication::setOrganizationName(ORG_NAME);
     QCoreApplication::setOrganizationDomain(ORG_DOMAIN);
     QCoreApplication::setApplicationName(APP_NAME);
-#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
-    QCoreApplication::setApplicationVersion(QString::fromWCharArray(TRACKERBIRD_PRODUCT_VERSION));
-#endif
     CONFIG_DIR = QDir(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
     QString currentLogName = CONFIG_DIR.absoluteFilePath("ShadertoyVR.log");
     LOG_FILE = QSharedPointer<QFile>(new QFile(currentLogName));
