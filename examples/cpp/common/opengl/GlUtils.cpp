@@ -436,7 +436,7 @@ namespace oria {
     static ProgramPtr program;
     static ShapeWrapperPtr shape;
     if (!program) {
-      program = loadProgram(Resource::SHADERS_COLORCUBE_VS, Resource::SHADERS_COLORED_FS);
+      program = loadProgram(Resource::SHADERS_COLORCUBE_VS, Resource::SHADERS_COLORCUBE_FS);
       shape = ShapeWrapperPtr(new shapes::ShapeWrapper(List("Position")("Normal").Get(), shapes::Cube(), *program));;
       Platform::addShutdownHook([&]{
         program.reset();
@@ -616,7 +616,7 @@ namespace oria {
 
   }
   
-  void renderExampleScene(float ipd, float eyeHeight) {
+  void renderManikinScene(float ipd, float eyeHeight) {
     oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     oria::renderFloor();
     
@@ -633,6 +633,22 @@ namespace oria {
       oglplus::Context::Disable(oglplus::Capability::CullFace);
       oria::renderManikin();
     });
+  }
+
+  void renderExampleScene(float ipd, float eyeHeight) {
+    oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    oria::renderFloor();
+
+    MatrixStack & mv = Stacks::modelview();
+    mv.withPush([&]{
+      mv.translate(glm::vec3(0, eyeHeight, 0)).scale(glm::vec3(ipd));
+      oria::renderColorCube();
+    });
+    mv.withPush([&]{
+      mv.translate(glm::vec3(0, eyeHeight / 2, 0)).scale(glm::vec3(ipd / 2, eyeHeight, ipd / 2));
+      oria::renderColorCube();
+    });
+
   }
 
 
