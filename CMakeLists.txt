@@ -195,11 +195,6 @@ else()
     message(WARNING "Qt framework not found") 
 endif()
 
-include_directories(libraries/trackerbird)
-find_library(TRACKERBIRD Trackerbird
-	PATHS libraries/trackerbird)
-list(APPEND EXAMPLE_LIBS ${TRACKERBIRD})
-
 ######################################################
 # OGLplus provides object oriented OpenGL wrappers
 #

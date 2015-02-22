@@ -21,27 +21,11 @@ limitations under the License.
 #include "Application.h"
 #include "MainWindow.h"
 
-#ifndef _DEBUG
-#include "TrackerbirdConfig.h"
-#endif
-
-#ifdef TRACKERBIRD_PRODUCT_ID
-#include <Trackerbird.h>
-#endif
-
 
 MAIN_DECL {
   try {
 #ifdef USE_RIFT
     ovr_Initialize();
-#endif
-
-#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
-    tbCreateConfig(TRACKERBIRD_URL, TRACKERBIRD_PRODUCT_ID,
-      TRACKERBIRD_PRODUCT_VERSION, TRACKERBIRD_BUILD_NUMBER,
-      TRACKERBIRD_MULTISESSION_ENABLED);
-    tbStart();
-    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "./plugins");
 #endif
 
     QT_APP_WITH_ARGS(ShadertoyApp);
@@ -50,10 +34,6 @@ MAIN_DECL {
     riftRenderWidget->start();
     riftRenderWidget->requestActivate();
     int result = app.exec();
-
-#if (!defined(_DEBUG) && defined(TRACKERBIRD_PRODUCT_ID))
-    tbStop(TRUE);
-#endif
 
     riftRenderWidget->stop();
     riftRenderWidget->makeCurrent();
