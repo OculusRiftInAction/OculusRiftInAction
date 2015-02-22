@@ -101,5 +101,33 @@
         <file>shaders/lss3WS_relentless.jpg</file>
         <file>shaders/MsSGD1.jpg</file>
         <file>shaders/MtfGR8.jpg</file>
+        <file>shaders/4ds3zn.jpg</file>
+        <file>shaders/4ds3zn.json</file>
+        <file>shaders/4slGzn.jpg</file>
+        <file>shaders/4slGzn.json</file>
+        <file>shaders/ld2GRz.jpg</file>
+        <file>shaders/ld2GRz.json</file>
+        <file>shaders/ldfGzr.jpg</file>
+        <file>shaders/ldfGzr.json</file>
+        <file>shaders/ldj3Dm.jpg</file>
+        <file>shaders/ldj3Dm.json</file>
+        <file>shaders/ldSGRW.jpg</file>
+        <file>shaders/ldSGRW.json</file>
+        <file>shaders/lsl3W2.jpg</file>
+        <file>shaders/lsl3W2.json</file>
+        <file>shaders/lts3Wn.jpg</file>
+        <file>shaders/lts3Wn.json</file>
+        <file>shaders/MsBGRh.jpg</file>
+        <file>shaders/MsBGRh.json</file>
+        <file>shaders/XdBSzd.jpg</file>
+        <file>shaders/XdBSzd.json</file>
+        <file>shaders/Xlf3D8.jpg</file>
+        <file>shaders/Xlf3D8.json</file>
+        <file>shaders/XsjXR1.jpg</file>
+        <file>shaders/XsjXR1.json</file>
+        <file>shaders/XslXW2.jpg</file>
+        <file>shaders/XslXW2.json</file>
+        <file>shaders/4tXGDn.jpg</file>
+        <file>shaders/4tXGDn.json</file>
     </qresource>
 </RCC>

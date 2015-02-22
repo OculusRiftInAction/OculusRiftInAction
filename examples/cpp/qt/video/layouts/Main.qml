@@ -4,32 +4,61 @@ import QtQuick.Window 2.2
 import QtQuick.Controls.Styles 1.3
 import Qt.labs.settings 1.0
 
-Rectangle {
-    id: editRoot
+Item {
+    id: root
     width: 1280
     height: 720
-    color: "#00000000"
-    property alias text: shaderTextEdit.text
-    function setChannelIcon(channel, path) {
-        var channelItem;
-        switch(channel) {
-        case 0:
-            channelItem = channel0;
+
+    signal toggleUi()
+    signal toggleEyePerFrame()
+    signal startShutdown()
+    signal recenterPose()
+    signal epfModeChanged(bool checked)
+    signal modifyTextureResolution(double scale)
+    
+    Keys.onPressed: {
+        console.log("Key pressed " + event.key);
+        switch (event.key) {
+        case Qt.Key_Q:
+            if (Qt.ControlModifier == event.modifiers) {
+                startShutdown();
+                event.accepted = true;
+                break;
+            }
+
+        case Qt.Key_Escape:
+        case Qt.Key_F1:
+            toggleUi();
+            event.accepted = true;
             break;
-        case 1:
-            channelItem = channel1;
+
+        case Qt.Key_F2:
+            recenterPose();
+            event.accepted = true;
             break;
-        case 2:
-            channelItem = channel2;
+
+        case Qt.Key_F5:
+            modifyTextureResolution(Math.SQRT1_2);
+            event.accepted = true;
             break;
-        case 3:
-            channelItem = channel3;
+
+        case Qt.Key_F6:
+            modifyTextureResolution(0.95);
+            event.accepted = true;
             break;
-        }
-        if (channelItem) {
-            channelItem.source = path;
+
+        case Qt.Key_F7:
+            modifyTextureResolution(1.05);
+            event.accepted = true;
+            break;
+
+        case Qt.Key_F8:
+            modifyTextureResolution(Math.SQRT2);
+            event.accepted = true;
+            break;
         }
     }
+    
 
     Column {
         id: channelColumn
@@ -154,7 +183,7 @@ Rectangle {
 
         Rectangle {
             id: lineColumn
-            property int rowHeight: shaderTextEdit.font.pixelSize + 1
+            property int rowHeight: shaderTextEdit.font.pixelSize
             color: "#222"
             width: 48
             anchors.left: parent.left

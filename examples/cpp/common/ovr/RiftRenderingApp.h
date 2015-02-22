@@ -48,9 +48,7 @@ protected:
     return eyePoses[currentEye];
   }
 
-  virtual void updateFps(float fps) {
-  }
-
+  virtual void updateFps(float fps) { }
   virtual void initializeRiftRendering();
   virtual void drawRiftFrame() final;
   virtual void perFrameRender() {};

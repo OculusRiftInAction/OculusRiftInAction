@@ -2,8 +2,6 @@ import QtQuick 2.3
 import QtQuick.Controls 1.2
 import QtQuick.Window 2.2
 
-
-
 Item {
     id: root
     width: 1280
@@ -125,6 +123,7 @@ Item {
             break;
         }
     }
+
 
     function channelSelect(channel) {
         activeChannel = channel;
