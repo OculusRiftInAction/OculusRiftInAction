@@ -71,7 +71,7 @@ public:
     MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.postMultiply(glm::inverse(player));
-      oria::renderExampleScene(ipd, eyeHeight);
+      oria::renderManikinScene(ipd, eyeHeight);
     });
 
     std::string message = Platform::format(
