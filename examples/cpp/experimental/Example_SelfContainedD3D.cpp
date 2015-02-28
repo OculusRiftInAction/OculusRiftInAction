@@ -23,6 +23,8 @@
 #include <d3dcompiler.h>
 #include <directxmath.h>
 #include <directxcolors.h>
+#define OVR_D3D_VERSION 11
+#include <OVR_CAPI_D3D.h>
 
 using namespace DirectX;
 
@@ -117,7 +119,6 @@ struct ConstantBuffer {
     XMFLOAT4 vOutputColor;
 };
 
-
 //--------------------------------------------------------------------------------------
 // Global Variables
 //--------------------------------------------------------------------------------------
@@ -143,17 +144,102 @@ ID3D11Buffer*           g_pIndexBuffer = nullptr;
 ID3D11Buffer*           g_pConstantBuffer = nullptr;
 XMMATRIX                g_World;
 XMMATRIX                g_View;
-XMMATRIX                g_Projection;
 
+
+//------------------------------------------------------------
+struct ImageBuffer {
+    ID3D11Texture2D *            Tex;
+    ID3D11ShaderResourceView *   TexSv;
+    ID3D11RenderTargetView *     TexRtv;
+    ID3D11DepthStencilView *     TexDsv;
+    ovrSizei                     Size;
+
+    ImageBuffer::ImageBuffer(bool rendertarget, bool depth, ovrSizei size, int mipLevels = 1,
+        unsigned char * data = NULL) : Size(size) {
+        D3D11_TEXTURE2D_DESC dsDesc;
+        dsDesc.Width = size.w;
+        dsDesc.Height = size.h;
+        dsDesc.MipLevels = mipLevels;
+        dsDesc.ArraySize = 1;
+        dsDesc.Format = depth ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM;
+        dsDesc.SampleDesc.Count = 1;
+        dsDesc.SampleDesc.Quality = 0;
+        dsDesc.Usage = D3D11_USAGE_DEFAULT;
+        dsDesc.CPUAccessFlags = 0;
+        dsDesc.MiscFlags = 0;
+        dsDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+        if (rendertarget &&  depth) dsDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        if (rendertarget && !depth) dsDesc.BindFlags |= D3D11_BIND_RENDER_TARGET;
+        g_pd3dDevice->CreateTexture2D(&dsDesc, NULL, &Tex);
+        g_pd3dDevice->CreateShaderResourceView(Tex, NULL, &TexSv);
+
+        if (rendertarget &&  depth) g_pd3dDevice->CreateDepthStencilView(Tex, NULL, &TexDsv);
+        if (rendertarget && !depth) g_pd3dDevice->CreateRenderTargetView(Tex, NULL, &TexRtv);
+
+        if (data) // Note data is trashed, as is width and height
+        {
+            for (int level = 0; level < mipLevels; level++) {
+                g_pImmediateContext->UpdateSubresource(Tex, level, NULL, data, size.w * 4, size.h * 4);
+                for (int j = 0; j < (size.h & ~1); j += 2) {
+                    const uint8_t* psrc = data + (size.w * j * 4);
+                    uint8_t*       pdest = data + ((size.w >> 1) * (j >> 1) * 4);
+                    for (int i = 0; i < size.w >> 1; i++, psrc += 8, pdest += 4) {
+                        pdest[0] = (((int)psrc[0]) + psrc[4] + psrc[size.w * 4 + 0] + psrc[size.w * 4 + 4]) >> 2;
+                        pdest[1] = (((int)psrc[1]) + psrc[5] + psrc[size.w * 4 + 1] + psrc[size.w * 4 + 5]) >> 2;
+                        pdest[2] = (((int)psrc[2]) + psrc[6] + psrc[size.w * 4 + 2] + psrc[size.w * 4 + 6]) >> 2;
+                        pdest[3] = (((int)psrc[3]) + psrc[7] + psrc[size.w * 4 + 3] + psrc[size.w * 4 + 7]) >> 2;
+                    }
+                }
+                size.w >>= 1;  size.h >>= 1;
+            }
+        }
+    }
+};
+
+ovrEyeRenderDesc EyeRenderDesc[2];     // Description of the VR.
+ovrRecti         EyeRenderViewport[2]; // Useful to remember when varying resolution
+ImageBuffer    * pEyeRenderTexture[2]; // Where the eye buffers will be rendered
+ImageBuffer    * pEyeDepthBuffer[2];   // For the eye buffers to use when rendered
+ovrPosef         EyeRenderPose[2];     // Useful to remember where the rendered eye originated
+float            YawAtRender[2];       // Useful to remember where the rendered eye originated
+float            Yaw(3.141592f);       // Horizontal rotation of the player
+//Vector3f         Pos(0.0f, 1.6f, -5.0f); // Position of player
+ovrHmd HMD;
+ovrVector3f useHmdToEyeViewOffset[2]; 
+ovrMatrix4f eyeProjections[2];
 
 //--------------------------------------------------------------------------------------
 // Forward declarations
 //--------------------------------------------------------------------------------------
 HRESULT InitWindow(HINSTANCE hInstance, int nCmdShow);
-HRESULT InitDevice();
+HRESULT InitDevice(ovrSizei size);
 void CleanupDevice();
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void Render();
+void RenderFrame();
+
+void SetMaxFrameLatency(int value) {
+    IDXGIDevice1* DXGIDevice1 = NULL;
+    HRESULT hr = g_pd3dDevice->QueryInterface(__uuidof(IDXGIDevice1), (void**)&DXGIDevice1);
+    if (FAILED(hr) | (DXGIDevice1 == NULL)) return;
+    DXGIDevice1->SetMaximumFrameLatency(value);
+    DXGIDevice1->Release();
+}
+
+//----------------------------------------------------------------------------------------------------------
+void ClearAndSetRenderTarget(ID3D11RenderTargetView * rendertarget,
+    ImageBuffer * depthbuffer, ovrRecti vp) {
+    float black[] = { 0, 0, 0, 1 };
+    g_pImmediateContext->OMSetRenderTargets(1, &rendertarget, depthbuffer->TexDsv);
+    g_pImmediateContext->ClearRenderTargetView(rendertarget, black);
+    g_pImmediateContext->ClearDepthStencilView(depthbuffer->TexDsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1, 0);
+    D3D11_VIEWPORT D3Dvp;
+    D3Dvp.Width = (float)vp.Size.w;    D3Dvp.Height = (float)vp.Size.h;
+    D3Dvp.MinDepth = 0;              D3Dvp.MaxDepth = 1;
+    D3Dvp.TopLeftX = (float)vp.Pos.x;    D3Dvp.TopLeftY = (float)vp.Pos.y;
+    g_pImmediateContext->RSSetViewports(1, &D3Dvp);
+}
 
 
 //--------------------------------------------------------------------------------------
@@ -161,15 +247,62 @@ void Render();
 // loop. Idle time is used to render the scene.
 //--------------------------------------------------------------------------------------
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
+    // Initializes LibOVR, and the Rift
+    ovr_Initialize();
+    HMD = ovrHmd_Create(0);
+
+    if (!HMD) { MessageBoxA(NULL, "Oculus Rift not detected.", "", MB_OK); return(0); }
+    if (HMD->ProductName[0] == '\0')  MessageBoxA(NULL, "Rift detected, display not enabled.", "", MB_OK);
+    // Setup Window and Graphics - use window frame if relying on Oculus driver
+    bool windowed = (HMD->HmdCaps & ovrHmdCap_ExtendDesktop) ? false : true;
+
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     if (FAILED(InitWindow(hInstance, nCmdShow)))
         return 0;
 
-    if (FAILED(InitDevice())) {
+    if (FAILED(InitDevice(HMD->Resolution))) {
         CleanupDevice();
         return 0;
+    }
+
+    SetMaxFrameLatency(1);
+    ovrHmd_AttachToWindow(HMD, g_hWnd, NULL, NULL);
+    ovrHmd_SetEnabledCaps(HMD, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
+
+    // Start the sensor which informs of the Rift's pose and motion
+    ovrHmd_ConfigureTracking(HMD, ovrTrackingCap_Orientation | ovrTrackingCap_MagYawCorrection |
+        ovrTrackingCap_Position, 0);
+
+    // Make the eye render buffers (caution if actual size < requested due to HW limits). 
+    for (int eye = 0; eye<2; eye++) {
+        ovrSizei idealSize = ovrHmd_GetFovTextureSize(HMD, (ovrEyeType)eye,
+            HMD->DefaultEyeFov[eye], 1.0f);
+        pEyeRenderTexture[eye] = new ImageBuffer(true, false, idealSize);
+        pEyeDepthBuffer[eye] = new ImageBuffer(true, true, pEyeRenderTexture[eye]->Size);
+        EyeRenderViewport[eye].Pos = { 0, 0 };
+        EyeRenderViewport[eye].Size = pEyeRenderTexture[eye]->Size;
+    }
+
+    ovrD3D11Config d3d11cfg;
+    d3d11cfg.D3D11.Header.API = ovrRenderAPI_D3D11;
+    d3d11cfg.D3D11.Header.BackBufferSize = HMD->Resolution;
+    d3d11cfg.D3D11.Header.Multisample = 1;
+    d3d11cfg.D3D11.pDevice = g_pd3dDevice;
+    d3d11cfg.D3D11.pDeviceContext = g_pImmediateContext;
+    d3d11cfg.D3D11.pBackBufferRT = g_pRenderTargetView;
+    d3d11cfg.D3D11.pSwapChain = g_pSwapChain;
+
+    if (!ovrHmd_ConfigureRendering(HMD, &d3d11cfg.Config,
+        ovrDistortionCap_Chromatic | ovrDistortionCap_Vignette |
+        ovrDistortionCap_TimeWarp | ovrDistortionCap_Overdrive,
+        HMD->DefaultEyeFov, EyeRenderDesc))
+        return(1);
+
+    for (int eye = 0; eye < 2; eye++) {
+        useHmdToEyeViewOffset[eye] = EyeRenderDesc[eye].HmdToEyeViewOffset;
+        eyeProjections[eye] = ovrMatrix4f_Projection(EyeRenderDesc[eye].Fov, 0.01f, 100.0f, false);
     }
 
     // Main message loop
@@ -179,7 +312,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         } else {
-            Render();
+            RenderFrame();
         }
     }
 
@@ -268,13 +401,11 @@ HRESULT CompileShaderFromFile(WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR szS
 //--------------------------------------------------------------------------------------
 // Create Direct3D device and swap chain
 //--------------------------------------------------------------------------------------
-HRESULT InitDevice() {
+HRESULT InitDevice(ovrSizei size) {
     HRESULT hr = S_OK;
 
-    RECT rc;
-    GetClientRect(g_hWnd, &rc);
-    UINT width = rc.right - rc.left;
-    UINT height = rc.bottom - rc.top;
+    UINT width = size.w;
+    UINT height = size.h;
 
     UINT createDeviceFlags = 0;
 #ifdef _DEBUG
@@ -603,13 +734,10 @@ HRESULT InitDevice() {
     g_World = XMMatrixIdentity();
 
     // Initialize the view matrix
-    XMVECTOR Eye = XMVectorSet(0.0f, 4.0f, -10.0f, 0.0f);
-    XMVECTOR At = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMVECTOR Eye = XMVectorSet(0.0f, 0.0f, -5.0f, 0.0f);
+    XMVECTOR At = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
     XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     g_View = XMMatrixLookAtLH(Eye, At, Up);
-
-    // Initialize the projection matrix
-    g_Projection = XMMatrixPerspectiveFovLH(XM_PIDIV4, width / (FLOAT)height, 0.01f, 100.0f);
 
     return S_OK;
 }
@@ -667,11 +795,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     return 0;
 }
 
+inline XMVECTOR toXm(const ovrQuatf & q) {
+    XMFLOAT4 xq(q.x, q.y, -q.z, q.w);
+    return XMLoadFloat4(&xq);
+}
+
+inline XMMATRIX toXM(const ovrPosef & op) {
+    XMMATRIX orientation = XMMatrixRotationQuaternion(toXm(op.Orientation));
+    XMMATRIX translation = XMMatrixTranslation(op.Position.x, op.Position.y, op.Position.z);
+    return XMMatrixMultiply(translation, orientation);
+}
+
 
 //--------------------------------------------------------------------------------------
 // Render a frame
 //--------------------------------------------------------------------------------------
-void Render() {
+void Render(const ovrPosef & ovrPose, const ovrMatrix4f & ovrProjection) {
     // Update our time
     static float t = 0.0f;
     if (g_driverType == D3D_DRIVER_TYPE_REFERENCE) {
@@ -706,23 +845,21 @@ void Render() {
     XMStoreFloat4(&vLightDirs[1], vLightDir);
 
     //
-    // Clear the back buffer
-    //
-
-    g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
-
-    //
-    // Clear the depth buffer to 1.0 (max depth)
-    //
-    g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-
-    //
     // Update matrix variables and lighting variables
     //
     ConstantBuffer cb1;
+    // Initialize the projection matrix
+
     cb1.mWorld = XMMatrixTranspose(g_World);
-    cb1.mView = XMMatrixTranspose(g_View);
-    cb1.mProjection = XMMatrixTranspose(g_Projection);
+
+    XMMATRIX pose = toXM(ovrPose);
+    XMMATRIX currentView = XMMatrixMultiply(g_View, pose);
+    //currentView = XMMatrixMultiply(XMMatrixScaling(2, 2, 2), currentView);
+    cb1.mView = XMMatrixTranspose(currentView);
+
+    XMMATRIX newProjection(&(ovrProjection.M[0][0]));
+
+    cb1.mProjection = newProjection;
     cb1.vLightDir[0] = vLightDirs[0];
     cb1.vLightDir[1] = vLightDirs[1];
     cb1.vLightColor[0] = vLightColors[0];
@@ -759,6 +896,44 @@ void Render() {
     //
     // Present our back buffer to our front buffer
     //
-    g_pSwapChain->Present( 0, 0 );
+//    g_pSwapChain->Present( 0, 0 );
 }
 
+void RenderFrame() {
+    ovrPosef temp_EyeRenderPose[2];
+    ovrHmd_GetEyePoses(HMD, 0, useHmdToEyeViewOffset, temp_EyeRenderPose, NULL);
+
+    ovrHmd_BeginFrame(HMD, 0);
+    for (int i = 0; i < 2; ++i) {
+        ovrEyeType eye = HMD->EyeRenderOrder[i];
+        ImageBuffer * useBuffer = pEyeRenderTexture[eye];
+        ovrPosef    * useEyePose = &EyeRenderPose[eye];
+        float       * useYaw = &YawAtRender[eye];
+        bool          clearEyeImage = true;
+        bool          updateEyeImage = true;
+
+        if (clearEyeImage) {
+            ClearAndSetRenderTarget(useBuffer->TexRtv, pEyeDepthBuffer[eye], EyeRenderViewport[eye]);
+        }
+
+        if (updateEyeImage) {
+            // Write in values actually used (becomes significant in Example features)
+            *useEyePose = temp_EyeRenderPose[eye];
+            *useYaw = Yaw;
+
+            Render(temp_EyeRenderPose[eye], eyeProjections[eye]);
+        }
+
+    }
+
+
+    ovrD3D11Texture eyeTexture[2]; // Gather data for eye textures 
+    for (int eye = 0; eye<2; eye++) {
+        eyeTexture[eye].D3D11.Header.API = ovrRenderAPI_D3D11;
+        eyeTexture[eye].D3D11.Header.TextureSize = pEyeRenderTexture[eye]->Size;
+        eyeTexture[eye].D3D11.Header.RenderViewport = EyeRenderViewport[eye];
+        eyeTexture[eye].D3D11.pTexture = pEyeRenderTexture[eye]->Tex;
+        eyeTexture[eye].D3D11.pSRView = pEyeRenderTexture[eye]->TexSv;
+    }
+    ovrHmd_EndFrame(HMD, EyeRenderPose, &eyeTexture[0].Texture);
+}
