@@ -36,7 +36,7 @@ namespace oria {
     T toQtType(Resource res) {
       T result;
       size_t size = Resources::getResourceSize(res);
-      result.resize(size);
+      result.resize((int) size);
       Resources::getResourceData(res, result.data());
       return result;
     }

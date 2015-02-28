@@ -19,22 +19,21 @@
 
 #pragma once
 
-/**
-A class that takes care of the basic duties of putting an OpenGL
-window on the desktop in the correct position so that it's visible
-through the Rift.
-*/
-class RiftGlfwApp : public GlfwApp, public RiftManagerApp {
+class RiftManagerApp {
 protected:
-  GLFWmonitor * hmdMonitor;
-  const bool fullscreen;
-  bool fakeRiftMonitor{ false };
+
+  ovrHmd hmd;
+
+  glm::uvec2 hmdNativeResolution;
+  glm::ivec2 hmdDesktopPosition;
 
 public:
-  RiftGlfwApp(bool fullscreen = false);
-  virtual ~RiftGlfwApp();
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2);
+  virtual ~RiftManagerApp();
 
-  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition);
-  virtual void viewport(ovrEyeType eye);
-  virtual void onKey(int key, int scancode, int action, int mods);
+  int getEnabledCaps();
+  void enableCaps(int caps);
+  void toggleCaps(ovrHmdCaps cap);
+  void disableCaps(int caps);
 };
+

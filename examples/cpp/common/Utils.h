@@ -41,10 +41,6 @@ public:
     times.clear();
   }
 
-  unsigned int count() const {
-    return times.size() - 1;
-  }
-
   float elapsed() const {
     if (times.size() < 1) {
       return 0.0f;
@@ -61,6 +57,6 @@ public:
     if (elapsed() == 0.0f) {
       return NAN;
     }
-    return (float)count() / elapsed();
+    return (times.size() - 1) / elapsed();
   }
 };

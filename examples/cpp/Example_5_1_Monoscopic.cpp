@@ -10,7 +10,7 @@ public:
         PI / 2.0f, aspect(WINDOW_SIZE), 0.01f, 100.0f);
 
     Stacks::modelview().top() = glm::lookAt(
-      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 5 * OVR_DEFAULT_IPD), 
+      vec3(0, OVR_DEFAULT_EYE_HEIGHT, 0.5f), 
       vec3(0, OVR_DEFAULT_EYE_HEIGHT, 0), 
       Vectors::UP);
   }
