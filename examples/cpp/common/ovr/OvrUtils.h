@@ -96,80 +96,18 @@ namespace ovr {
   GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition);
 }
 
-// Combine some macros together to create a single macro
-// to launch a class containing a run method
-#define RUN_OVR_APP(AppClass) \
-MAIN_DECL { \
-  if (!ovr_Initialize()) { \
-      SAY_ERR("Failed to initialize the Oculus SDK"); \
-      return -1; \
-  } \
-  int result = -1; \
-  try { \
-    result = AppClass().run(); \
-  } catch (std::exception & error) { \
-    SAY_ERR(error.what()); \
-  } catch (std::string & error) { \
-    SAY_ERR(error.c_str()); \
-  } \
-  ovr_Shutdown(); \
-  return result; \
+namespace oria {
+
+  bool clearHSW(ovrHmd hmd);
+
 }
-
-
-class RiftManagerApp {
-protected:
-  ovrHmd hmd;
-
-  glm::uvec2 hmdNativeResolution;
-  glm::ivec2 hmdDesktopPosition;
-
-public:
-  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
-    hmd = ovrHmd_Create(0);
-    if (nullptr == hmd) {
-      hmd = ovrHmd_CreateDebug(defaultHmdType);
-      hmdDesktopPosition = glm::ivec2(100, 100);
-    } else {
-      hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
-    }
-    hmdNativeResolution = glm::ivec2(hmd->Resolution.w, hmd->Resolution.h);
-  }
-
-  virtual ~RiftManagerApp() {
-    if (hmd) {
-      ovrHmd_Destroy(hmd);
-      hmd = nullptr;
-    }
-  }
-
-  int getEnabledCaps() {
-    return ovrHmd_GetEnabledCaps(hmd);
-  }
-
-  void enableCaps(int caps) {
-    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() | caps);
-  }
-
-  void toggleCaps(ovrHmdCaps cap) {
-    if (cap & getEnabledCaps()) {
-      disableCaps(cap);
-    } else {
-      enableCaps(cap);
-    }
-  }
-
-  void disableCaps(int caps) {
-    ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
-  }
-};
 
 // Convenience method for looping over each eye with a lambda
 template <typename Function>
 void for_each_eye(Function function) {
   for (ovrEyeType eye = ovrEyeType::ovrEye_Left;
-      eye < ovrEyeType::ovrEye_Count;
-      eye = static_cast<ovrEyeType>(eye + 1)) {
+    eye < ovrEyeType::ovrEye_Count;
+    eye = static_cast<ovrEyeType>(eye + 1)) {
     function(eye);
   }
 }

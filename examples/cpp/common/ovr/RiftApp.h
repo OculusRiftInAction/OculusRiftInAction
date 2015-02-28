@@ -37,7 +37,6 @@ protected:
   void renderStringAt(const std::string & str, float x, float y, float size = 18.0f);
   virtual void initGl();
   virtual void finishFrame();
-  virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw() final;
   virtual void update();
   virtual void renderScene() = 0;

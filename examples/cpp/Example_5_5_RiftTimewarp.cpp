@@ -10,8 +10,7 @@ class CubeScene_RiftTimewarp : public RiftGlfwApp {
   ovrTexture eyeTextures[2];
   ovrVector3f eyeOffsets[2];
 
-  float ipd{ OVR_DEFAULT_IPD };
-  float eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
+  float ipd, eyeHeight;
 
 public:
   CubeScene_RiftTimewarp() {
@@ -19,7 +18,7 @@ public:
     ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, ipd);
 
     Stacks::modelview().top() = glm::lookAt(
-      vec3(0, eyeHeight, 5 * ipd),
+      vec3(0, eyeHeight, 0.5f),
       vec3(0, eyeHeight, 0),
       Vectors::UP);
 
@@ -31,7 +30,7 @@ public:
   }
 
   virtual void initGl() {
-    GlfwApp::initGl();
+    RiftGlfwApp::initGl();
 
     ovrRenderAPIConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -39,8 +38,7 @@ public:
     cfg.Header.BackBufferSize = ovr::fromGlm(getSize());
     cfg.Header.Multisample = 1;
 
-    int distortionCaps =
-      ovrDistortionCap_TimeWarp |
+    int distortionCaps = ovrDistortionCap_TimeWarp |
       ovrDistortionCap_Chromatic |
       ovrDistortionCap_Vignette;
     ovrEyeRenderDesc eyeRenderDescs[2];
@@ -61,43 +59,14 @@ public:
       textureHeader.RenderViewport.Pos.x = 0;
       textureHeader.RenderViewport.Pos.y = 0;
       ((ovrGLTextureData&)eyeTextures[eye]).TexId =
-        oglplus::GetName(eyeArgs.framebuffer->color);
+          oglplus::GetName(eyeArgs.framebuffer->color);
 
-      eyeOffsets[eye] =
-        eyeRenderDescs[eye].HmdToEyeViewOffset;
+      eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
 
       ovrMatrix4f projection = ovrMatrix4f_Projection(fov, 0.01f, 100, true);
       eyeArgs.projection = ovr::toGlm(projection);
     });
   }
-
-
-  void onKey(int key, int scancode, int action, int mods) {
-    if (action == GLFW_PRESS) {
-      static ovrHSWDisplayState hswDisplayState;
-      ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
-      if (hswDisplayState.Displayed) {
-        ovrHmd_DismissHSWDisplay(hmd);
-        return;
-      }
-    }
-
-    if (GLFW_PRESS != action) {
-      GlfwApp::onKey(key, scancode, action, mods);
-      return;
-    }
-
-    switch (key) {
-    case GLFW_KEY_R:
-      ovrHmd_RecenterPose(hmd);
-      break;
-
-    default:
-      GlfwApp::onKey(key, scancode, action, mods);
-      break;
-    }
-  }
-
 
   virtual void finishFrame() {
   }
@@ -115,7 +84,7 @@ public:
 
       eyeArgs.framebuffer->Bind();
       oglplus::Context::Clear().DepthBuffer();
-      Stacks::withPush(mv, [&] {
+      Stacks::withPush(mv, [&]{
         mv.preMultiply(glm::inverse(ovr::toGlm(eyePoses[eye])));
         oria::renderExampleScene(ipd, eyeHeight);
       });

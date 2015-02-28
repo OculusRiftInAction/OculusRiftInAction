@@ -31,20 +31,10 @@ protected:
   bool fakeRiftMonitor{ false };
 
 public:
-  RiftGlfwApp(bool fullscreen = false) : fullscreen(fullscreen) {
-  }
+  RiftGlfwApp(bool fullscreen = false);
+  virtual ~RiftGlfwApp();
 
-  virtual ~RiftGlfwApp() {
-  }
-
-  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    return ovr::createRiftRenderingWindow(hmd, outSize, outPosition);
-  }
-
-  using GlfwApp::viewport;
-  virtual void viewport(ovrEyeType eye) {
-    const glm::uvec2 & windowSize = getSize();
-    glm::ivec2 viewportPosition(eye == ovrEye_Left ? 0 : windowSize.x / 2, 0);
-    GlfwApp::viewport(glm::uvec2(windowSize.x / 2, windowSize.y), viewportPosition);
-  }
+  virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition);
+  virtual void viewport(ovrEyeType eye);
+  virtual void onKey(int key, int scancode, int action, int mods);
 };

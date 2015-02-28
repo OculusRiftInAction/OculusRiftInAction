@@ -33,7 +33,7 @@ inline QRect getSecondaryScreenGeometry(const uvec2 & size) {
     }
     QRect geometry = desktop.screenGeometry(i);
     QSize screenSize = geometry.size();
-    if (best < 0 && (screenSize.width() >= size.x  && screenSize.height() >= size.y)) {
+    if (best < 0 && (screenSize.width() >= (int)size.x  && screenSize.height() >= (int)size.y)) {
       best = i;
       bestSize = geometry;
     }
