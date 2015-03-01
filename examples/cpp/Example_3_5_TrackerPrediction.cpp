@@ -1,5 +1,4 @@
 #include "Common.h"
-#include <opencv2/opencv.hpp>
 
 class SensorFusionPredictionExample : public GlfwApp {
   ovrHmd hmd;
@@ -91,29 +90,6 @@ public:
       mv.transform(predicted).scale(1.25f);
       oria::renderRift(0.3f);
     });
-
-    static double diff = 0;
-    double delta = glm::distance(actual * vec4(1, 0, 0, 1), predicted * vec4(1, 0, 0, 1));
-    if (delta > diff) {
-      diff = delta;
-      screenshot();
-    }
-  }
-
-  void screenshot() {
-    glFlush();
-    cv::Mat img(1024, 768, CV_8UC3);
-    glPixelStorei(GL_PACK_ALIGNMENT, (img.step & 3) ? 1 : 4);
-    glPixelStorei(GL_PACK_ROW_LENGTH, img.step / img.elemSize());
-    glReadPixels(0, 0, img.cols, img.rows, GL_BGR, GL_UNSIGNED_BYTE, img.data);
-    cv::flip(img, img, 0);
-    static int counter = 0;
-    static char buffer[128];
-    sprintf(buffer, "screenshot%05i.png", counter++);
-    bool success = cv::imwrite(buffer, img);
-    if (!success) {
-      throw std::runtime_error("Failed to write image");
-    }
   }
 };
 
