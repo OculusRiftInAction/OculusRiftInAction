@@ -22,5 +22,6 @@ qt5_add_resources(APP_RCC ${QRC})
 list(APPEND SOURCE_FILES ${APP_RCC} ${APP_RESOURCES})
 
 make_example2("Examples/Qt" "ShadertoyVR" "${SOURCE_FILES}")
+qt5_use_modules(ShadertoyVR  ${QT_COMPONENTS})
 
 
