@@ -19,13 +19,16 @@ limitations under the License.
 
 #pragma once
 
+#include "MainWindow.h"
+
 class ShadertoyApp : public QApplication {
   Q_OBJECT
   QWidget desktopWindow;
-
+  MainWindow * mainWindow;
 public:
   ShadertoyApp(int argc, char ** argv);
   virtual ~ShadertoyApp();
+  void destroyWindow();
 
 private:
   void setupDesktopWindow();

@@ -20,6 +20,8 @@ limitations under the License.
 #include "QtCommon.h"
 #include "Application.h"
 #include "Globals.h"
+#include "MainWindow.h"
+
 
 QSharedPointer<QFile> LOG_FILE;
 QtMessageHandler ORIGINAL_MESSAGE_HANDLER;
@@ -45,8 +47,16 @@ ShadertoyApp::ShadertoyApp(int argc, char ** argv) : QApplication(argc, argv) {
         qWarning() << "Could not open log file";
     }
     ORIGINAL_MESSAGE_HANDLER = qInstallMessageHandler(MessageOutput);
+
+    mainWindow = new MainWindow();
+    mainWindow->start();
+    mainWindow->requestActivate();
 }
 
+void ShadertoyApp::destroyWindow() {
+    mainWindow->stop();
+    delete mainWindow;
+}
 
 void ShadertoyApp::MessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     ORIGINAL_MESSAGE_HANDLER(type, context, msg);

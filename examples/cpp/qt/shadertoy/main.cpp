@@ -20,7 +20,9 @@ limitations under the License.
 #include "QtCommon.h"
 #include "Application.h"
 #include "MainWindow.h"
+#include <qtextstream.h>
 
+extern MainWindow * riftRenderWidget;
 
 MAIN_DECL {
   try {
@@ -29,16 +31,8 @@ MAIN_DECL {
 #endif
 
     QT_APP_WITH_ARGS(ShadertoyApp);
-
-    MainWindow * riftRenderWidget = new MainWindow();
-    riftRenderWidget->start();
-    riftRenderWidget->requestActivate();
     int result = app.exec();
-
-    riftRenderWidget->stop();
-    riftRenderWidget->makeCurrent();
-    Platform::runShutdownHooks();
-    delete riftRenderWidget;
+    app.destroyWindow();
 
     ovr_Shutdown();
 

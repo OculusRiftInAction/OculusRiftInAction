@@ -169,32 +169,37 @@ endif()
 #
 # Qt can be found by setting a QT5_ROOT to the root of your 
 
-set(QT_COMPONENTS Core Gui QuickWidgets OpenGL Xml XmlPatterns Declarative)
+option(USE_QT "Attempt to find Qt and build the Qt based examples" OFF)
+       
+if (USE_QT)
+	
+	set(QT_COMPONENTS Core Gui QuickWidgets OpenGL Xml XmlPatterns Declarative)
+	
+	# Qt emits a ton of warnings which we're not interested in
+	if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
+	    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
+	endif()
+	
+	find_package(Qt5 QUIET COMPONENTS ${QT_COMPONENTS})
+	
+	if (Qt5Core_FOUND)
+	    message(STATUS "Qt Found")
+	    set(HAVE_QT 1)
+	    set(CMAKE_INCLUDE_CURRENT_DIR ON)
+	    set(CMAKE_AUTOMOC ON)
+	    set(CMAKE_AUTORCC ON)
+	    set(CMAKE_AUTOMOC_MOC_OPTIONS "-bQtCommon.h" "-bCommon.h" )
+	   
+		foreach(qtc ${QT_COMPONENTS})
+	    	list(APPEND EXAMPLE_LIBS ${Qt5${qtc}_LIBRARIES})
+	        add_definitions(${Qt5${qtc}_DEFINITIONS})
+	        include_directories(${Qt5${qtc}_INCLUDE_DIRS})
+		endforeach()
+	else()
+	    message(WARNING "Qt framework not found") 
+	endif()
 
-# Qt emits a ton of warnings which we're not interested in
-if(NOT DEFINED CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
-    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
 endif()
-
-find_package(Qt5 QUIET COMPONENTS ${QT_COMPONENTS})
-
-if (Qt5Core_FOUND)
-    message(STATUS "Qt Found")
-    set(HAVE_QT 1)
-    set(CMAKE_INCLUDE_CURRENT_DIR ON)
-    set(CMAKE_AUTOMOC ON)
-    set(CMAKE_AUTORCC ON)
-    set(CMAKE_AUTOMOC_MOC_OPTIONS "-bQtCommon.h" "-bCommon.h" )
-   
-	foreach(qtc ${QT_COMPONENTS})
-    	list(APPEND EXAMPLE_LIBS ${Qt5${qtc}_LIBRARIES})
-        add_definitions(${Qt5${qtc}_DEFINITIONS})
-        include_directories(${Qt5${qtc}_INCLUDE_DIRS})
-	endforeach()
-else()
-    message(WARNING "Qt framework not found") 
-endif()
-
 ######################################################
 # OGLplus provides object oriented OpenGL wrappers
 #

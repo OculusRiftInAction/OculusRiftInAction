@@ -113,14 +113,15 @@ public:
 
 class QOffscreenUi : public QObject {
     Q_OBJECT
-        using ActomicMouse = std::atomic<vec2>;
+
+    using ActomicMouse = std::atomic<QSize>;
 
     bool m_paused;
     ActomicMouse mousePosition;
 
 public:
     QOffscreenUi();
-    ~QOffscreenUi();
+    virtual ~QOffscreenUi();
     void setup(const QSize & size, QOpenGLContext * context);
     void loadQml(const QUrl & qmlSource, std::function<void(QQmlContext*)> f = [](QQmlContext*){});
     QQmlContext * qmlContext();

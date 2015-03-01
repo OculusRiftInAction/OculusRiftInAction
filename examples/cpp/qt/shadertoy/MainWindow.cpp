@@ -110,6 +110,8 @@ void MainWindow::stop() {
     QRiftWindow::stop();
     delete uiWindow;
     uiWindow = nullptr;
+    makeCurrent();
+    Platform::runShutdownHooks();
 }
 
 void MainWindow::setup() {
@@ -507,12 +509,6 @@ void MainWindow::updateFps(float fps) {
 ///////////////////////////////////////////////////////
 //
 // Event handling customization
-//
-
-
-///////////////////////////////////////////////////////
-//
-// Event handling customization
 // 
 void MainWindow::mouseMoveEvent(QMouseEvent * me) {
     // Make sure we don't show the system cursor over the window
@@ -579,8 +575,8 @@ void MainWindow::perFrameRender() {
                     oria::renderGeometry(plane, uiProgram);
 
                     // Render the mouse sprite on the UI
-                    vec2 mp = uiWindow->getMousePosition().load();
-                    mv.translate(vec3(mp, 0.0f));
+                    QSize mp = uiWindow->getMousePosition().load();
+                    mv.translate(vec3(mp.width(), mp.height(), 0.0f));
                     mv.scale(vec3(0.1f));
                     mouseTexture->Bind(Texture::Target::_2D);
                     oria::renderGeometry(mouseShape, uiProgram);

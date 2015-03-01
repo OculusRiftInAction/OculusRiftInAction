@@ -397,7 +397,7 @@ void QOffscreenUi::mouseMoved(vec2 mp) {
     mp *= 2.0f;
     mp -= 1.0f;
     mp.y *= -1.0f;
-    mousePosition.store(mp);
+    mousePosition.store(QSize(mp.x, mp.y));
 }
 
 bool QOffscreenUi::interceptEvent(QEvent * e) {

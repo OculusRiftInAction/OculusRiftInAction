@@ -127,7 +127,7 @@ namespace shadertoy {
       return ChannelInputType::AUDIO;
     } else {
       // FIXME add support for video
-      throw std::exception("Unable to parse channel type");
+      throw std::runtime_error("Unable to parse channel type");
     }
   }
 
