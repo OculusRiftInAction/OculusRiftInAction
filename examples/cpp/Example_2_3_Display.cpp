@@ -15,57 +15,57 @@ public:
     }
   }
 
-virtual GLFWwindow * createRenderingTarget(
-    glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-  GLFWwindow * window = nullptr;
-  bool extendedMode =
-      ovrHmdCap_ExtendDesktop & hmd->HmdCaps;
+  virtual GLFWwindow * createRenderingTarget(
+      glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    GLFWwindow * window = nullptr;
+    bool extendedMode =
+        ovrHmdCap_ExtendDesktop & hmd->HmdCaps;
 
-  outPosition = glm::ivec2(
-      hmd->WindowsPos.x,
-      hmd->WindowsPos.y);
-  outSize = glm::uvec2(
-      hmd->Resolution.w,
-      hmd->Resolution.h);
+    outPosition = glm::ivec2(
+        hmd->WindowsPos.x,
+        hmd->WindowsPos.y);
+    outSize = glm::uvec2(
+        hmd->Resolution.w,
+        hmd->Resolution.h);
 
-  if (extendedMode) {
-    GLFWmonitor * monitor =
-        glfw::getMonitorAtPosition(outPosition);
-    if (nullptr != monitor) {
-      const GLFWvidmode * mode = glfwGetVideoMode(monitor);
-      outSize = glm::uvec2(mode->width, mode->height);
+    if (extendedMode) {
+      GLFWmonitor * monitor =
+          glfw::getMonitorAtPosition(outPosition);
+      if (nullptr != monitor) {
+        const GLFWvidmode * mode = glfwGetVideoMode(monitor);
+        outSize = glm::uvec2(mode->width, mode->height);
+      }
+      glfwWindowHint(GLFW_DECORATED, 0);
+      window = glfw::createWindow(outSize, outPosition);
+    } else {
+      window = glfw::createSecondaryScreenWindow(outSize);
+      void * nativeWindowHandle =
+          glfw::getNativeWindowHandle(window);
+      if (nullptr != nativeWindowHandle) {
+        ovrHmd_AttachToWindow(hmd, nativeWindowHandle,
+            nullptr, nullptr);
+      }
     }
-    glfwWindowHint(GLFW_DECORATED, 0);
-    window = glfw::createWindow(outSize, outPosition);
-  } else {
-    window = glfw::createSecondaryScreenWindow(outSize);
-    void * nativeWindowHandle =
-        glfw::getNativeWindowHandle(window);
-    if (nullptr != nativeWindowHandle) {
-      ovrHmd_AttachToWindow(hmd, nativeWindowHandle,
-          nullptr, nullptr);
-    }
+
+    return window;
   }
 
-  return window;
-}
-
-void draw() {
-  glm::uvec2 eyeSize = getSize();
-  eyeSize.x /= 2;
+  void draw() {
+    glm::uvec2 eyeSize = getSize();
+    eyeSize.x /= 2;
   
-  glEnable(GL_SCISSOR_TEST);
+    glEnable(GL_SCISSOR_TEST);
 
-  glScissor(0, 0, eyeSize.x, eyeSize.y);
-  glClearColor(1, 0, 0, 1);
-  glClear(GL_COLOR_BUFFER_BIT);
+    glScissor(0, 0, eyeSize.x, eyeSize.y);
+    glClearColor(1, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-  glScissor(eyeSize.x, 0, eyeSize.x, eyeSize.y);
-  glClearColor(0, 0, 1, 1);
-  glClear(GL_COLOR_BUFFER_BIT);
+    glScissor(eyeSize.x, 0, eyeSize.x, eyeSize.y);
+    glClearColor(0, 0, 1, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-  glDisable(GL_SCISSOR_TEST);
-}
+    glDisable(GL_SCISSOR_TEST);
+  }
 };
 
 RUN_OVR_APP(RiftDisplay);

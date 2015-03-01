@@ -42,7 +42,7 @@ namespace oria {
   void renderSkybox(Resource firstImageResource);
   void renderFloor();
   void renderManikin();
-  void renderRift();
+  void renderRift(float alpha = 0.0f);
   void renderArtificialHorizon(float alpha = 0.0f);
   void renderManikinScene(float ipd, float eyeHeight);
   void renderExampleScene(float ipd, float eyeHeight);

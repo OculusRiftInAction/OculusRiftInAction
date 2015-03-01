@@ -19,7 +19,6 @@ public:
     SAY(hmd->ProductName);
     ovrHmd_Destroy(hmd);
 
-
     ovr_Shutdown();
 
     SAY("Exiting");

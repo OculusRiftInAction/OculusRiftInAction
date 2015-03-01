@@ -34,7 +34,6 @@ public:
   }
 
   virtual void resetPosition() {
-    //eyeHeight = 0;
     static const glm::vec3 EYE = glm::vec3(0, eyeHeight, ipd * 5.0f);
     static const glm::vec3 LOOKAT = glm::vec3(0, eyeHeight, 0);
     player = glm::inverse(glm::lookAt(EYE, LOOKAT, Vectors::UP));
@@ -42,7 +41,7 @@ public:
   }
 
   virtual void finishFrame() {
-    /*
+    /**
      * The parent class calls glfwSwapBuffers in finishFrame,
      * but with the Oculus SDK, the SDK it responsible for buffer
      * swapping, so we have to override the method and ensure it
@@ -52,12 +51,12 @@ public:
   }
 
   virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    /*
-    * In the Direct3D examples in the Oculus SDK, they make the point that the
-    * onscreen window size does not need to match the Rift resolution.  However
-    * This doesn't currently work in OpenGL, so we have to create the window at
-    * the full resolution of the BackBufferSize
-    */
+    /**
+     * In the Direct3D examples in the Oculus SDK, they make the point that the
+     * onscreen window size does not need to match the Rift resolution.  However
+     * this doesn't currently work in OpenGL, so we have to create the window at
+     * the full resolution of the BackBufferSize.
+     */
     return ovr::createRiftRenderingWindow(hmd, outSize, outPosition);
   }
 
@@ -83,13 +82,14 @@ public:
     memset(&cfg, 0, sizeof(ovrGLConfig));
     cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
     cfg.OGL.Header.Multisample = 1;
-    /*
-    * In the Direct3D examples in the Oculus SDK, they make the point that the
-    * onscreen window size does not need to match the Rift resolution.  However
-    * This doesn't currently work in OpenGL, so we have to create the window at
-    * the full resolution of the Rift and ensure that we use the same
-    * size here when setting the BackBufferSize
-    */
+
+    /**
+     * In the Direct3D examples in the Oculus SDK, they make the point that the
+     * onscreen window size does not need to match the Rift resolution.  However
+     * this doesn't currently work in OpenGL, so we have to create the window at
+     * the full resolution of the Rift and ensure that we use the same
+     * size here when setting the BackBufferSize.
+     */
     cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
 
     ON_LINUX([&]{
@@ -97,9 +97,9 @@ public:
     });
 
     int distortionCaps =
-      ovrDistortionCap_TimeWarp |
-      ovrDistortionCap_Chromatic |
-      ovrDistortionCap_Vignette;
+        ovrDistortionCap_TimeWarp |
+        ovrDistortionCap_Chromatic |
+        ovrDistortionCap_Vignette;
 
     ON_LINUX([&]{
       distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
@@ -107,7 +107,7 @@ public:
 
     ovrEyeRenderDesc              eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
-      distortionCaps, eyeFovPorts, eyeRenderDescs);
+        distortionCaps, eyeFovPorts, eyeRenderDescs);
     if (!configResult) {
       FAIL("Unable to configure SDK based distortion rendering");
     }
@@ -115,18 +115,13 @@ public:
     for_each_eye([&](ovrEyeType eye){
       eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
       eyeProjections[eye] = ovr::toGlm(
-        ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01f, 1000.0f, true));
+          ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01f, 1000.0f, true));
     });
   }
 
   void onKey(int key, int scancode, int action, int mods) {
-    if (action == GLFW_PRESS) {
-      static ovrHSWDisplayState hswDisplayState;
-      ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
-      if (hswDisplayState.Displayed) {
-        ovrHmd_DismissHSWDisplay(hmd);
-        return;
-      }
+    if (oria::clearHSW(hmd)) {
+      return;
     }
 
     if (CameraControl::instance().onKey(key, scancode, action, mods)) {
@@ -134,37 +129,29 @@ public:
     }
 
     if (GLFW_PRESS != action) {
-      GlfwApp::onKey(key, scancode, action, mods);
-      return;
+      int caps = ovrHmd_GetEnabledCaps(hmd);
+      switch (key) {
+      case GLFW_KEY_V:
+        if (caps & ovrHmdCap_NoVSync) {
+          ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_NoVSync);
+        } else {
+          ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_NoVSync);
+        }
+        return;
+      case GLFW_KEY_P:
+        if (caps & ovrHmdCap_LowPersistence) {
+          ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_LowPersistence);
+        } else {
+          ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_LowPersistence);
+        }
+        return;
+      case GLFW_KEY_R:
+        resetPosition();
+        return;
+      }
     }
 
-    int caps = ovrHmd_GetEnabledCaps(hmd);
-    switch (key) {
-    case GLFW_KEY_V:
-      if (caps & ovrHmdCap_NoVSync) {
-        ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_NoVSync);
-      } else {
-        ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_NoVSync);
-      }
-      break;
-
-    case GLFW_KEY_P:
-      if (caps & ovrHmdCap_LowPersistence) {
-        ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_LowPersistence);
-      }
-      else {
-        ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_LowPersistence);
-      }
-      break;
-
-    case GLFW_KEY_R:
-      resetPosition();
-      break;
-
-    default:
-      GlfwApp::onKey(key, scancode, action, mods);
-      break;
-    }
+    GlfwApp::onKey(key, scancode, action, mods);
   }
 
   virtual void update() {
@@ -181,7 +168,7 @@ public:
     ovrHmd_BeginFrame(hmd, frameIndex);
     glEnable(GL_DEPTH_TEST);
 
-    for( int i = 0; i < 2; ++i) {
+    for (int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
 
       const ovrRecti & vp = textures[eye].Header.RenderViewport;
@@ -203,23 +190,7 @@ public:
 
   virtual void renderScene() {
     oglplus::Context::Clear().DepthBuffer().ColorBuffer();
-    oria::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
-    oria::renderFloor();
-
-    // Scale the size of the cube to the distance between the eyes
-    MatrixStack & mv = Stacks::modelview();
-
-    mv.withPush([&]{
-      mv.translate(glm::vec3(0, eyeHeight, 0)).scale(glm::vec3(ipd));
-      oria::renderColorCube();
-    });
-
-    mv.withPush([&]{
-      mv.translate(glm::vec3(0, 0, ipd * -5.0));
-
-      oglplus::Context::Disable(oglplus::Capability::CullFace);
-      oria::renderManikin();
-    });
+    oria::renderManikinScene(ipd, eyeHeight);
   }
 };
 

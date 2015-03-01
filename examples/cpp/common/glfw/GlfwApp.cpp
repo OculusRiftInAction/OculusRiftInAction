@@ -202,7 +202,6 @@ void GlfwApp::destroyWindow() {
   glfwDestroyWindow(window);
 }
 
-
 void GlfwApp::onKey(int key, int scancode, int action, int mods) {
   if (GLFW_PRESS != action) {
     return;
