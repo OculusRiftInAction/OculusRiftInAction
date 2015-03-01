@@ -562,9 +562,7 @@ namespace oria {
     mv.withPush([&]{
       mv.rotate(-HALF_PI - 0.22f, Vectors::X_AXIS).scale(0.5f);
       renderGeometry(shape, program, [&] {
-        if (alpha >= 0) {
-          Uniform<float>(*program, "ForceAlpha").Set(alpha);
-        }
+        Uniform<float>(*program, "ForceAlpha").Set(alpha);
         oria::bindLights(program);
       });
     });
