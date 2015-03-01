@@ -6,7 +6,6 @@ Item {
     id: root
     width: 1280
     height: 720
-    FontLoader { id: tronFont; source: "fonts/uifont.ttf" }
     property int activeChannel: -1
     property alias text: editor.text
 
@@ -37,6 +36,7 @@ Item {
     signal epfModeChanged(bool checked)
 
     Keys.onPressed: {
+    	console.log(event.key);
         switch (event.key) {
         case Qt.Key_Q:
             if (Qt.ControlModifier == event.modifiers) {
