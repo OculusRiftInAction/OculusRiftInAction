@@ -523,18 +523,10 @@ void MainWindow::mouseMoveEvent(QMouseEvent * me) {
 bool MainWindow::event(QEvent * e) {
 #ifdef USE_RIFT
     static bool dismissedHmd = false;
-    switch (e->type()) {
-    case QEvent::KeyPress:
-        if (!dismissedHmd) {
-            // Allow the user to remove the HSW message early
-            ovrHSWDisplayState hswState;
-            ovrHmd_GetHSWDisplayState(hmd, &hswState);
-            if (hswState.Displayed) {
-                ovrHmd_DismissHSWDisplay(hmd);
-                dismissedHmd = true;
-                return true;
-            }
-        }
+    if (e->type() == QEvent::KeyPress) {
+      if (oria::clearHSW(hmd)) {
+        return true;
+      }
     }
 #endif
     if (uiWindow) {

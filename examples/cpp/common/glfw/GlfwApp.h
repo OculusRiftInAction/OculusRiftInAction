@@ -72,7 +72,5 @@ private:
   friend void MouseMoveCallback(GLFWwindow* window, double x, double y);
   friend void CharacterCallback(GLFWwindow* window, unsigned int codepoint);
   friend void ScrollCallback(GLFWwindow * window, double x, double y);
-
-  virtual void screenshot();
 };
 

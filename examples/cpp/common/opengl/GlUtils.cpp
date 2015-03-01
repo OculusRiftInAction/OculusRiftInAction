@@ -344,20 +344,6 @@ namespace oria {
     getFont(fontResource)->renderString(toUtf16(cstr), cursor, fontSize);
   }
 
-  void renderParagraph(const std::string & str) {
-    // FIXME
-//    glm::vec2 cursor;
-//    Text::FontPtr font = getFont(Resource::FONTS_INCONSOLATA_MEDIUM_SDFF);
-//    rectf bounds;
-//    std::wstring wstr = toUtf16(str);
-//    for (size_t i = 0; i < wstr.length(); ++i) {
-//      uint16_t wchar = wstr.at(i);
-//      rectf letterBound = font->getBounds(wchar);
-//      extendLeft(bounds, letterBound);
-//    }
-//    renderString(str, cursor);
-  }
-
   void renderString(const std::string & str, glm::vec3 & cursor3d,
     float fontSize, Resource fontResource) {
     glm::vec4 target = glm::vec4(cursor3d, 0);
@@ -558,7 +544,7 @@ namespace oria {
     });
   }
 
-  void renderRift() {
+  void renderRift(float alpha) {
     using namespace oglplus;
     static ProgramPtr program;
     static ShapeWrapperPtr shape;
@@ -576,6 +562,9 @@ namespace oria {
     mv.withPush([&]{
       mv.rotate(-HALF_PI - 0.22f, Vectors::X_AXIS).scale(0.5f);
       renderGeometry(shape, program, [&] {
+        if (alpha >= 0) {
+          Uniform<float>(*program, "ForceAlpha").Set(alpha);
+        }
         oria::bindLights(program);
       });
     });
@@ -640,6 +629,20 @@ namespace oria {
     oria::renderFloor();
 
     MatrixStack & mv = Stacks::modelview();
+    for (int j = -1; j <= 1; j++) {
+      for (int k = -1; k <= 1; k++) {
+        mv.withPush([&]{
+          mv.translate(glm::vec3(0, 0.01, 0));
+          mv.scale(glm::vec3(4));
+          mv.translate(glm::vec3(j, 0, k));
+          oria::draw3dGrid();
+        });
+      }
+    }
+    mv.withPush([&]{
+      mv.translate(glm::vec3(0, eyeHeight, 0)).scale(glm::vec3(ipd));
+      oria::renderColorCube();
+    });
     mv.withPush([&]{
       mv.translate(glm::vec3(0, eyeHeight, 0)).scale(glm::vec3(ipd));
       oria::renderColorCube();

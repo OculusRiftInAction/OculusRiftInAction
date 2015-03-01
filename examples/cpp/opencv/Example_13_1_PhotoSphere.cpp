@@ -8,8 +8,6 @@
 
 class PhotoSphereExample : public RiftApp {
 
-
-
 public:
   PhotoSphereExample() {
   }

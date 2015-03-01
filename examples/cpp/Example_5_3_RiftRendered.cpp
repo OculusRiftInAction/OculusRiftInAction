@@ -10,8 +10,7 @@ class CubeScene_Rift: public RiftGlfwApp {
   PerEyeArg eyes[2];
   ovrTexture eyeTextures[2];
 
-  float ipd{ OVR_DEFAULT_IPD };
-  float eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
+  float ipd, eyeHeight;
 
 public:
   CubeScene_Rift() {
@@ -19,13 +18,13 @@ public:
     ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, ipd);
 
     Stacks::modelview().top() = glm::lookAt(
-      vec3(0, eyeHeight, 5 * ipd),
+      vec3(0, eyeHeight, 0.5f),
       vec3(0, eyeHeight, 0),
       Vectors::UP);
   }
 
   virtual void initGl() {
-    GlfwApp::initGl();
+    RiftGlfwApp::initGl();
 
     ovrRenderAPIConfig cfg;
     memset(&cfg, 0, sizeof(cfg));

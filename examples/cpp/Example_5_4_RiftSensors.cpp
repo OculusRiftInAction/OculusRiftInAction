@@ -10,8 +10,7 @@ class CubeScene_RiftSensors : public RiftGlfwApp {
   ovrTexture eyeTextures[2];
   ovrVector3f eyeOffsets[2];
 
-  float ipd{ OVR_DEFAULT_IPD };
-  float eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
+  float ipd, eyeHeight;
 
 public:
   CubeScene_RiftSensors() {
@@ -19,7 +18,7 @@ public:
     ipd = ovrHmd_GetFloat(hmd, OVR_KEY_IPD, ipd);
 
     Stacks::modelview().top() = glm::lookAt(
-      vec3(0, eyeHeight, 5 * ipd),
+      vec3(0, eyeHeight, 0.5f),
       vec3(0, eyeHeight, 0),
       Vectors::UP);
 
@@ -31,7 +30,7 @@ public:
   }
 
   virtual void initGl() {
-    GlfwApp::initGl();
+    RiftGlfwApp::initGl();
 
     ovrRenderAPIConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -60,10 +59,9 @@ public:
       textureHeader.RenderViewport.Pos.x = 0;
       textureHeader.RenderViewport.Pos.y = 0;
       ((ovrGLTextureData&)eyeTextures[eye]).TexId =
-        oglplus::GetName(eyeArgs.framebuffer->color);
+          oglplus::GetName(eyeArgs.framebuffer->color);
 
-      eyeOffsets[eye] = 
-        eyeRenderDescs[eye].HmdToEyeViewOffset;
+      eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
 
       ovrMatrix4f projection = ovrMatrix4f_Projection(fov, 0.01f, 100, true);
       eyeArgs.projection = ovr::toGlm(projection);

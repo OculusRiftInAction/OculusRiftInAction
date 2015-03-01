@@ -202,7 +202,6 @@ void GlfwApp::destroyWindow() {
   glfwDestroyWindow(window);
 }
 
-
 void GlfwApp::onKey(int key, int scancode, int action, int mods) {
   if (GLFW_PRESS != action) {
     return;
@@ -211,12 +210,6 @@ void GlfwApp::onKey(int key, int scancode, int action, int mods) {
   switch (key) {
   case GLFW_KEY_ESCAPE:
     glfwSetWindowShouldClose(window, 1);
-    return;
-
-  case GLFW_KEY_S:
-    if (mods & GLFW_MOD_SHIFT) {
-      screenshot();
-    }
     return;
   }
 }
@@ -238,28 +231,6 @@ void GlfwApp::viewport(const glm::vec2 & size, const glm::vec2 & pos) {
 void GlfwApp::renderStringAt(const std::string & string, float x, float y) {
   renderStringAt(string, vec2(x, y));
 }
-
-void GlfwApp::screenshot() {
-  //#ifdef HAVE_OPENCV
-  //    //use fast 4-byte alignment (default anyway) if possible
-  //    glFlush();
-  //    cv::Mat img(windowSize.y, windowSize.x, CV_8UC3);
-  //    glPixelStorei(GL_PACK_ALIGNMENT, (img.step & 3) ? 1 : 4);
-  //    glPixelStorei(GL_PACK_ROW_LENGTH, img.step / img.elemSize());
-  //    glReadPixels(0, 0, img.cols, img.rows, GL_BGR, GL_UNSIGNED_BYTE, img.data);
-  //    cv::flip(img, img, 0);
-  //
-  //    static int counter = 0;
-  //    static char buffer[128];
-  //    sprintf(buffer, "screenshot%05i.png", counter++);
-  //    bool success = cv::imwrite(buffer, img);
-  //    if (!success) {
-  //      throw std::runtime_error("Failed to write image");
-  //    }
-  //#endif
-}
-
-
 
 void GlfwApp::renderStringAt(const std::string & str, const glm::vec2 & pos) {
   MatrixStack & mv = Stacks::modelview();
