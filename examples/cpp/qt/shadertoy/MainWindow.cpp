@@ -248,6 +248,7 @@ void MainWindow::setupOffscreenUi() {
     });
 
     setItemText("res", QString().sprintf("%0.2f", texRes));
+    uiWindow->setSourceSize(size());
 }
 
 QVariant MainWindow::getItemProperty(const QString & itemName, const QString & property) {
@@ -575,7 +576,7 @@ void MainWindow::perFrameRender() {
                     oria::renderGeometry(plane, uiProgram);
 
                     // Render the mouse sprite on the UI
-                    QSize mp = uiWindow->getMousePosition().load();
+                    QSizeF mp = uiWindow->getMousePosition().load();
                     mv.translate(vec3(mp.width(), mp.height(), 0.0f));
                     mv.scale(vec3(0.1f));
                     mouseTexture->Bind(Texture::Target::_2D);
