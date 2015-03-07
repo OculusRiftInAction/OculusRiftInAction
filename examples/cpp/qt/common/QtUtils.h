@@ -114,7 +114,7 @@ public:
 class QOffscreenUi : public QObject {
     Q_OBJECT
 
-    using ActomicMouse = std::atomic<QSize>;
+    using ActomicMouse = std::atomic<QSizeF>;
 
     bool m_paused;
     ActomicMouse mousePosition;

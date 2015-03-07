@@ -72,8 +72,8 @@ public:
   }
 
   void draw() {
-    // Bug in SDK prevents direct mode from activating unless I call this
     static ovrPosef eyePoses[2];
+    // A bug in some versions of the SDK prevents Direct Mode from engaging properly unless you call the GetEyePoses function
     {
       static ovrVector3f eyeOffsets[2];
       ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
