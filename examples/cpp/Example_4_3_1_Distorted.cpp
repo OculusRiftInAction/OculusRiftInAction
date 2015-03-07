@@ -29,20 +29,15 @@ public:
       glm::uvec2 textureSize;
       sceneTextures[eye] = oria::load2dTexture(sceneImages[eye], textureSize);
 
-      memset(eyeTextures + eye, 0,
-        sizeof(eyeTextures[eye]));
+      memset(eyeTextures + eye, 0, sizeof(eyeTextures[eye]));
 
-      ovrTextureHeader & eyeTextureHeader =
-        eyeTextures[eye].Header;
+      ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
 
       eyeTextureHeader.TextureSize = ovr::fromGlm(textureSize);
-      eyeTextureHeader.RenderViewport.Size =
-        eyeTextureHeader.TextureSize;
-
+      eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
-      ((ovrGLTextureData&)eyeTextures[eye]).TexId =
-        oglplus::GetName(*sceneTextures[eye]);
+      ((ovrGLTextureData&)eyeTextures[eye]).TexId = oglplus::GetName(*sceneTextures[eye]);
     });
 
     ovrRenderAPIConfig config;
@@ -57,8 +52,8 @@ public:
 #endif
 
     int distortionCaps = 
-      ovrDistortionCap_Vignette
-      | ovrDistortionCap_Chromatic;
+        ovrDistortionCap_Vignette
+        | ovrDistortionCap_Chromatic;
 
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &config,
@@ -72,6 +67,7 @@ public:
   }
 
   void draw() {
+    static ovrPosef eyePoses[2];
     ovrHmd_BeginFrame(hmd, getFrame());
     ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
   }

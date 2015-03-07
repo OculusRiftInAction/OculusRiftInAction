@@ -56,7 +56,6 @@ public:
     RiftGlfwApp::shutdownGl();
   }
 
-
   void draw() {
     using namespace oglplus;
 
