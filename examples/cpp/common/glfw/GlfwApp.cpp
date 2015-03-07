@@ -73,10 +73,10 @@ int GlfwApp::run() {
   try {
     preCreate();
     window = createRenderingTarget(windowSize, windowPosition);
-    postCreate();
     if (!window) {
       FAIL("Unable to create OpenGL window");
     }
+    postCreate();
 
     // Sometimes window initialization generates GL errors, so clear them out 
     // before calling any oglplus stuff
@@ -142,7 +142,7 @@ void GlfwApp::postCreate()  {
   glfwSwapInterval(1);
 
   // Initialize the OpenGL bindings
-  // For some reason we have to set this experminetal flag to properly
+  // For some reason we have to set this expermiental flag to properly
   // init GLEW if we use a core context.
   glewExperimental = GL_TRUE;
   if (0 != glewInit()) {

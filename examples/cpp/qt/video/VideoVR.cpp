@@ -409,7 +409,8 @@ private:
                         oria::renderGeometry(plane, uiProgram);
 
                         // Render the mouse sprite on the UI
-                        vec2 mp = uiWindow->getMousePosition().load();
+                        QSizeF size = uiWindow->getMousePosition().load();
+                        vec2 mp(size.width(), size.height());
                         mv.translate(vec3(mp, 0.0f));
                         mv.scale(vec3(0.1f));
                         mouseTexture->Bind(Texture::Target::_2D);
