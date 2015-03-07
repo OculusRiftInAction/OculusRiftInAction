@@ -59,8 +59,9 @@ public:
 
   void draw() {
     using namespace oglplus;
-    static ovrPosef eyePoses[2];
+    // A bug in some versions of the SDK prevents Direct Mode from engaging properly unless you call the GetEyePoses function
     {
+      static ovrPosef eyePoses[2];
       static ovrVector3f eyeOffsets[2];
       ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
     }
