@@ -7,14 +7,6 @@ public:
 
   void draw() {
 
-    // A bug in some versions of the SDK (0.4.x) prevents Direct Mode from 
-    // engaging properly unless you call the GetEyePoses function.
-    {
-      static ovrVector3f offsets[2];
-      static ovrPosef poses[2];
-      ovrHmd_GetEyePoses(hmd, 0, offsets, poses, nullptr);
-    }
-
     glm::uvec2 eyeSize(hmd->Resolution.w / 2, hmd->Resolution.h);
     glm::ivec2 position = glm::ivec2(0, 0);
     glm::vec4 color = glm::vec4(1, 0, 0, 1);
@@ -45,4 +37,8 @@ public:
   Fullscreen() : DisplayTargetingExample(true) {}
 };
 
+/**
+ * Set this to Windowed for a windowed app.
+ * Set this to Fullscreen for a fullscreen app.
+ */
 RUN_OVR_APP(Windowed);
