@@ -17,20 +17,14 @@ public:
 
   virtual GLFWwindow * createRenderingTarget(
       glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    GLFWwindow * window = nullptr;
-    bool extendedMode =
-        ovrHmdCap_ExtendDesktop & hmd->HmdCaps;
+    GLFWwindow * window;
+    bool extendedMode = ovrHmdCap_ExtendDesktop & hmd->HmdCaps;
 
-    outPosition = glm::ivec2(
-        hmd->WindowsPos.x,
-        hmd->WindowsPos.y);
-    outSize = glm::uvec2(
-        hmd->Resolution.w,
-        hmd->Resolution.h);
+    outPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
+    outSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
 
     if (extendedMode) {
-      GLFWmonitor * monitor =
-          glfw::getMonitorAtPosition(outPosition);
+      GLFWmonitor * monitor = glfw::getMonitorAtPosition(outPosition);
       if (nullptr != monitor) {
         const GLFWvidmode * mode = glfwGetVideoMode(monitor);
         outSize = glm::uvec2(mode->width, mode->height);
@@ -38,12 +32,19 @@ public:
       glfwWindowHint(GLFW_DECORATED, 0);
       window = glfw::createWindow(outSize, outPosition);
     } else {
+
+      // A bug in some versions of the SDK (0.4.x) prevents Direct Mode from 
+      // engaging properly unless you call the GetEyePoses function.
+      {
+        static ovrVector3f offsets[2];
+        static ovrPosef poses[2];
+        ovrHmd_GetEyePoses(hmd, 0, offsets, poses, nullptr);
+      }
+
       window = glfw::createSecondaryScreenWindow(outSize);
-      void * nativeWindowHandle =
-          glfw::getNativeWindowHandle(window);
+      void * nativeWindowHandle = glfw::getNativeWindowHandle(window);
       if (nullptr != nativeWindowHandle) {
-        ovrHmd_AttachToWindow(hmd, nativeWindowHandle,
-            nullptr, nullptr);
+        ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
       }
     }
 
