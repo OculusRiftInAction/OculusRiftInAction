@@ -27,11 +27,10 @@ through the Rift.
 class RiftGlfwApp : public GlfwApp, public RiftManagerApp {
 protected:
   GLFWmonitor * hmdMonitor;
-  const bool fullscreen;
   bool fakeRiftMonitor{ false };
 
 public:
-  RiftGlfwApp(bool fullscreen = false);
+  RiftGlfwApp();
   virtual ~RiftGlfwApp();
 
   virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition);

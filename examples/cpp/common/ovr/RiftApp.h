@@ -80,7 +80,7 @@ protected:
   }
 
 public:
-  RiftApp(bool fullscreen = false);
+  RiftApp();
   virtual ~RiftApp();
 };
 
