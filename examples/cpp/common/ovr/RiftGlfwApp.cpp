@@ -21,7 +21,7 @@
 #include "RiftGlfwApp.h"
 #include <OVR_CAPI_GL.h>
 
-RiftGlfwApp::RiftGlfwApp(bool fullscreen) : fullscreen(fullscreen) {
+RiftGlfwApp::RiftGlfwApp() {
 }
 
 RiftGlfwApp::~RiftGlfwApp() {
