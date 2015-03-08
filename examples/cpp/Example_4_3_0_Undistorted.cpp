@@ -56,15 +56,9 @@ public:
     RiftGlfwApp::shutdownGl();
   }
 
-
   void draw() {
     using namespace oglplus;
-    // A bug in some versions of the SDK prevents Direct Mode from engaging properly unless you call the GetEyePoses function
-    {
-      static ovrPosef eyePoses[2];
-      static ovrVector3f eyeOffsets[2];
-      ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
-    }
+
     DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
     Context::Clear().ColorBuffer();
     for_each_eye([&](ovrEyeType eye) {

@@ -29,20 +29,13 @@ public:
       glm::uvec2 textureSize;
       sceneTextures[eye] = oria::load2dTexture(sceneImages[eye], textureSize);
 
-      memset(eyeTextures + eye, 0,
-        sizeof(eyeTextures[eye]));
-
-      ovrTextureHeader & eyeTextureHeader =
-        eyeTextures[eye].Header;
-
+      memset(eyeTextures + eye, 0, sizeof(eyeTextures[eye]));
+      ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
       eyeTextureHeader.TextureSize = ovr::fromGlm(textureSize);
-      eyeTextureHeader.RenderViewport.Size =
-        eyeTextureHeader.TextureSize;
-
+      eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
 
-      ((ovrGLTextureData&)eyeTextures[eye]).TexId =
-        oglplus::GetName(*sceneTextures[eye]);
+      ((ovrGLTextureData&)eyeTextures[eye]).TexId = oglplus::GetName(*sceneTextures[eye]);
     });
 
     ovrRenderAPIConfig config;
@@ -57,12 +50,12 @@ public:
 #endif
 
     int distortionCaps = 
-      ovrDistortionCap_Vignette
-      | ovrDistortionCap_Chromatic;
+        ovrDistortionCap_Vignette
+        | ovrDistortionCap_Chromatic;
 
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &config,
-      distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
+        distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
     }
@@ -73,11 +66,6 @@ public:
 
   void draw() {
     static ovrPosef eyePoses[2];
-    // A bug in some versions of the SDK prevents Direct Mode from engaging properly unless you call the GetEyePoses function
-    {
-      static ovrVector3f eyeOffsets[2];
-      ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
-    }
     ovrHmd_BeginFrame(hmd, getFrame());
     ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
   }
