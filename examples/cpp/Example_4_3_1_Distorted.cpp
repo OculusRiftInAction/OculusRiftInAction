@@ -57,7 +57,7 @@ public:
 
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &config,
-      distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
+        distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
     if (0 == configResult) {
       FAIL("Unable to configure rendering");
     }
