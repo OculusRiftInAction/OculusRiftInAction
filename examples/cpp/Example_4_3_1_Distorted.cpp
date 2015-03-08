@@ -30,9 +30,7 @@ public:
       sceneTextures[eye] = oria::load2dTexture(sceneImages[eye], textureSize);
 
       memset(eyeTextures + eye, 0, sizeof(eyeTextures[eye]));
-
       ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
-
       eyeTextureHeader.TextureSize = ovr::fromGlm(textureSize);
       eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
