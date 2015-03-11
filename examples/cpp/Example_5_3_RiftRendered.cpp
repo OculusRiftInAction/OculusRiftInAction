@@ -68,9 +68,6 @@ public:
 
   virtual void draw() {
     static ovrPosef eyePoses[2];
-    static ovrVector3f eyeOffsets[2];
-    // Bug in SDK prevents direct mode from activating unless I call this
-    ovrHmd_GetEyePoses(hmd, getFrame(), eyeOffsets, eyePoses, nullptr);
 
     ovrHmd_BeginFrame(hmd, getFrame());
     MatrixStack & mv = Stacks::modelview();
