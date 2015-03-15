@@ -642,16 +642,10 @@ namespace oria {
       oria::renderColorCube();
     });
     mv.withPush([&]{
-      mv.translate(glm::vec3(0, eyeHeight, 0)).scale(glm::vec3(ipd));
-      oria::renderColorCube();
-    });
-    mv.withPush([&]{
       mv.translate(glm::vec3(0, eyeHeight / 2, 0)).scale(glm::vec3(ipd / 2, eyeHeight, ipd / 2));
       oria::renderColorCube();
     });
-
   }
-
 
   void GL_CALLBACK debugCallback(
     GLenum source,
