@@ -23,7 +23,8 @@ This command is likely to take a while. It's a big project with lots of submodul
 ## Creating project files
 
 	cd OculusRiftInAction
-	mkdir build && cd build
+	mkdir build
+	cd build
 	cmake .. [-G <your preferred toolset>]
 
 CMake will create project files for a given toolset.  What toolset you use depends on your platform, and there's usually a 
