@@ -158,7 +158,7 @@ void QRiftWindow::renderLoop() {
     m_context->swapBuffers(this);
     static RateCounter rateCounter;
     rateCounter.increment();
-    if (rateCounter.count() > 60) {
+    if (rateCounter.elapsed() > 1.0f) {
       float fps = rateCounter.getRate();
       updateFps(fps);
       rateCounter.reset();

@@ -46,8 +46,8 @@ endif()
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(libraries/OculusSDK/LibOVR)
-set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
-list(APPEND EXAMPLE_LIBS OculusVR)
+set_target_properties(ovr PROPERTIES FOLDER "3rdparty")
+list(APPEND EXAMPLE_LIBS ovr)
 
 ###############################################################################
 #
@@ -253,7 +253,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
 include_directories(${CMAKE_BINARY_DIR}/libraries/oglplus/include)
 
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
-include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Src)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OculusSDK/LibOVR/Include)
 
 if (OpenCV_FOUND) 
     include_directories(${OpenCV_INCLUDE_DIRS})

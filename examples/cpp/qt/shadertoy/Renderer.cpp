@@ -75,7 +75,9 @@ void Renderer::initTextureCache() {
         cacheEntry.tex = oria::loadCubemapTexture([&](int i) {
             QString texturePath = pathTemplate.arg(i);
             ImagePtr image = oria::loadImage(readFileToVector(":" + texturePath), false);
-            cacheEntry.size = uvec2(image->Width(), image->Height());
+            if (image) {
+                cacheEntry.size = uvec2(image->Width(), image->Height());
+            }
             return image;
         });
         canonicalPathMap["qrc:" + path] = path;

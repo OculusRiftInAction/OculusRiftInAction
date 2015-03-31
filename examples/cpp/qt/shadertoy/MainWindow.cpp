@@ -664,7 +664,7 @@ void MainWindow::perEyeRender() {
         Texture::Active(0);
         //      oria::viewport(textureSize());
         mv.withPush([&] {
-            mv.translate(vec3(0, 0, -1));
+            mv.translate(vec3(0, 0, -1.2));
             mv.scale(vec3(1.0f, animationValue, 1.0f));
             uiFramebuffer->BindColor();
             oria::renderGeometry(uiShape, uiProgram);

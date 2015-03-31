@@ -12,7 +12,6 @@ void RiftRenderingApp::initializeRiftRendering() {
     });
 
     int distortionCaps = 0
-      | ovrDistortionCap_Chromatic
       | ovrDistortionCap_Vignette
       | ovrDistortionCap_Overdrive
       | ovrDistortionCap_TimeWarp;
