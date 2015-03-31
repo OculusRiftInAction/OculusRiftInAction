@@ -63,8 +63,7 @@ void RiftApp::initGl() {
   cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
   cfg.OGL.Header.Multisample = 1;
 
-  int distortionCaps =
-    ovrDistortionCap_Chromatic
+  int distortionCaps = 0
     | ovrDistortionCap_Vignette
     | ovrDistortionCap_Overdrive
     | ovrDistortionCap_TimeWarp;

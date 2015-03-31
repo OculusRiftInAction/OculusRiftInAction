@@ -1,9 +1,5 @@
 import QtQuick 2.3
 
-//BorderImage {
-//    source: "tron_black_bg_no_corners.sci"
-//    clip: true
-//}
 
 Rectangle {
     property int margin: 5
