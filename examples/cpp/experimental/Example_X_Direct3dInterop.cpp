@@ -288,7 +288,7 @@ public:
         BOOL success = wglDXLockObjectsNV(gl_handleD3D, 2, gl_handles);
         if (!success) {
             FAIL("Could not lock objects");
-        }
+        }   
         for_each_eye([&](ovrEyeType eye) {
             FramebufferWrapper & fw = *perEyeArgs[eye].framebuffer;
             fw.initDepth();
@@ -320,7 +320,8 @@ public:
         for_each_eye([&](ovrEyeType eye) {
             EyeArgs & eyeArgs = perEyeArgs[eye];
             eyeArgs.projection = ovr::toGlm(
-                ovrMatrix4f_Projection(hmd->DefaultEyeFov[eye], 0.01, 100, true));
+                ovrMatrix4f_Projection(hmd->DefaultEyeFov[eye], 0.01, 100, 
+                    ovrProjection_ClipRangeOpenGL | ovrProjection_RightHanded));
             hmdToEyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
         });
 
@@ -328,6 +329,7 @@ public:
             ovrTrackingCap_Orientation |
             ovrTrackingCap_Position, 0);
         resetPosition();
+        glCullFace(GL_FRONT);
     }
 
     ~HelloRift() {
@@ -443,7 +445,8 @@ public:
     virtual void renderScene() {
         glClearColor(0, 1, 1, 1);
         glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-        oria::renderExampleScene(OVR_DEFAULT_IPD, OVR_DEFAULT_EYE_HEIGHT);
+
+        oria::renderManikinScene(ipd, eyeHeight);
     }
 
     int run() {
