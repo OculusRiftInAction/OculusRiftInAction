@@ -49,9 +49,7 @@ public:
     ((ovrGLConfigData&)config).Disp = 0;
 #endif
 
-    int distortionCaps = 
-        ovrDistortionCap_Vignette
-        | ovrDistortionCap_Chromatic;
+    int distortionCaps = ovrDistortionCap_Vignette;
 
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &config,

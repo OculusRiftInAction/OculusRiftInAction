@@ -20,7 +20,7 @@
 #pragma once
 
 class GlfwApp {
-private:
+protected:
   GLFWwindow *  window{ nullptr };
   glm::uvec2    windowSize;
   glm::ivec2    windowPosition;

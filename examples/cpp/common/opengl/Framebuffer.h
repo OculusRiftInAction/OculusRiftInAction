@@ -34,30 +34,43 @@ struct FramebufferWrapper {
     init(size);
   }
 
+  void initColor() {
+      using namespace oglplus;
+      Context::Bound(Texture::Target::_2D, color)
+          .MinFilter(TextureMinFilter::Linear)
+          .MagFilter(TextureMagFilter::Linear)
+          .WrapS(TextureWrap::ClampToEdge)
+          .WrapT(TextureWrap::ClampToEdge)
+          .Image2D(
+          0, PixelDataInternalFormat::RGBA8,
+          size.x, size.y,
+          0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
+          );
+  }
+
+  void initDepth() {
+      using namespace oglplus;
+      Context::Bound(Renderbuffer::Target::Renderbuffer, depth)
+          .Storage(
+          PixelDataInternalFormat::DepthComponent,
+          size.x, size.y);
+  }
+
+  void initDone() {
+      using namespace oglplus;
+      Bound([&] {
+          fbo.AttachTexture(Framebuffer::Target::Draw, FramebufferAttachment::Color, color, 0);
+          fbo.AttachRenderbuffer(Framebuffer::Target::Draw, FramebufferAttachment::Depth, depth);
+          fbo.Complete(Framebuffer::Target::Draw);
+      });
+  }
+  
   void init(const glm::uvec2 & size) {
     using namespace oglplus;
     this->size = size;
-    Context::Bound(Texture::Target::_2D, color)
-      .MinFilter(TextureMinFilter::Linear)
-      .MagFilter(TextureMagFilter::Linear)
-      .WrapS(TextureWrap::ClampToEdge)
-      .WrapT(TextureWrap::ClampToEdge)
-      .Image2D(
-        0, PixelDataInternalFormat::RGBA8,
-        size.x, size.y,
-        0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
-      );
-
-    Context::Bound(Renderbuffer::Target::Renderbuffer, depth)
-      .Storage(
-          PixelDataInternalFormat::DepthComponent,
-          size.x, size.y);
-
-    Bound([&]{
-      fbo.AttachTexture(Framebuffer::Target::Draw, FramebufferAttachment::Color, color, 0);
-      fbo.AttachRenderbuffer(Framebuffer::Target::Draw, FramebufferAttachment::Depth, depth);
-      fbo.Complete(Framebuffer::Target::Draw);
-    });
+    initColor();
+    initDepth();
+    initDone();
   }
 
   void Bind(oglplus::Framebuffer::Target target = oglplus::Framebuffer::Target::Draw) {

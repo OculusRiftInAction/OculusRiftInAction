@@ -96,10 +96,9 @@ public:
       cfg.OGL.Disp = glfwGetX11Display();
     });
 
-    int distortionCaps =
-        ovrDistortionCap_TimeWarp |
-        ovrDistortionCap_Chromatic |
-        ovrDistortionCap_Vignette;
+    int distortionCaps = 0
+        | ovrDistortionCap_TimeWarp
+        | ovrDistortionCap_Vignette;
 
     ON_LINUX([&]{
       distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;

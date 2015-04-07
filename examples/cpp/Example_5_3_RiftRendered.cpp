@@ -32,9 +32,7 @@ public:
     cfg.Header.BackBufferSize = ovr::fromGlm(getSize());
     cfg.Header.Multisample = 1;
 
-    int distortionCaps = 
-      ovrDistortionCap_Chromatic |
-      ovrDistortionCap_Vignette;
+    int distortionCaps = ovrDistortionCap_Vignette;
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg,
         distortionCaps, hmd->DefaultEyeFov, eyeRenderDescs);
