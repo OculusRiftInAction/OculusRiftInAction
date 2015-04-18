@@ -19,6 +19,10 @@
 
 #pragma once
 
+#if defined(OS_LINUX)
+#include <X11/Xlib.h>
+#endif
+
 namespace glfw {
   inline glm::uvec2 getSize(GLFWmonitor * monitor) {
     const GLFWvidmode * mode = glfwGetVideoMode(monitor);
@@ -78,6 +82,7 @@ namespace glfw {
   }
 
   void * getNativeWindowHandle(GLFWwindow * window);
+  void * getNativeDisplay(GLFWwindow * window);
 
   inline GLFWwindow * createWindow(const glm::uvec2 & size, const glm::ivec2 & position = glm::ivec2(INT_MIN)) {
     GLFWwindow * window = glfwCreateWindow(size.x, size.y, "glfw", nullptr, nullptr);

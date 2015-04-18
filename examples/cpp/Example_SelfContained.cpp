@@ -431,7 +431,11 @@ public:
                 float fps = rateCounter.getRate();
                 char message[8192];
                 sprintf(message, "FPS: %0.2f\n", fps);
+#ifdef OS_WIN
                 OutputDebugStringA(message);
+#else
+		std::cout << message;
+#endif
                 rateCounter.reset();
             }
         }

@@ -1,5 +1,6 @@
 #include "Common.h"
 
+
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
@@ -93,7 +94,7 @@ public:
     cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
 
     ON_LINUX([&]{
-      cfg.OGL.Disp = glfwGetX11Display();
+      cfg.OGL.Disp = (Display*)glfw::getNativeDisplay(getWindow());
     });
 
     int distortionCaps = 0

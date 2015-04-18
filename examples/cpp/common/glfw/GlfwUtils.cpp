@@ -29,4 +29,14 @@ namespace glfw {
     });
     return nativeWindowHandle;
   }
+
+  void * getNativeDisplay(GLFWwindow * window) {
+    void * nativeDisplay = nullptr;
+    ON_LINUX([&]{
+      nativeDisplay = (void*)glfwGetX11Display();
+    });
+    return nativeDisplay;
+  }
+
+
 }
