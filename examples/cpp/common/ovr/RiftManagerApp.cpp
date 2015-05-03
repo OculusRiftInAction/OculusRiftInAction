@@ -20,14 +20,13 @@
 #include "Common.h"
 
 RiftManagerApp::RiftManagerApp(ovrHmdType defaultHmdType) {
-  hmd = ovrHmd_Create(0);
-  if (nullptr == hmd) {
-    hmd = ovrHmd_CreateDebug(defaultHmdType);
-    hmdDesktopPosition = glm::ivec2(100, 100);
-  } else {
-    hmdDesktopPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
+  ovrResult result = ovrHmd_Create(0, &hmd);
+  if (ovrSuccess != result) {
+    result = ovrHmd_CreateDebug(defaultHmdType, &hmd);
+  } 
+  if (ovrSuccess != result) {
+    FAIL("Could not create real or debug HMD");
   }
-  hmdNativeResolution = glm::ivec2(hmd->Resolution.w, hmd->Resolution.h);
 }
 
 RiftManagerApp::~RiftManagerApp() {

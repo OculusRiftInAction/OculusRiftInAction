@@ -1,65 +1,50 @@
 #include "Common.h"
 
 void RiftRenderingApp::initializeRiftRendering() {
-    ovrGLConfig cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(hmdNativeResolution);
-    cfg.OGL.Header.Multisample = 1;
+  ovrLayerEyeFov & layer = layers[0].EyeFov;
+  layer.Header.Type = ovrLayerType_EyeFov;
+  layer.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;
 
-    ON_WINDOWS([&]{
-      cfg.OGL.Window = (HWND)getNativeWindow();
-    });
+  for_each_eye([&](ovrEyeType eye) {
+    EyeParams & ep = eyesParams[eye];
+    ep.renderDesc = ovrHmd_GetRenderDesc(hmd, eye, hmd->MaxEyeFov[eye]);
+    const ovrEyeRenderDesc & erd = ep.renderDesc;
+    eyeOffsets[eye] = erd.HmdToEyeViewOffset;
 
-    int distortionCaps = 0
-      | ovrDistortionCap_Vignette
-      | ovrDistortionCap_Overdrive
-      | ovrDistortionCap_TimeWarp;
+    const ovrFovPort & fov = erd.Fov;
+    layer.Fov[eye] = fov;
 
-    ON_LINUX([&]{
-      distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
-    });
-
-    ovrEyeRenderDesc eyeRenderDescs[2];
-    int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
-      distortionCaps, hmd->MaxEyeFov, eyeRenderDescs);
-    assert(configResult);
-
-    for_each_eye([&](ovrEyeType eye){
-      const ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
-      ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 100000.0f, true);
-      projections[eye] = ovr::toGlm(ovrPerspectiveProjection);
-      eyeOffsets[eye] = erd.HmdToEyeViewOffset;
-    });
+    ovrRecti & viewport = layer.Viewport[eye];
+    viewport.Pos = { 0, 0 };
+    viewport.Size = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
+    ep.size = ovr::toGlm(viewport.Size);
+    ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(fov, 0.01f, 100000.0f, true);
+    ep.projection = ovr::toGlm(ovrPerspectiveProjection);
 
     // Allocate the frameBuffer that will hold the scene, and then be
-    // re-rendered to the screen with distortion
-    glm::uvec2 frameBufferSize = ovr::toGlm(eyeTextures[0].Header.TextureSize);
-    for_each_eye([&](ovrEyeType eye) {
-      eyeFramebuffers[eye] = FramebufferWrapperPtr(new FramebufferWrapper());
-      eyeFramebuffers[eye]->init(frameBufferSize);
-      ((ovrGLTexture&)(eyeTextures[eye])).OGL.TexId =
-        oglplus::GetName(eyeFramebuffers[eye]->color);
-    });
+    // submitted to the SDk for distortion and display on screen
+    ep.fbo = ovr::SwapTexFboPtr(new ovr::SwapTextureFramebufferWrapper(hmd, ovr::toGlm(viewport.Size)));
+    layer.ColorTexture[eye] = ep.fbo->textureSet;
+  });
+}
+
+void RiftRenderingApp::setupMirror(const glm::uvec2 & size) {
+  if (mirrorEnabled) {
+      if (!mirrorFbo) {
+        mirrorFbo = ovr::MirrorFboPtr(new ovr::MirrorFramebufferWrapper(hmd));
+      }
+    mirrorFbo->Init(size);
   }
+}
 
-RiftRenderingApp::RiftRenderingApp() {
-    Platform::sleepMillis(200);
-    if (!ovrHmd_ConfigureTracking(hmd,
-      ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0)) {
-      SAY_ERR("Could not attach to sensor device");
-    }
 
-    memset(eyeTextures, 0, 2 * sizeof(ovrGLTexture));
-
-    for_each_eye([&](ovrEyeType eye){
-      ovrSizei eyeTextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmd->MaxEyeFov[eye], 1.0f);
-      ovrTextureHeader & eyeTextureHeader = eyeTextures[eye].Header;
-      eyeTextureHeader.TextureSize = eyeTextureSize;
-      eyeTextureHeader.RenderViewport.Size = eyeTextureSize;
-      eyeTextureHeader.API = ovrRenderAPI_OpenGL;
-    });
+RiftRenderingApp::RiftRenderingApp() : layers(1) {
+  Platform::sleepMillis(200);
+  if (!ovrHmd_ConfigureTracking(hmd,
+    ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0)) {
+    SAY_ERR("Could not attach to sensor device");
   }
+}
 
 RiftRenderingApp::~RiftRenderingApp() {
 }
@@ -67,40 +52,43 @@ RiftRenderingApp::~RiftRenderingApp() {
 static RateCounter rateCounter;
 
 void RiftRenderingApp::drawRiftFrame() {
-  ++frameCount;
-  ovrHmd_BeginFrame(hmd, frameCount);
   MatrixStack & mv = Stacks::modelview();
   MatrixStack & pr = Stacks::projection();
 
   perFrameRender();
-  
+
   ovrPosef fetchPoses[2];
+  ovrLayerEyeFov & layer = layers[0].EyeFov;
   ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, fetchPoses, nullptr);
   for (int i = 0; i < 2; ++i) {
     ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
+    EyeParams & eyeParams = eyesParams[eye];
     // Force us to alternate eyes if we aren't keeping up with the required framerate
     if (eye == lastEyeRendered) {
       continue;
     }
+    ovrPosef & pose = fetchPoses[eye];
+
     // We want to ensure that we only update the pose we 
     // send to the SDK if we actually render this eye.
-    eyePoses[eye] = fetchPoses[eye];
-
+    layer.RenderPose[eye] = pose;
     lastEyeRendered = eye;
     Stacks::withPush(pr, mv, [&] {
       // Set up the per-eye projection matrix
-      pr.top() = projections[eye];
+      pr.top() = eyeParams.projection;
 
       // Set up the per-eye modelview matrix
       // Apply the head pose
-      glm::mat4 eyePose = ovr::toGlm(eyePoses[eye]);
+      glm::mat4 eyePose = ovr::toGlm(pose);
       mv.preMultiply(glm::inverse(eyePose));
 
       // Render the scene to an offscreen buffer
-      eyeFramebuffers[eye]->Bind();
-      perEyeRender();
+      eyeParams.fbo->Pushed([&]{
+        eyeParams.fbo->Viewport();
+        perEyeRender();
+      });
     });
-    
+
     if (eyePerFrameMode) {
       break;
     }
@@ -109,16 +97,40 @@ void RiftRenderingApp::drawRiftFrame() {
   if (endFrameLock) {
     endFrameLock->lock();
   }
-  ovrHmd_EndFrame(hmd, eyePoses, eyeTextures);
+
+  ovrLayerHeader* layers = &layer.Header;
+  ovrHmd_SubmitFrame(hmd, frameCount, nullptr, &layers, 1);
   if (endFrameLock) {
     endFrameLock->unlock();
   }
+  for_each_eye([&](ovrEyeType eye) {
+    if (eyePerFrameMode && lastEyeRendered == eye) {
+      // Only increment the eye we're going to change next
+      return;
+    }
+    eyesParams[eye].fbo->Increment();
+  });
+
+  if (mirrorEnabled && mirrorFbo) {
+      mirrorFbo->Pushed(oglplus::Framebuffer::Target::Read, [&] {
+          // Copy the mirror buffer, flipping the Y axis, because reasons.
+          glBlitFramebuffer(
+              0, mirrorFbo->size.y, mirrorFbo->size.x, 0,
+              0, 0, mirrorFbo->size.x, mirrorFbo->size.y,
+              GL_COLOR_BUFFER_BIT, GL_NEAREST
+          );
+      });
+  }
+  
+
+
   rateCounter.increment();
   if (rateCounter.elapsed() > 2.0f) {
     float fps = rateCounter.getRate();
     updateFps(fps);
     rateCounter.reset();
   }
+  ++frameCount;
 }
 
 

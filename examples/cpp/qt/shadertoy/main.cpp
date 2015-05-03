@@ -27,7 +27,7 @@ extern MainWindow * riftRenderWidget;
 MAIN_DECL {
   try {
 #ifdef USE_RIFT
-    ovr_Initialize();
+    ovr_Initialize(nullptr);
 #endif
 
     QT_APP_WITH_ARGS(ShadertoyApp);

@@ -19,7 +19,6 @@
 
 #pragma once
 
-
 /**
 * Conversion between GLM and Oculus math types
 */
@@ -94,12 +93,46 @@ namespace ovr {
   }
 
   GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition);
-}
-
-namespace oria {
-
-  bool clearHSW(ovrHmd hmd);
-
+  
+  
+  struct RiftFramebufferWrapper : public FramebufferWrapper {
+    ovrHmd hmd;
+    RiftFramebufferWrapper(const ovrHmd & hmd) : hmd(hmd) { };
+  };
+  
+  // A wrapper for constructing and using a
+  struct SwapTextureFramebufferWrapper : public RiftFramebufferWrapper {
+    ovrSwapTextureSet*      textureSet{ nullptr };
+    
+    SwapTextureFramebufferWrapper(const ovrHmd & hmd);
+    SwapTextureFramebufferWrapper(const ovrHmd & hmd, const glm::uvec2 & size);
+    ~SwapTextureFramebufferWrapper();
+    
+    void Increment();
+    
+  protected:
+    virtual void initColor();
+    virtual void initDone();
+    virtual void onBind(oglplus::Framebuffer::Target target);
+    virtual void onUnbind(oglplus::Framebuffer::Target target);
+  };
+  
+  using SwapTexFboPtr = std::shared_ptr<SwapTextureFramebufferWrapper>;
+  
+  struct MirrorFramebufferWrapper : public RiftFramebufferWrapper {
+    float                   targetAspect;
+    ovrGLTexture*           texture{ nullptr };
+    MirrorFramebufferWrapper(const ovrHmd & hmd);
+    MirrorFramebufferWrapper(const ovrHmd & hmd, const glm::uvec2 & size);
+    ~MirrorFramebufferWrapper();
+    
+  private:
+    void initColor();
+    void initDone();
+  };
+  
+  using MirrorFboPtr = std::shared_ptr<MirrorFramebufferWrapper>;
+  
 }
 
 // Convenience method for looping over each eye with a lambda

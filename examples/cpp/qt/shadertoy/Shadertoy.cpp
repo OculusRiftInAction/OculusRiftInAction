@@ -49,17 +49,25 @@ namespace shadertoy {
     "iChannel3",
   };
 
-  const char * SHADER_HEADER = "#version 330\n"
-    "uniform vec3      iResolution;           // viewport resolution (in pixels)\n"
-    "uniform float     iGlobalTime;           // shader playback time (in seconds)\n"
-    "uniform float     iChannelTime[4];       // channel playback time (in seconds)\n"
-    "uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)\n"
-    "uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click\n"
-    "uniform vec4      iDate;                 // (year, month, day, time in seconds)\n"
-    "uniform float     iSampleRate;           // sound sample rate (i.e., 44100)\n"
-    "uniform vec3      iPos; // Head position\n"
-    "in vec3 iDir; // Direction from viewer\n"
-    "out vec4 FragColor;\n";
+  const char * SHADER_HEADER = R"V0G0N(#version 330
+uniform vec3      iResolution;           // viewport resolution (in pixels)
+uniform float     iGlobalTime;           // shader playback time (in seconds)
+uniform float     iChannelTime[4];       // channel playback time (in seconds)
+uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
+uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
+uniform vec4      iDate;                 // (year, month, day, time in seconds)
+uniform float     iSampleRate;           // sound sample rate (i.e., 44100)
+uniform vec3      iPos; // Head position
+in vec3 iDir; // Direction from viewer
+out vec4 FragColor;
+)V0G0N";
+
+  const char * SHADER_FOOTER = R"V0G0N(
+void main() {
+    mainImage(FragColor, gl_FragCoord.xy);
+}
+)V0G0N";
+
 
   const char * LINE_NUMBER_HEADER =
     "#line 1\n";
@@ -134,12 +142,17 @@ namespace shadertoy {
   Shader parseShaderJson(const QByteArray & shaderJson) {
     Shader result;
     QJsonDocument jsonResponse = QJsonDocument::fromJson(shaderJson);
-    QJsonObject jsonObject = jsonResponse.object();
-    QJsonObject info = path(jsonResponse.object(), { "Shader", 0, "info" }).toObject();
+    QJsonValue shaderBody = path(jsonResponse.object(), { "Shader" });
+    if (shaderBody.isArray()) {
+        shaderBody = path(shaderBody, { 0 });
+        Q_ASSERT(!shaderBody.isArray());
+        Q_ASSERT(shaderBody.isObject());
+    }
+    QJsonObject info = path(shaderBody, { "info" }).toObject();
     result.name = info["name"].toString().toLocal8Bit();
     result.id = info["id"].toString().toLocal8Bit();
     //result.description = info["description"].toString().toLocal8Bit();
-    QJsonObject renderPass = path(jsonResponse.object(), { "Shader", 0, "renderpass", 0 }).toObject();
+    QJsonObject renderPass = path(shaderBody, { "renderpass", 0 }).toObject();
     result.fragmentSource = renderPass["code"].toString().toLocal8Bit();
     QJsonArray inputs = renderPass["inputs"].toArray();
     for (int i = 0; i < inputs.count(); ++i) {

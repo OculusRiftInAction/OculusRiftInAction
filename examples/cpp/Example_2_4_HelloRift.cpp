@@ -1,14 +1,13 @@
 #include "Common.h"
 
-
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
   bool                    debugDevice{ false };
-  ovrTexture              textures[2];
   ovrVector3f             eyeOffsets[2];
-  FramebufferWrapperPtr   eyeFramebuffers[2];
+  ovr::SwapTexFboPtr      eyeFramebuffers[2];
   glm::mat4               eyeProjections[2];
+  ovrLayerEye_Union       submitLayers[1];
 
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
   float                   ipd{ OVR_DEFAULT_IPD };
@@ -16,11 +15,17 @@ protected:
 
 public:
   HelloRift() {
-    ovr_Initialize();
-    hmd = ovrHmd_Create(0);
+    if (!OVR_SUCCESS(ovr_Initialize(nullptr))) {
+      FAIL("Could not initialize Oculus SDK");
+    }
+    if (!OVR_SUCCESS(ovrHmd_Create(0, &hmd))) {
+      SAY("Could not open HMD, attempting debug");
+    }
     if (nullptr == hmd) {
       debugDevice = true;
-      hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
+      if (!OVR_SUCCESS(ovrHmd_CreateDebug(ovrHmd_DK2, &hmd))) {
+        FAIL("Could not create debug HMD");
+      }
     }
 
     ovrHmd_ConfigureTracking(hmd,
@@ -63,67 +68,30 @@ public:
 
   void initGl() {
     GlfwApp::initGl();
-
-    ovrFovPort eyeFovPorts[2];
+    ovrLayerEyeFov & layer = submitLayers[0].EyeFov;
+    layer.Header.Type = ovrLayerType_EyeFov;
+    layer.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;
     for_each_eye([&](ovrEyeType eye){
-      ovrTextureHeader & eyeTextureHeader = textures[eye].Header;
-      eyeFovPorts[eye] = hmd->DefaultEyeFov[eye];
-      eyeTextureHeader.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, hmd->DefaultEyeFov[eye], 1.0f);
-      eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
-      eyeTextureHeader.RenderViewport.Pos.x = 0;
-      eyeTextureHeader.RenderViewport.Pos.y = 0;
-      eyeTextureHeader.API = ovrRenderAPI_OpenGL;
+      ovrFovPort & fov = layer.Fov[eye];
+      fov = hmd->MaxEyeFov[eye];
 
-      eyeFramebuffers[eye] = FramebufferWrapperPtr(new FramebufferWrapper());
-      eyeFramebuffers[eye]->init(ovr::toGlm(eyeTextureHeader.TextureSize));
-      ((ovrGLTexture&)textures[eye]).OGL.TexId = oglplus::GetName(eyeFramebuffers[eye]->color);
-    });
+      ovrRecti & vp = layer.Viewport[eye];
+      vp.Pos = { 0, 0 };
+      vp.Size = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
 
-    ovrGLConfig cfg;
-    memset(&cfg, 0, sizeof(ovrGLConfig));
-    cfg.OGL.Header.API = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.Multisample = 1;
+      eyeFramebuffers[eye] = ovr::SwapTexFboPtr(new ovr::SwapTextureFramebufferWrapper(hmd));
+      eyeFramebuffers[eye]->Init(ovr::toGlm(vp.Size));
+      layer.ColorTexture[eye] = eyeFramebuffers[eye]->textureSet;
 
-    /**
-     * In the Direct3D examples in the Oculus SDK, they make the point that the
-     * onscreen window size does not need to match the Rift resolution.  However
-     * this doesn't currently work in OpenGL, so we have to create the window at
-     * the full resolution of the Rift and ensure that we use the same
-     * size here when setting the BackBufferSize.
-     */
-    cfg.OGL.Header.BackBufferSize = ovr::fromGlm(getSize());
+      auto erd = ovrHmd_GetRenderDesc(hmd, eye, fov);
+      eyeOffsets[eye] = erd.HmdToEyeViewOffset;
 
-    ON_LINUX([&]{
-      cfg.OGL.Disp = (Display*)glfw::getNativeDisplay(getWindow());
-    });
-
-    int distortionCaps = 0
-        | ovrDistortionCap_TimeWarp
-        | ovrDistortionCap_Vignette;
-
-    ON_LINUX([&]{
-      distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
-    });
-
-    ovrEyeRenderDesc              eyeRenderDescs[2];
-    int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
-        distortionCaps, eyeFovPorts, eyeRenderDescs);
-    if (!configResult) {
-      FAIL("Unable to configure SDK based distortion rendering");
-    }
-
-    for_each_eye([&](ovrEyeType eye){
-      eyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
-      eyeProjections[eye] = ovr::toGlm(
-          ovrMatrix4f_Projection(eyeFovPorts[eye], 0.01f, 1000.0f, true));
+      ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(fov, OVR_DEFAULT_IPD * 4, 100000.0f, true);
+      eyeProjections[eye] = ovr::toGlm(ovrPerspectiveProjection);
     });
   }
 
   void onKey(int key, int scancode, int action, int mods) {
-    if (oria::clearHSW(hmd)) {
-      return;
-    }
-
     if (CameraControl::instance().onKey(key, scancode, action, mods)) {
       return;
     }
@@ -162,30 +130,37 @@ public:
   void draw() {
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
-    ++frameIndex;
-    ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
+    // auto frameTiming = ovrHmd_GetFrameTiming(hmd, frameIndex);
+    // auto trackingState = ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds());
+    // ovr_CalcEyePoses(trackingState.HeadPose.ThePose, eyeOffsets, eyePoses);
 
-    ovrHmd_BeginFrame(hmd, frameIndex);
+    ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
     glEnable(GL_DEPTH_TEST);
 
     for (int i = 0; i < 2; ++i) {
       ovrEyeType eye = hmd->EyeRenderOrder[i];
-
-      const ovrRecti & vp = textures[eye].Header.RenderViewport;
-      eyeFramebuffers[eye]->Bind();
-      oglplus::Context::Viewport(vp.Pos.x, vp.Pos.y, vp.Size.w, vp.Size.h);
       Stacks::projection().top() = eyeProjections[eye];
-
       MatrixStack & mv = Stacks::modelview();
       mv.withPush([&]{
         // Apply the per-eye offset & the head pose
         mv.top() = glm::inverse(ovr::toGlm(eyePoses[eye])) * mv.top();
-        renderScene();
+        eyeFramebuffers[eye]->Pushed([&] {
+            eyeFramebuffers[eye]->Viewport();
+            renderScene();
+        });
       });
     };
     oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-
-    ovrHmd_EndFrame(hmd, eyePoses, textures);
+    ovrLayerEyeFov & layer = submitLayers[0].EyeFov;
+    for_each_eye([&](ovrEyeType eye) {
+      layer.RenderPose[eye] = eyePoses[eye];
+    });
+    ovrLayerHeader* firstHeader = &submitLayers[0].Header;
+    ovrHmd_SubmitFrame(hmd, frameIndex, nullptr, &firstHeader, 1);
+    for_each_eye([&](ovrEyeType eye) {
+      eyeFramebuffers[eye]->Increment();
+    });
+    ++frameIndex;
   }
 
   virtual void renderScene() {
@@ -195,4 +170,3 @@ public:
 };
 
 RUN_APP(HelloRift);
-

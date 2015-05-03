@@ -191,12 +191,17 @@ bool Renderer::setShaderSourceInternal(QString source) {
         }
         header += shadertoy::LINE_NUMBER_HEADER;
         FragmentShaderPtr newFragmentShader(new FragmentShader());
+        bool oldStyle = source.contains("void main(");
         source.
             replace(QRegExp("\\t"), "  ").
             replace(QRegExp("\\bgl_FragColor\\b"), "FragColor").
             replace(QRegExp("\\btexture2D\\b"), "texture").
             replace(QRegExp("\\btextureCube\\b"), "texture");
         source.insert(0, header);
+
+        if (!oldStyle) {
+            source.append(shadertoy::SHADER_FOOTER);
+        }
         QByteArray qb = source.toLocal8Bit();
         GLchar * fragmentSource = (GLchar*)qb.data();
         StrCRef src(fragmentSource);

@@ -17,7 +17,7 @@ class Texture {
 public:
     ID3D11Texture2D*            Tex;
     ID3D11ShaderResourceView*   TexSv;
-    int                             Width, Height;
+    int                         Width, Height;
 
     Texture(int w, int h)
         : Tex(NULL), TexSv(NULL), Width(w), Height(h) {
@@ -59,15 +59,13 @@ void populateSharedPointer(std::shared_ptr<T> & ptr, F lambda) {
 
 class DxStubWindow {
 protected:
-    const uint32_t              WindowWidth, WindowHeight;
-    IDXGIFactory*                DXGIFactory{ NULL };
-    HWND                        Window{ NULL };
-    HWND                        GlWindow;
+    const uint32_t          WindowWidth, WindowHeight;
+    IDXGIFactory*           DXGIFactory{ NULL };
+    HWND                    Window{ NULL };
+    HWND                    GlWindow;
     ID3D11Device*           Device{ NULL };
     ID3D11DeviceContext*    Context{ NULL };
     IDXGISwapChain*         SwapChain{ NULL };
-    IDXGIAdapter*           Adapter{ NULL };
-    IDXGIOutput*            FullscreenOutput{ NULL };
     ID3D11Texture2D*        BackBuffer;
     ID3D11RenderTargetView* BackBufferRT;
     D3D11_VIEWPORT              D3DViewport;
@@ -105,38 +103,39 @@ public:
         }
 
         // Create the D3D window (can't be invisible sadly)
-    {
-        DWORD wsStyle = WS_POPUP | WS_VISIBLE | WS_SYSMENU;
-        DWORD sizeDivisor = 2;
-        RECT winSize = { 0, 0, w / 64, h / 64 };
-        AdjustWindowRect(&winSize, wsStyle, false);
-        Window = CreateWindowExA(WS_EX_TOOLWINDOW, "OVRAppWindow", "OculusRoomTiny",
-            wsStyle, 0, 0, winSize.right - winSize.left, winSize.bottom - winSize.top,
-            NULL, NULL, hInstance, this);
+        {
+            DWORD wsStyle = WS_POPUP | WS_SYSMENU;
+            DWORD sizeDivisor = 2;
+            RECT winSize = { 0, 0, w / 64, h / 64 };
+            AdjustWindowRect(&winSize, wsStyle, false);
+            Window = CreateWindowExA(WS_EX_TOOLWINDOW, "OVRAppWindow", "OculusRoomTiny",
+                wsStyle, 0, 0, winSize.right - winSize.left, winSize.bottom - winSize.top,
+                NULL, NULL, hInstance, this);
 
-        if (!Window) {
-            FAIL("Unable to create DX window");
+            if (!Window) {
+                FAIL("Unable to create DX window");
+            }
         }
-    }
 
-    HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory));
-    if (FAILED(hr)) {
-        FAIL("Unable to create DXGI Factory");
-    }
-    DXGIFactory->EnumAdapters(0, &Adapter);
+        HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory));
+        if (FAILED(hr)) {
+            FAIL("Unable to create DXGI Factory");
+        }
+        IDXGIAdapter*           Adapter{ NULL };
+        DXGIFactory->EnumAdapters(0, &Adapter);
 
-    int flags = 0;
-    //int flags =  D3D11_CREATE_DEVICE_DEBUG;    
-    hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
-        NULL, flags, NULL, 0, D3D11_SDK_VERSION,
-        &Device, NULL, &Context);
-    if (FAILED(hr)) {
-        FAIL("Unable to create D3D11 Device & Context");
-    }
-    if (!RecreateSwapChain()) {
-        FAIL("Unable to create swap chain");
-    }
-    SwapChain->SetFullscreenState(1, FullscreenOutput);
+        int flags = 0;
+        //int flags =  D3D11_CREATE_DEVICE_DEBUG;    
+        hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
+            NULL, flags, NULL, 0, D3D11_SDK_VERSION,
+            &Device, NULL, &Context);
+        if (FAILED(hr)) {
+            FAIL("Unable to create D3D11 Device & Context");
+        }
+        Adapter->Release();
+        if (!RecreateSwapChain()) {
+            FAIL("Unable to create swap chain");
+        }
     }
 
     ~DxStubWindow() {
@@ -282,13 +281,13 @@ public:
             eyeArgs.framebuffer->size = ovr::toGlm(eyeTextureHeader.TextureSize);
             ID3D11Texture2D * texHandle = d3dTexture.D3D11.pTexture;
             gl_handles[eye] = wglDXRegisterObjectNV(gl_handleD3D, texHandle, oglplus::GetName(eyeArgs.framebuffer->color),
-              GL_TEXTURE_2D,
-              WGL_ACCESS_WRITE_DISCARD_NV);
+                GL_TEXTURE_2D,
+                WGL_ACCESS_WRITE_DISCARD_NV);
         });
         BOOL success = wglDXLockObjectsNV(gl_handleD3D, 2, gl_handles);
         if (!success) {
             FAIL("Could not lock objects");
-        }   
+        }
         for_each_eye([&](ovrEyeType eye) {
             FramebufferWrapper & fw = *perEyeArgs[eye].framebuffer;
             fw.initDepth();
@@ -320,8 +319,8 @@ public:
         for_each_eye([&](ovrEyeType eye) {
             EyeArgs & eyeArgs = perEyeArgs[eye];
             eyeArgs.projection = ovr::toGlm(
-                ovrMatrix4f_Projection(hmd->DefaultEyeFov[eye], 0.01, 100, 
-                    ovrProjection_ClipRangeOpenGL | ovrProjection_RightHanded));
+                ovrMatrix4f_Projection(hmd->DefaultEyeFov[eye], 0.01, 100,
+                ovrProjection_ClipRangeOpenGL | ovrProjection_RightHanded));
             hmdToEyeOffsets[eye] = eyeRenderDescs[eye].HmdToEyeViewOffset;
         });
 

@@ -38,6 +38,7 @@ namespace shadertoy {
   extern const char * UNIFORM_CHANNELS[MAX_CHANNELS];
 
   extern const char * SHADER_HEADER;
+  extern const char * SHADER_FOOTER;
   extern const char * LINE_NUMBER_HEADER;
 
   extern const QStringList TEXTURES;

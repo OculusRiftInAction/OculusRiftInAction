@@ -19,105 +19,110 @@ limitations under the License.
 
 #include "Common.h"
 
-#ifdef _DEBUG
-#define BRAD_DEBUG 1
-#endif
-
 namespace ovr {
-
-  /**
-   * Build an extended mode window positioned to exactly overlay the OS desktop monitor
-   * which corresponds to the Rift.
-   */
-  GLFWwindow * createExtendedModeWindow(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    // In extended desktop mode, we should be using the current resolution of the Rift.
-    GLFWmonitor * monitor = glfw::getMonitorAtPosition(outPosition);
-    if (nullptr != monitor) {
-      auto mode = glfwGetVideoMode(monitor);
-      outSize = glm::uvec2(mode->width, mode->height);
-    }
-
-    // If we're creating a desktop window, we strip off any window decorations
-    // which might change the location of the rendered contents relative to the lenses.
-    glfwWindowHint(GLFW_DECORATED, 0);
-    return glfw::createWindow(outSize, outPosition);
-  }
-
-  /**
-   * Build a Direct HMD mode window, binding the OVR SDK to the native window object.
-   */
-  GLFWwindow * createDirectHmdModeWindow(ovrHmd hmd, glm::uvec2 & outSize) {
-
-    // On linux it's recommended to leave the screen in its default portrait orientation.
-    // The SDK currently allows no mechanism to test if this is the case.
-    // So in direct mode, we need to swap the x and y value.
-    ON_LINUX([&] {
-      std::swap(outSize.x, outSize.y);
-    });
-
-    // In direct HMD mode, we always use the native resolution, because the
-    // user has no control over it.
-    // In direct mode, try to put the output window on a secondary screen
-    // (for easier debugging, assuming your dev environment is on the primary)
-    GLFWwindow * window = glfw::createSecondaryScreenWindow(outSize);
-
-    // Attach the OVR SDK to the native window
-    void * nativeWindowHandle = glfw::getNativeWindowHandle(window);
-    if (nullptr != nativeWindowHandle) {
-      ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
-    }
-
-    // A bug in some versions of the SDK (0.4.x) prevents Direct Mode from 
-    // engaging properly unless you call the GetEyePoses function.
-    {
-      static ovrVector3f offsets[2];
-      static ovrPosef poses[2];
-      ovrHmd_GetEyePoses(hmd, 0, offsets, poses, nullptr);
-    }
-
-    return window;
-  }
 
   /**
    * Build an OpenGL window, respecting the Rift's current display mode choice of
    * extended or direct HMD.
    */
   GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    bool extendedMode = true;
-
-    outPosition = glm::ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
     outSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
+    outSize /= 2;
+    GLFWwindow * window = glfw::createSecondaryScreenWindow(outSize);
+    glfwGetWindowPos(window, &outPosition.x, &outPosition.y);
+    return window;
+  }
 
-    // The ovrHmdCap_ExtendDesktop is currently only reported reliably on Windows
-    ON_WINDOWS([&] {
-      extendedMode = (ovrHmdCap_ExtendDesktop & hmd->HmdCaps);
+
+  SwapTextureFramebufferWrapper::SwapTextureFramebufferWrapper(const ovrHmd & hmd)
+    : RiftFramebufferWrapper(hmd) { }
+
+  SwapTextureFramebufferWrapper::SwapTextureFramebufferWrapper(const ovrHmd & hmd, const glm::uvec2 & size)
+    : RiftFramebufferWrapper(hmd) {
+      Init(size);
+    }
+
+  SwapTextureFramebufferWrapper::~SwapTextureFramebufferWrapper() {
+    ovrHmd_DestroySwapTextureSet(hmd, textureSet);
+  }
+
+  void SwapTextureFramebufferWrapper::initColor() {
+    // FIXME deallocate any previously created swap texutre set if the size has changed.
+    if (!OVR_SUCCESS(ovrHmd_CreateSwapTextureSetGL(hmd, GL_RGBA, size.x, size.y, &textureSet))) {
+      FAIL("Unable to create swap textures");
+    }
+
+    for (int i = 0; i < textureSet->TextureCount; ++i) {
+      ovrGLTexture& ovrTex = (ovrGLTexture&)textureSet->Textures[i];
+      glBindTexture(GL_TEXTURE_2D, ovrTex.OGL.TexId);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+  }
+
+  void SwapTextureFramebufferWrapper::initDone() {
+    using namespace oglplus;
+    Framebuffer::Target target = Framebuffer::Target::Draw;
+    Pushed(target, [&]{
+      fbo.AttachRenderbuffer(target, FramebufferAttachment::Depth, depth);
+      // do nothing with color, because our color attachment will change every frame
+    });
+  }
+
+  void SwapTextureFramebufferWrapper::onBind(oglplus::Framebuffer::Target target) {
+    using namespace oglplus;
+    ovrGLTexture& tex = (ovrGLTexture&)(textureSet->Textures[textureSet->CurrentIndex]);
+    GLenum glTarget = target == Framebuffer::Target::Draw ? GL_DRAW_FRAMEBUFFER : GL_READ_FRAMEBUFFER;
+    glFramebufferTexture2D(glTarget, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.OGL.TexId, 0);
+  }
+  
+  void SwapTextureFramebufferWrapper::onUnbind(oglplus::Framebuffer::Target target) {
+    using namespace oglplus;
+    GLenum glTarget = target == Framebuffer::Target::Draw ? GL_DRAW_FRAMEBUFFER : GL_READ_FRAMEBUFFER;
+    glFramebufferTexture2D(glTarget, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+  }
+
+  void SwapTextureFramebufferWrapper::Increment() {
+    ++textureSet->CurrentIndex;
+    textureSet->CurrentIndex %= textureSet->TextureCount;
+  }
+  
+  MirrorFramebufferWrapper::MirrorFramebufferWrapper(const ovrHmd & hmd)
+    : RiftFramebufferWrapper(hmd) { }
+
+  MirrorFramebufferWrapper::MirrorFramebufferWrapper(const ovrHmd & hmd, const glm::uvec2 & size)
+    : RiftFramebufferWrapper(hmd) {
+      Init(size);
+  }
+
+  MirrorFramebufferWrapper::~MirrorFramebufferWrapper() {
+    if (texture) {
+      ovrHmd_DestroyMirrorTexture(hmd, (ovrTexture*)texture);
+      texture = nullptr;
+    }
+  }
+    
+  void MirrorFramebufferWrapper::initColor() {
+      if (texture) {
+        ovrHmd_DestroyMirrorTexture(hmd, (ovrTexture*)texture);
+        texture = nullptr;
+      }
+      ovrResult result = ovrHmd_CreateMirrorTextureGL(hmd, GL_RGBA, size.x, size.y, (ovrTexture**)&texture);
+      Q_ASSERT(OVR_SUCCESS(result));
+  }
+  
+  void MirrorFramebufferWrapper::initDone() {
+    using namespace oglplus;
+    Framebuffer::Target target = Framebuffer::Target::Read;
+    Pushed(target, [&]{
+      fbo.AttachRenderbuffer(target, FramebufferAttachment::Depth, depth);
+      glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture->OGL.TexId, 0);
     });
 
-    return extendedMode
-      ? createExtendedModeWindow(outSize, outPosition)
-      : createDirectHmdModeWindow(hmd, outSize);
   }
 
 }
 
-namespace oria {
-
-  // Returns true if the HSW needed to be removed from display, else false.
-  bool clearHSW(ovrHmd hmd) {
-    static bool dismissedHsw = false;
-
-    if (!dismissedHsw) {
-      ovrHSWDisplayState hswDisplayState;
-      ovrHmd_GetHSWDisplayState(hmd, &hswDisplayState);
-      if (hswDisplayState.Displayed) {
-        ovrHmd_DismissHSWDisplay(hmd);
-        return true;
-      }
-      else {
-        dismissedHsw = true;
-      }
-    }
-    return !dismissedHsw;
-  }
-
-}

@@ -124,15 +124,6 @@ public:
 #include "glfw/GlfwUtils.h"
 #include "glfw/GlfwApp.h"
 
-#if defined(OS_WIN)
-#define OVR_OS_WIN32
-#elif defined(OS_OSX)
-#define OVR_OS_MAC
-#elif defined(OS_LINUX)
-#define OVR_OS_LINUX
-#endif
-
-#include <OVR_CAPI.h>
 #include <OVR_CAPI_GL.h>
 
 #include "ovr/OvrUtils.h"

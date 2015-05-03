@@ -52,6 +52,8 @@ QRiftWindow::QRiftWindow() {
   // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
   format.setDepthBufferSize(16);
   format.setStencilBufferSize(8);
+  format.setSwapBehavior(QSurfaceFormat::SwapBehavior::SingleBuffer);
+  auto swapBehavior = format.swapBehavior();
   format.setVersion(4, 3);
   format.setProfile(QSurfaceFormat::OpenGLContextProfile::CoreProfile);
   setFormat(format);
@@ -59,46 +61,22 @@ QRiftWindow::QRiftWindow() {
   m_context = new QOpenGLContext;
   m_context->setFormat(format);
   m_context->create();
+  swapBehavior = m_context->format().swapBehavior();
+
 
   renderThread.setLambda([&] { renderLoop(); });
   bool directHmdMode = false;
-
-#ifdef USE_RIFT
-  // The ovrHmdCap_ExtendDesktop only reliably reports on Windows currently
-  ON_WINDOWS([&] {
-    directHmdMode = (0 == (ovrHmdCap_ExtendDesktop & hmd->HmdCaps));
-  });
-#endif
-
-  if (!directHmdMode) {
-    setFlags(Qt::FramelessWindowHint);
-  }
-
-  // FIXME 
-  setFlags(Qt::FramelessWindowHint);
   show();
 
 #ifdef USE_RIFT
-  if (directHmdMode) {
-    QRect geometry = getSecondaryScreenGeometry(ovr::toGlm(hmd->Resolution));
-    setFramePosition(geometry.topLeft());
-  } else {
-    setFramePosition(QPoint(hmd->WindowsPos.x, hmd->WindowsPos.y));
-  }
-  resize(hmd->Resolution.w, hmd->Resolution.h);
-
-  // If we're in direct mode, attach to the window
-  if (directHmdMode) {
-    void * nativeWindowHandle = (void*)(size_t)winId();
-    if (nullptr != nativeWindowHandle) {
-      ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
-    }
-  }
-#else
-  QRect geometry = getSecondaryScreenGeometry(uvec2(1920, 1080));
-  setFramePosition(geometry.topLeft());
-  resize(geometry.size());
+  uvec2 windowSize = uvec2(hmd->Resolution.w / 4, hmd->Resolution.h / 4);
+#else 
+  uvec2 windowSize = uvec2(1280, 800);
 #endif
+
+  QRect geometry = getSecondaryScreenGeometry(windowSize);
+  setFramePosition(geometry.topLeft());
+  resize(QSize(windowSize.x, windowSize.y));
 }
 
 QRiftWindow::~QRiftWindow() {
@@ -130,6 +108,7 @@ void QRiftWindow::queueRenderThreadTask(Lambda task) {
 void QRiftWindow::drawFrame() {
 #ifdef USE_RIFT
   drawRiftFrame();
+  m_context->swapBuffers(this);
 #else
   MatrixStack & mv = Stacks::modelview();
   MatrixStack & pr = Stacks::projection();
@@ -169,6 +148,7 @@ void QRiftWindow::renderLoop() {
   m_context->moveToThread(QApplication::instance()->thread());
 }
 
+static bool _setup = false;
 void QRiftWindow::setup() {
   m_context->makeCurrent(this);
   glewExperimental = true;
@@ -190,6 +170,28 @@ void QRiftWindow::setup() {
 #ifdef USE_RIFT
   initializeRiftRendering();
 #endif
+  _setup = true;
+  if (mirrorEnabled) {
+      makeCurrent();
+      if (!mirrorFbo) {
+          mirrorFbo = ovr::MirrorFboPtr(new ovr::MirrorFramebufferWrapper(hmd));
+      }
+      mirrorFbo->Init(oria::qt::toGlm(size()));
+  }
+}
+
+
+void QRiftWindow::resizeEvent(QResizeEvent * ev) {
+    glm::uvec2 newSize = oria::qt::toGlm(ev->size());
+    if (mirrorEnabled && _setup) {
+        queueRenderThreadTask([=] {
+            makeCurrent();
+            if (!mirrorFbo) {
+                mirrorFbo = ovr::MirrorFboPtr(new ovr::MirrorFramebufferWrapper(hmd));
+            }
+            mirrorFbo->Init(newSize);
+        });
+    }
 }
 
 //#include "QRiftWindow.moc"

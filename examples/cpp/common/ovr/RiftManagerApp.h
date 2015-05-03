@@ -21,11 +21,7 @@
 
 class RiftManagerApp {
 protected:
-
   ovrHmd hmd;
-
-  glm::uvec2 hmdNativeResolution;
-  glm::ivec2 hmdDesktopPosition;
 
 public:
   RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2);
