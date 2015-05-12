@@ -24,28 +24,28 @@ public class Movegaze : MonoBehaviour {
 				// If the ray cast has hit something check to see if it has been for longer than 2 seconds
 				if((currentTime - startTime) > 2){
 					attachedObject = lookedatObject;
-					attachedObject.rigidbody.useGravity = false;
-					attachedObject.rigidbody.isKinematic = false;
+					attachedObject.GetComponent<Rigidbody>().useGravity = false;
+					attachedObject.GetComponent<Rigidbody>().isKinematic = false;
 					attachedObject.transform.parent = this.transform;
-					attachedObject.renderer.material.color = Color.red;
+					attachedObject.GetComponent<Renderer>().material.color = Color.red;
 				} else {
 					// If less than 2 seconds make it the looked at object and turn it blue
 					if (lookedatObject == null){
 						lookedatObject = hit.collider.gameObject;
-						lookedatObject.renderer.material.color = Color.blue;
+						lookedatObject.GetComponent<Renderer>().material.color = Color.blue;
 					}
 				}
 			} else {
 				// If the ray isn't hitting anything
 				if (lookedatObject != null) {
-					lookedatObject.renderer.material.color = Color.white;
+					lookedatObject.GetComponent<Renderer>().material.color = Color.white;
 				}
 				startTime = currentTime;
 				lookedatObject = null;
 			} 
 		} else { 
 			// If the attached object is not null, check to see if it has been put down.
-			if (attachedObject.renderer.material.color == Color.white){	
+			if (attachedObject.GetComponent<Renderer>().material.color == Color.white){	
 				startTime = currentTime;
 				attachedObject = null;
 			}	

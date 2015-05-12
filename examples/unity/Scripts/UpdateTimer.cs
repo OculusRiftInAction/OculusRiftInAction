@@ -14,6 +14,9 @@ public class UpdateTimer : MonoBehaviour {
 	}
 	
 	void Update () {
+		if (OVRManager.isHSWDisplayed){  		
+			startTime = Time.time;
+		}
 		elapsedTime = Time.time - startTime;
 		elapsedTimeText.text = "Elapsed Time " + elapsedTime.ToString("N0");
 	}

@@ -32,6 +32,7 @@ public class MouseLook : MonoBehaviour {
 
 	void Update ()
 	{
+
 		if (axes == RotationAxes.MouseXAndY)
 		{
 			float rotationX = transform.localEulerAngles.y + Input.GetAxis("Mouse X") * sensitivityX;
@@ -57,8 +58,9 @@ public class MouseLook : MonoBehaviour {
 	void Start ()
 	{
 		//Hide the mouse cursor
-		Screen.showCursor = false;
-		Screen.lockCursor = true;
+		Cursor.lockState = CursorLockMode.Locked;
+		Cursor.visible = false;
+
 
 		// Make the rigid body not change rotation
 		if (GetComponent<Rigidbody>())

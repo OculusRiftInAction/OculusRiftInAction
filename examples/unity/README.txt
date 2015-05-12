@@ -1,6 +1,6 @@
-UNITY PRO 4 EXAMPLES - README
+UNITY 5 EXAMPLES - README
 
-The scripts and Unity package in this directory are for use with Chapter 7 and 8 of “Oculus Rift in Action.”  Chapter 7  provides all of the instructions you need to build a simple Rift-compatible scene using Unity Pro 4.6 or later and the Oculus Integration package version 0.4.4. Chapter 8 builds on those examples by adding a simple GUI.
+The scripts and Unity package in this directory are for use with Chapter 7 and 8 of “Oculus Rift in Action.”  Chapter 7  provides all of the instructions you need to build a simple Rift-compatible scene using Unity 5 and the Oculus Integration package version 0.5.0-Beta. Chapter 8 builds on those examples by adding a simple GUI.
 
 The scripts and a base scene are available in the OculusRiftinAction.unitypackage. 
 
@@ -12,7 +12,7 @@ The Scripts directory contains all of the scripts used to create the examples in
 
 Character Controller Scripts  
 ———————————————————————————
-These are the first person controller scripts from the Unity 4.6  Standard Assets. The MouseLook Script has been modified to work with the Oculus OVRCameraRig Prefab.
+These are the first person controller scripts originally from the Unity 4.6 Standard Assets that have been updated to use the Unity 5 API. The MouseLook Script has also been modified to work with the Oculus OVRCameraRig Prefab.
 
 - CharacterMotor.js
 - FPSInputController.js
@@ -44,7 +44,7 @@ Cubecollision.cs
 OculusRiftinAction.unitypackage
 ———————————————
 
-The OculusRiftinAction.unitypackage package the base scene and the completed scenes:
+The OculusRiftinAction.unitypackage package contains the base scene and the completed scenes:
 
 Beach - The base scene used for all examples
 Beach_OVRPlayerController - The base scene with the OVRPlayerController added
