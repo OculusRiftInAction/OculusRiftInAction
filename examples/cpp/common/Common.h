@@ -128,9 +128,8 @@ public:
 
 #include "ovr/OvrUtils.h"
 #include "ovr/RiftManagerApp.h"
-#include "ovr/RiftGlfwApp.h"
-#include "ovr/RiftApp.h"
 #include "ovr/RiftRenderingApp.h"
+#include "ovr/RiftGlfwApp.h"
 
 #ifndef PI
 #define PI 3.14159265f

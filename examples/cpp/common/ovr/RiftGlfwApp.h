@@ -18,3 +18,12 @@
  ************************************************************************************/
 
 #pragma once
+
+class RiftGlfwApp : public RiftRenderingApp, public GlfwApp {
+protected:
+    virtual void initGl() override;
+    void viewport(ovrEyeType eye);
+    virtual void draw() override final;
+    virtual void onKey(int key, int scancode, int action, int mods) override;
+    virtual GLFWwindow * createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) override;
+};

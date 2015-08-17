@@ -18,3 +18,29 @@
  ************************************************************************************/
 
 #include "Common.h"
+void RiftGlfwApp::initGl() {
+    GlfwApp::initGl();
+    initializeRiftRendering();
+    setupMirror(getSize());
+    glfwSwapInterval(0);
+}
+
+GLFWwindow * RiftGlfwApp::createRenderingTarget(glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    return ovr::createRiftRenderingWindow(hmdDesc, outSize, outPosition);
+}
+
+void RiftGlfwApp::draw() {
+    drawRiftFrame();
+}
+
+
+void RiftGlfwApp::onKey(int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS) {
+        switch (key) {
+        case GLFW_KEY_R:
+            ovr_RecenterPose(hmd);
+            return;
+        }
+    }
+    GlfwApp::onKey(key, scancode, action, mods);
+}

@@ -22,6 +22,8 @@
 class RiftManagerApp {
 protected:
   ovrHmd hmd;
+  ovrHmdDesc hmdDesc;
+  ovrGraphicsLuid graphicsLuid;
 
 public:
   RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2);

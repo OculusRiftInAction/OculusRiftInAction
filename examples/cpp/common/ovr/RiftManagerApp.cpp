@@ -20,28 +20,26 @@
 #include "Common.h"
 
 RiftManagerApp::RiftManagerApp(ovrHmdType defaultHmdType) {
-  ovrResult result = ovrHmd_Create(0, &hmd);
-  if (ovrSuccess != result) {
-    result = ovrHmd_CreateDebug(defaultHmdType, &hmd);
-  } 
+  ovrResult result = ovr_Create(&hmd, &graphicsLuid);
   if (ovrSuccess != result) {
     FAIL("Could not create real or debug HMD");
   }
+  hmdDesc = ovr_GetHmdDesc(hmd);
 }
 
 RiftManagerApp::~RiftManagerApp() {
   if (hmd) {
-    ovrHmd_Destroy(hmd);
+    ovr_Destroy(hmd);
     hmd = nullptr;
   }
 }
 
 int RiftManagerApp::getEnabledCaps() {
-  return ovrHmd_GetEnabledCaps(hmd);
+  return ovr_GetEnabledCaps(hmd);
 }
 
 void RiftManagerApp::enableCaps(int caps) {
-  ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() | caps);
+  ovr_SetEnabledCaps(hmd, getEnabledCaps() | caps);
 }
 
 void RiftManagerApp::toggleCaps(ovrHmdCaps cap) {
@@ -53,5 +51,5 @@ void RiftManagerApp::toggleCaps(ovrHmdCaps cap) {
 }
 
 void RiftManagerApp::disableCaps(int caps) {
-  ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
+  ovr_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
 }

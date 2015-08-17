@@ -6,7 +6,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 
-class PhotoSphereExample : public RiftApp {
+class PhotoSphereExample : public RiftGlfwApp {
 
 public:
   PhotoSphereExample() {
@@ -32,7 +32,7 @@ public:
     oglplus::DefaultTexture().Bind(oglplus::Texture::Target::_2D);
   }
 
-  void renderScene() {
+  void perEyeRender() override {
     using namespace oglplus;
     Context::Clear().DepthBuffer();
     glClear(GL_DEPTH_BUFFER_BIT);
@@ -90,7 +90,7 @@ public:
     else {
       // Failed to load EXIF data
       texture->Bind(Texture::Target::_2D);
-      Context::PixelStore(PixelStorageMode::UnpackAlignment, 1);
+      Context::PixelStore(PixelParameter::UnpackAlignment, 1);
       Context::Bound(TextureTarget::_2D, *texture)
         .Image2D(images::Image(mat.cols, mat.rows, 1, 3, mat.datastart));
     }

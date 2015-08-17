@@ -25,8 +25,8 @@ namespace ovr {
    * Build an OpenGL window, respecting the Rift's current display mode choice of
    * extended or direct HMD.
    */
-  GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition) {
-    outSize = glm::uvec2(hmd->Resolution.w, hmd->Resolution.h);
+  GLFWwindow * createRiftRenderingWindow(const ovrHmdDesc & hmdDesc, glm::uvec2 & outSize, glm::ivec2 & outPosition) {
+    outSize = glm::uvec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
     outSize /= 2;
     GLFWwindow * window = glfw::createSecondaryScreenWindow(outSize);
     glfwGetWindowPos(window, &outPosition.x, &outPosition.y);
@@ -43,12 +43,12 @@ namespace ovr {
     }
 
   SwapTextureFramebufferWrapper::~SwapTextureFramebufferWrapper() {
-    ovrHmd_DestroySwapTextureSet(hmd, textureSet);
+    ovr_DestroySwapTextureSet(hmd, textureSet);
   }
 
   void SwapTextureFramebufferWrapper::initColor() {
     // FIXME deallocate any previously created swap texutre set if the size has changed.
-    if (!OVR_SUCCESS(ovrHmd_CreateSwapTextureSetGL(hmd, GL_RGBA, size.x, size.y, &textureSet))) {
+    if (!OVR_SUCCESS(ovr_CreateSwapTextureSetGL(hmd, GL_RGBA, size.x, size.y, &textureSet))) {
       FAIL("Unable to create swap textures");
     }
 
@@ -100,18 +100,18 @@ namespace ovr {
 
   MirrorFramebufferWrapper::~MirrorFramebufferWrapper() {
     if (texture) {
-      ovrHmd_DestroyMirrorTexture(hmd, (ovrTexture*)texture);
+      ovr_DestroyMirrorTexture(hmd, (ovrTexture*)texture);
       texture = nullptr;
     }
   }
     
   void MirrorFramebufferWrapper::initColor() {
       if (texture) {
-        ovrHmd_DestroyMirrorTexture(hmd, (ovrTexture*)texture);
+        ovr_DestroyMirrorTexture(hmd, (ovrTexture*)texture);
         texture = nullptr;
       }
-      ovrResult result = ovrHmd_CreateMirrorTextureGL(hmd, GL_RGBA, size.x, size.y, (ovrTexture**)&texture);
-      Q_ASSERT(OVR_SUCCESS(result));
+      ovrResult result = ovr_CreateMirrorTextureGL(hmd, GL_RGBA, size.x, size.y, (ovrTexture**)&texture);
+      assert(OVR_SUCCESS(result));
   }
   
   void MirrorFramebufferWrapper::initDone() {

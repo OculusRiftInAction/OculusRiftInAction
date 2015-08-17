@@ -64,7 +64,7 @@ public:
     CaptureData captured;
     while (!stopped) {
       float captureTime = ovr_GetTimeInSeconds();
-      ovrTrackingState tracking = ovrHmd_GetTrackingState(hmd, captureTime);
+      ovrTrackingState tracking = ovr_GetTrackingState(hmd, captureTime);
       captured.pose = tracking.HeadPose.ThePose;
 
       videoCapture.read(captured.image);

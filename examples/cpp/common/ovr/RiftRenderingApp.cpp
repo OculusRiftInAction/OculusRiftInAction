@@ -7,7 +7,7 @@ void RiftRenderingApp::initializeRiftRendering() {
 
   for_each_eye([&](ovrEyeType eye) {
     EyeParams & ep = eyesParams[eye];
-    ep.renderDesc = ovrHmd_GetRenderDesc(hmd, eye, hmd->MaxEyeFov[eye]);
+    ep.renderDesc = ovr_GetRenderDesc(hmd, eye, hmdDesc.DefaultEyeFov[eye]);
     const ovrEyeRenderDesc & erd = ep.renderDesc;
     eyeOffsets[eye] = erd.HmdToEyeViewOffset;
 
@@ -16,7 +16,7 @@ void RiftRenderingApp::initializeRiftRendering() {
 
     ovrRecti & viewport = layer.Viewport[eye];
     viewport.Pos = { 0, 0 };
-    viewport.Size = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
+    viewport.Size = ovr_GetFovTextureSize(hmd, eye, fov, 1.0f);
     ep.size = ovr::toGlm(viewport.Size);
     ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(fov, 0.01f, 100000.0f, true);
     ep.projection = ovr::toGlm(ovrPerspectiveProjection);
@@ -40,7 +40,7 @@ void RiftRenderingApp::setupMirror(const glm::uvec2 & size) {
 
 RiftRenderingApp::RiftRenderingApp() : layers(1) {
   Platform::sleepMillis(200);
-  if (!ovrHmd_ConfigureTracking(hmd,
+  if (!ovr_ConfigureTracking(hmd,
     ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0)) {
     SAY_ERR("Could not attach to sensor device");
   }
@@ -59,47 +59,48 @@ void RiftRenderingApp::drawRiftFrame() {
 
   ovrPosef fetchPoses[2];
   ovrLayerEyeFov & layer = layers[0].EyeFov;
-  ovrHmd_GetEyePoses(hmd, frameCount, eyeOffsets, fetchPoses, nullptr);
-  for (int i = 0; i < 2; ++i) {
-    ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
-    EyeParams & eyeParams = eyesParams[eye];
-    // Force us to alternate eyes if we aren't keeping up with the required framerate
-    if (eye == lastEyeRendered) {
-      continue;
-    }
-    ovrPosef & pose = fetchPoses[eye];
+  ovr_GetEyePoses(hmd, frameCount, eyeOffsets, fetchPoses, nullptr);
+  for_each_eye([&](ovrEyeType eye){
+      currentEye = eye;
+      EyeParams & eyeParams = eyesParams[eye];
+      // Force us to alternate eyes if we aren't keeping up with the required framerate
+      if (eye == lastEyeRendered) {
+          return;
+      }
+      ovrPosef & pose = fetchPoses[eye];
 
-    // We want to ensure that we only update the pose we 
-    // send to the SDK if we actually render this eye.
-    layer.RenderPose[eye] = pose;
-    lastEyeRendered = eye;
-    Stacks::withPush(pr, mv, [&] {
-      // Set up the per-eye projection matrix
-      pr.top() = eyeParams.projection;
+      // We want to ensure that we only update the pose we 
+      // send to the SDK if we actually render this eye.
+      layer.RenderPose[eye] = pose;
+      lastEyeRendered = eye;
+      Stacks::withPush(pr, mv, [&] {
+          // Set up the per-eye projection matrix
+          pr.top() = eyeParams.projection;
 
-      // Set up the per-eye modelview matrix
-      // Apply the head pose
-      glm::mat4 eyePose = ovr::toGlm(pose);
-      mv.preMultiply(glm::inverse(eyePose));
+          // Set up the per-eye modelview matrix
+          // Apply the head pose
+          glm::mat4 eyePose = ovr::toGlm(pose);
+          mv.preMultiply(glm::inverse(eyePose));
 
-      // Render the scene to an offscreen buffer
-      eyeParams.fbo->Pushed([&]{
-        eyeParams.fbo->Viewport();
-        perEyeRender();
+          // Render the scene to an offscreen buffer
+          eyeParams.fbo->Pushed([&] {
+              eyeParams.fbo->Viewport();
+              perEyeRender();
+          });
       });
-    });
 
-    if (eyePerFrameMode) {
-      break;
-    }
-  }
+      if (eyePerFrameMode) {
+          return;
+      }
+  });
+  currentEye = ovrEye_Count;
 
   if (endFrameLock) {
     endFrameLock->lock();
   }
 
   ovrLayerHeader* layers = &layer.Header;
-  ovrHmd_SubmitFrame(hmd, frameCount, nullptr, &layers, 1);
+  ovr_SubmitFrame(hmd, frameCount, nullptr, &layers, 1);
   if (endFrameLock) {
     endFrameLock->unlock();
   }

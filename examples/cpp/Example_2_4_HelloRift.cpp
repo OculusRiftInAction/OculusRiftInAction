@@ -3,11 +3,13 @@
 class HelloRift : public GlfwApp {
 protected:
   ovrHmd                  hmd{ 0 };
+  ovrHmdDesc              hmdDesc;
+  ovrGraphicsLuid         graphicsLuid;
   bool                    debugDevice{ false };
   ovrVector3f             eyeOffsets[2];
   ovr::SwapTexFboPtr      eyeFramebuffers[2];
   glm::mat4               eyeProjections[2];
-  ovrLayerEye_Union       submitLayers[1];
+  ovrLayer_Union          submitLayers[1];
 
   float                   eyeHeight{ OVR_DEFAULT_EYE_HEIGHT };
   float                   ipd{ OVR_DEFAULT_IPD };
@@ -18,24 +20,19 @@ public:
     if (!OVR_SUCCESS(ovr_Initialize(nullptr))) {
       FAIL("Could not initialize Oculus SDK");
     }
-    if (!OVR_SUCCESS(ovrHmd_Create(0, &hmd))) {
-      SAY("Could not open HMD, attempting debug");
-    }
-    if (nullptr == hmd) {
-      debugDevice = true;
-      if (!OVR_SUCCESS(ovrHmd_CreateDebug(ovrHmd_DK2, &hmd))) {
+    if (!OVR_SUCCESS(ovr_Create(&hmd, &graphicsLuid))) {
         FAIL("Could not create debug HMD");
-      }
     }
+    hmdDesc = ovr_GetHmdDesc(hmd);
 
-    ovrHmd_ConfigureTracking(hmd,
+    ovr_ConfigureTracking(hmd,
       ovrTrackingCap_Orientation |
       ovrTrackingCap_Position, 0);
     resetPosition();
   }
 
   ~HelloRift() {
-    ovrHmd_Destroy(hmd);
+    ovr_Destroy(hmd);
     hmd = 0;
   }
 
@@ -43,7 +40,7 @@ public:
     static const glm::vec3 EYE = glm::vec3(0, eyeHeight, ipd * 5.0f);
     static const glm::vec3 LOOKAT = glm::vec3(0, eyeHeight, 0);
     player = glm::inverse(glm::lookAt(EYE, LOOKAT, Vectors::UP));
-    ovrHmd_RecenterPose(hmd);
+    ovr_RecenterPose(hmd);
   }
 
   virtual void finishFrame() {
@@ -63,7 +60,7 @@ public:
      * this doesn't currently work in OpenGL, so we have to create the window at
      * the full resolution of the BackBufferSize.
      */
-    return ovr::createRiftRenderingWindow(hmd, outSize, outPosition);
+    return ovr::createRiftRenderingWindow(hmdDesc, outSize, outPosition);
   }
 
   void initGl() {
@@ -73,17 +70,17 @@ public:
     layer.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;
     for_each_eye([&](ovrEyeType eye){
       ovrFovPort & fov = layer.Fov[eye];
-      fov = hmd->MaxEyeFov[eye];
+      fov = hmdDesc.MaxEyeFov[eye];
 
       ovrRecti & vp = layer.Viewport[eye];
       vp.Pos = { 0, 0 };
-      vp.Size = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
+      vp.Size = ovr_GetFovTextureSize(hmd, eye, fov, 1.0f);
 
       eyeFramebuffers[eye] = ovr::SwapTexFboPtr(new ovr::SwapTextureFramebufferWrapper(hmd));
       eyeFramebuffers[eye]->Init(ovr::toGlm(vp.Size));
       layer.ColorTexture[eye] = eyeFramebuffers[eye]->textureSet;
 
-      auto erd = ovrHmd_GetRenderDesc(hmd, eye, fov);
+      auto erd = ovr_GetRenderDesc(hmd, eye, fov);
       eyeOffsets[eye] = erd.HmdToEyeViewOffset;
 
       ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(fov, OVR_DEFAULT_IPD * 4, 100000.0f, true);
@@ -97,22 +94,8 @@ public:
     }
 
     if (GLFW_PRESS != action) {
-      int caps = ovrHmd_GetEnabledCaps(hmd);
+      int caps = ovr_GetEnabledCaps(hmd);
       switch (key) {
-      case GLFW_KEY_V:
-        if (caps & ovrHmdCap_NoVSync) {
-          ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_NoVSync);
-        } else {
-          ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_NoVSync);
-        }
-        return;
-      case GLFW_KEY_P:
-        if (caps & ovrHmdCap_LowPersistence) {
-          ovrHmd_SetEnabledCaps(hmd, caps & ~ovrHmdCap_LowPersistence);
-        } else {
-          ovrHmd_SetEnabledCaps(hmd, caps | ovrHmdCap_LowPersistence);
-        }
-        return;
       case GLFW_KEY_R:
         resetPosition();
         return;
@@ -130,15 +113,11 @@ public:
   void draw() {
     static int frameIndex = 0;
     static ovrPosef eyePoses[2];
-    // auto frameTiming = ovrHmd_GetFrameTiming(hmd, frameIndex);
-    // auto trackingState = ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds());
-    // ovr_CalcEyePoses(trackingState.HeadPose.ThePose, eyeOffsets, eyePoses);
-
-    ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
+    ovr_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
     glEnable(GL_DEPTH_TEST);
 
     for (int i = 0; i < 2; ++i) {
-      ovrEyeType eye = hmd->EyeRenderOrder[i];
+      ovrEyeType eye = static_cast<ovrEyeType>(i);
       Stacks::projection().top() = eyeProjections[eye];
       MatrixStack & mv = Stacks::modelview();
       mv.withPush([&]{
@@ -156,7 +135,7 @@ public:
       layer.RenderPose[eye] = eyePoses[eye];
     });
     ovrLayerHeader* firstHeader = &submitLayers[0].Header;
-    ovrHmd_SubmitFrame(hmd, frameIndex, nullptr, &firstHeader, 1);
+    ovr_SubmitFrame(hmd, frameIndex, nullptr, &firstHeader, 1);
     for_each_eye([&](ovrEyeType eye) {
       eyeFramebuffers[eye]->Increment();
     });

@@ -92,7 +92,7 @@ namespace ovr {
     return result;
   }
 
-  GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, glm::uvec2 & outSize, glm::ivec2 & outPosition);
+  GLFWwindow * createRiftRenderingWindow(const ovrHmdDesc & hmdDesc, glm::uvec2 & outSize, glm::ivec2 & outPosition);
   
   
   struct RiftFramebufferWrapper : public FramebufferWrapper {
@@ -149,7 +149,7 @@ void for_each_eye(Function function) {
 // to launch a class containing a run method
 #define RUN_OVR_APP(AppClass) \
 MAIN_DECL { \
-  if (!ovr_Initialize()) { \
+  if (!OVR_SUCCESS(ovr_Initialize(nullptr))) { \
       SAY_ERR("Failed to initialize the Oculus SDK"); \
       return -1; \
   } \

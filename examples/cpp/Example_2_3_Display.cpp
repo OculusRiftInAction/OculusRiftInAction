@@ -6,9 +6,9 @@ class RiftDisplay : public GlfwApp {
 public:
 
   RiftDisplay() {
-    hmd = ovrHmd_Create(0);
+    hmd = ovr_Create(0);
     if (!hmd) {
-      hmd = ovrHmd_CreateDebug(ovrHmd_DK2);
+      hmd = ovr_CreateDebug(ovr_DK2);
     }
     if (!hmd) {
       FAIL("Unable to detect Rift display");
@@ -38,13 +38,13 @@ public:
       {
         static ovrVector3f offsets[2];
         static ovrPosef poses[2];
-        ovrHmd_GetEyePoses(hmd, 0, offsets, poses, nullptr);
+        ovr_GetEyePoses(hmd, 0, offsets, poses, nullptr);
       }
 
       window = glfw::createSecondaryScreenWindow(outSize);
       void * nativeWindowHandle = glfw::getNativeWindowHandle(window);
       if (nullptr != nativeWindowHandle) {
-        ovrHmd_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
+        ovr_AttachToWindow(hmd, nativeWindowHandle, nullptr, nullptr);
       }
     }
 

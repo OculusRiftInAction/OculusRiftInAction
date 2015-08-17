@@ -13,7 +13,7 @@ public:
   }
 
   virtual ~SensorFusionPredictionExample() {
-    ovrHmd_Destroy(hmd);
+    ovr_Destroy(hmd);
     ovr_Shutdown();
   }
 
@@ -29,10 +29,11 @@ public:
 
     GLFWwindow * result = glfw::createWindow(outSize, outPosition);
 
-    ovr_Initialize();
-    hmd = ovrHmd_Create(0);
-    if (!hmd || !ovrHmd_ConfigureTracking(hmd, ovrTrackingCap_Orientation, 0)) {
-      FAIL("Unable to locate Rift sensor");
+    ovr_Initialize(nullptr);
+    ovrGraphicsLuid graphicsLuid;
+    if (!OVR_SUCCESS(ovr_Create(&hmd, &graphicsLuid) ||
+        !OVR_SUCCESS(ovr_ConfigureTracking(hmd, ovrTrackingCap_Orientation, 0)))) {
+        FAIL("Unable to locate Rift sensors");
     }
 
     return result;
@@ -52,7 +53,7 @@ public:
 
     switch (key) {
     case GLFW_KEY_R:
-      ovrHmd_RecenterPose(hmd);
+      ovr_RecenterPose(hmd);
       return;
     case GLFW_KEY_UP:
       predictionValue *= 1.5f;
@@ -65,8 +66,8 @@ public:
   }
 
   void update() {
-    ovrTrackingState recordedState = ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds());
-    ovrTrackingState predictedState = ovrHmd_GetTrackingState(hmd, ovr_GetTimeInSeconds() + predictionValue);
+    ovrTrackingState recordedState = ovr_GetTrackingState(hmd, ovr_GetTimeInSeconds());
+    ovrTrackingState predictedState = ovr_GetTrackingState(hmd, ovr_GetTimeInSeconds() + predictionValue);
     
     // Update the modelview to reflect the orientation of the Rift
     actual = glm::mat4_cast(ovr::toGlm(recordedState.HeadPose.ThePose.Orientation));

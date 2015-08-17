@@ -14,4 +14,4 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(ExampleCommon STATIC ${SOURCE_FILES})
-target_link_libraries(ExampleCommon ${EXAMPLE_LIBS})
+add_example_dependencies(ExampleCommon)

@@ -72,7 +72,7 @@ public:
     CaptureData frame;
 
     frame.frame = controller.frame();
-    frame.leapPose = ovr::toGlm(ovrHmd_GetTrackingState(hmd, 0.0).HeadPose.ThePose);
+    frame.leapPose = ovr::toGlm(ovr_GetTrackingState(hmd, 0.0).HeadPose.ThePose);
     set(frame);
   }
 };

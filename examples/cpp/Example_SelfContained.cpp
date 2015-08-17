@@ -563,8 +563,8 @@ namespace ovr {
     }
 
 
-    inline GLFWwindow * createRiftRenderingWindow(ovrHmd hmd, uvec2 & outSize, ivec2 & outPosition, GLFWwindow * shared = nullptr) {
-        outSize = uvec2(hmd->Resolution.w, hmd->Resolution.h);
+    inline GLFWwindow * createRiftRenderingWindow(const ovrHmdDesc& hmdDesc, uvec2 & outSize, ivec2 & outPosition, GLFWwindow * shared = nullptr) {
+        outSize = uvec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
         outSize /= 2;
         GLFWwindow * window = glfw::createSecondaryScreenWindow(outSize, nullptr);
         glfwGetWindowPos(window, &outPosition.x, &outPosition.y);
@@ -575,6 +575,8 @@ namespace ovr {
 class RiftManagerApp {
 protected:
     ovrHmd hmd;
+    ovrHmdDesc hmdDesc;
+    ovrGraphicsLuid graphicsLuid;
     uvec2 hmdNativeResolution;
 
 public:
@@ -586,25 +588,24 @@ public:
     }
 
     virtual ~RiftManagerApp() {
-        ovrHmd_Destroy(hmd);
+        ovr_Destroy(hmd);
         hmd = nullptr;
     }
 
-    void initHmd(ovrHmdType defaultHmdType = ovrHmd_DK2) {
-        if (ovrSuccess != ovrHmd_Create(0, &hmd)) {
-            if (ovrSuccess != ovrHmd_CreateDebug(defaultHmdType, &hmd)) {
-                FAIL("Could not create HMD");
-            }
+    void initHmd() {
+        if (!OVR_SUCCESS(ovr_Create(&hmd, &graphicsLuid))) {
+            FAIL("Could not create HMD");
         }
-        hmdNativeResolution = ivec2(hmd->Resolution.w, hmd->Resolution.h);
+        hmdDesc = ovr_GetHmdDesc(hmd);
+        hmdNativeResolution = ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
     }
 
     int getEnabledCaps() {
-        return ovrHmd_GetEnabledCaps(hmd);
+        return ovr_GetEnabledCaps(hmd);
     }
 
     void enableCaps(int caps) {
-        ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() | caps);
+        ovr_SetEnabledCaps(hmd, getEnabledCaps() | caps);
     }
 
     void toggleCap(ovrHmdCaps cap) {
@@ -620,7 +621,7 @@ public:
     }
 
     void disableCaps(int caps) {
-        ovrHmd_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
+        ovr_SetEnabledCaps(hmd, getEnabledCaps() & ~caps);
     }
 };
 
@@ -693,8 +694,8 @@ private:
 #include <OVR_CAPI_GL.h>
 
 // A base class for FBO wrappers that need to use the Oculus C 
-// API to manage textures via ovrHmd_CreateSwapTextureSetGL,
-// ovrHmd_CreateMirrorTextureGL, etc
+// API to manage textures via ovr_CreateSwapTextureSetGL,
+// ovr_CreateMirrorTextureGL, etc
 template <typename C>
 struct RiftFramebufferWrapper : public FramebufferWrapper<C> {
     ovrHmd hmd;
@@ -711,7 +712,7 @@ struct SwapTextureFramebufferWrapper : public RiftFramebufferWrapper<ovrSwapText
         : RiftFramebufferWrapper(hmd) {}
     ~SwapTextureFramebufferWrapper() {
         if (color) {
-            ovrHmd_DestroySwapTextureSet(hmd, color);
+            ovr_DestroySwapTextureSet(hmd, color);
             color = nullptr;
         }
     }
@@ -724,11 +725,11 @@ struct SwapTextureFramebufferWrapper : public RiftFramebufferWrapper<ovrSwapText
 protected:
     virtual void initColor() {
         if (color) {
-            ovrHmd_DestroySwapTextureSet(hmd, color);
+            ovr_DestroySwapTextureSet(hmd, color);
             color = nullptr;
         }
 
-        if (!OVR_SUCCESS(ovrHmd_CreateSwapTextureSetGL(hmd, GL_RGBA, size.x, size.y, &color))) {
+        if (!OVR_SUCCESS(ovr_CreateSwapTextureSetGL(hmd, GL_RGBA, size.x, size.y, &color))) {
             FAIL("Unable to create swap textures");
         }
 
@@ -769,7 +770,7 @@ struct MirrorFramebufferWrapper : public RiftFramebufferWrapper<ovrGLTexture*>{
         : RiftFramebufferWrapper(hmd) {}
     ~MirrorFramebufferWrapper() {
         if (color) {
-            ovrHmd_DestroyMirrorTexture(hmd, (ovrTexture*)color);
+            ovr_DestroyMirrorTexture(hmd, (ovrTexture*)color);
             color = nullptr;
         }
     }
@@ -788,10 +789,10 @@ private:
 
     void initColor() {
         if (color) {
-            ovrHmd_DestroyMirrorTexture(hmd, (ovrTexture*)color);
+            ovr_DestroyMirrorTexture(hmd, (ovrTexture*)color);
             color = nullptr;
         }
-        ovrResult result = ovrHmd_CreateMirrorTextureGL(hmd, GL_RGBA, size.x, size.y, (ovrTexture**)&color);
+        ovrResult result = ovr_CreateMirrorTextureGL(hmd, GL_RGBA, size.x, size.y, (ovrTexture**)&color);
         assert(OVR_SUCCESS(result));
     }
 
@@ -822,7 +823,7 @@ public:
     RiftApp() { }
 
     virtual void configureTracking() {
-        if (ovrSuccess != ovrHmd_ConfigureTracking(hmd,
+        if (ovrSuccess != ovr_ConfigureTracking(hmd,
             ovrTrackingCap_Orientation | ovrTrackingCap_Position | ovrTrackingCap_MagYawCorrection, 0)) {
             FAIL("Could not attach to sensor device");
         }
@@ -834,12 +835,12 @@ public:
         layer.Header.Type = ovrLayerType_EyeFov;
         layer.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;
         ovr::for_each_eye([&](ovrEyeType eye) {
-            ovrFovPort & fov = layer.Fov[eye] = hmd->MaxEyeFov[eye];
-            ovrSizei & size = layer.Viewport[eye].Size = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
+            ovrFovPort & fov = layer.Fov[eye] = hmdDesc.MaxEyeFov[eye];
+            ovrSizei & size = layer.Viewport[eye].Size = ovr_GetFovTextureSize(hmd, eye, fov, 1.0f);
             layer.Viewport[eye].Pos = { 0, 0 };
 
             ovrEyeRenderDesc & erd = eyeRenderDescs[eye];
-            erd = ovrHmd_GetRenderDesc(hmd, eye, hmd->MaxEyeFov[eye]);
+            erd = ovr_GetRenderDesc(hmd, eye, hmdDesc.MaxEyeFov[eye]);
             ovrMatrix4f ovrPerspectiveProjection = 
                 ovrMatrix4f_Projection(erd.Fov, 0.10f, 10000.0f, ovrProjection_RightHanded);
             projections[eye] = ovr::toGlm(ovrPerspectiveProjection);
@@ -859,7 +860,7 @@ public:
 protected:
     virtual GLFWwindow * createRenderingTarget(uvec2 & outSize, ivec2 & outPosition) {
         initHmd();
-        return ovr::createRiftRenderingWindow(hmd, outSize, outPosition, nullptr);
+        return ovr::createRiftRenderingWindow(hmdDesc, outSize, outPosition, nullptr);
     }
 
     virtual void initGl() {
@@ -878,7 +879,7 @@ protected:
     virtual void onKey(int key, int scancode, int action, int mods) {
         if (GLFW_PRESS == action) switch (key) {
         case GLFW_KEY_R:
-            ovrHmd_RecenterPose(hmd);
+            ovr_RecenterPose(hmd);
             return;
         }
 
@@ -886,18 +887,17 @@ protected:
     }
 
     virtual void draw() final {
-        ovrHmd_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
-        for (int i = 0; i < 2; ++i) {
-            ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
+        ovr_GetEyePoses(hmd, frameIndex, eyeOffsets, eyePoses, nullptr);
+        ovr::for_each_eye([&](ovrEyeType eye) {
             // Render the scene to an offscreen buffer
             eyeFbos[eye]->Bound([&] {
                 eyeFbos[eye]->Viewport();
                 renderScene(projections[eye], ovr::toGlm(eyePoses[eye]));
             });
             layer.RenderPose[eye] = eyePoses[eye];
-        }
+        });
         ovrLayerHeader* layers = &layer.Header;
-        ovrResult result = ovrHmd_SubmitFrame(hmd, frameIndex, nullptr, &layers, 1);
+        ovrResult result = ovr_SubmitFrame(hmd, frameIndex, nullptr, &layers, 1);
         ovr::for_each_eye([&](ovrEyeType eye) {
             eyeFbos[eye]->Increment();
         });
@@ -1141,7 +1141,7 @@ protected:
         glClearDepth(1.0f);
         glDisable(GL_DITHER);
         glEnable(GL_DEPTH_TEST);
-        ovrHmd_RecenterPose(hmd);
+        ovr_RecenterPose(hmd);
         cubeScene = std::shared_ptr<ColorCubeScene>(new ColorCubeScene(ipd));
     }
 

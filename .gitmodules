@@ -1,12 +1,3 @@
-[submodule "libraries/OculusSDK"]
-	path = libraries/OculusSDK
-	url = https://github.com/jherico/OculusSDK.git
-[submodule "libraries/glfw"]
-	path = libraries/glfw
-	url = https://github.com/glfw/glfw.git
-[submodule "libraries/glm"]
-	path = libraries/glm
-	url = https://github.com/g-truc/glm.git
 [submodule "libraries/libpng"]
 	path = libraries/libpng
 	url = https://github.com/jherico/libpng.git
@@ -16,18 +7,3 @@
 [submodule "resources"]
 	path = resources
 	url = https://github.com/OculusRiftInAction/OculusRiftInActionResources.git
-[submodule "examples/java"]
-	path = examples/java
-	url = https://github.com/OculusRiftInAction/jocular-examples.git
-[submodule "examples/python"]
-	path = examples/python
-	url = https://github.com/OculusRiftInAction/pyovr-examples.git
-[submodule "cmake"]
-	path = cmake
-	url = https://github.com/jherico/cmake.git
-[submodule "libraries/oglplus"]
-	path = libraries/oglplus
-	url = https://github.com/matus-chochlik/oglplus.git
-[submodule "libraries/boostconfig"]
-	path = libraries/boostconfig
-	url = https://github.com/boostorg/config.git

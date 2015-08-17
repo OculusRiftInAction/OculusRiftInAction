@@ -14,7 +14,7 @@ public:
   }
 
   virtual ~SensorFusionExample() {
-    ovrHmd_Destroy(hmd);
+    ovr_Destroy(hmd);
     ovr_Shutdown();
   }
 
@@ -30,12 +30,13 @@ public:
 
     GLFWwindow * result = glfw::createWindow(outSize, outPosition);
 
-    ovr_Initialize();
-    hmd = ovrHmd_Create(0);
-
-    if (!hmd || !ovrHmd_ConfigureTracking(hmd, ovrTrackingCap_Orientation, 0)) {
+    ovr_Initialize(nullptr);
+    ovrGraphicsLuid graphicsLuid;
+    if (!OVR_SUCCESS(ovr_Create(&hmd, &graphicsLuid) || 
+        !OVR_SUCCESS(ovr_ConfigureTracking(hmd, ovrTrackingCap_Orientation, 0)))) {
       FAIL("Unable to locate Rift sensors");
     }
+
     return result;
   }
 
@@ -54,7 +55,7 @@ public:
       renderSensors = !renderSensors;
       return;
     case GLFW_KEY_R:
-      ovrHmd_RecenterPose(hmd);
+      ovr_RecenterPose(hmd);
       return;
     }
 
@@ -62,7 +63,7 @@ public:
   }
 
   void update() {
-    ovrTrackingState trackingState = ovrHmd_GetTrackingState(hmd, 0);
+    ovrTrackingState trackingState = ovr_GetTrackingState(hmd, 0);
     ovrPoseStatef & poseState = trackingState.HeadPose;
 
     orientation = ovr::toGlm(poseState.ThePose.Orientation);

@@ -139,7 +139,7 @@ public:
       float captureTime = 
         ovr_GetTimeInSeconds() - CAMERA_LATENCY;
       ovrTrackingState tracking = 
-        ovrHmd_GetTrackingState(hmd, captureTime);
+        ovr_GetTrackingState(hmd, captureTime);
       captured.pose = tracking.HeadPose.ThePose;
 
       if (!videoCapture.grab() ||

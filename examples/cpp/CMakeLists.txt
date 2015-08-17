@@ -30,11 +30,14 @@ function(make_example2 PROJECT_FOLDER NAME SOURCE_FILES)
         add_executable(${EXECUTABLE} ${SOURCE_FILES} )
     endif()
 
-    target_link_libraries(${EXECUTABLE} ExampleCommon ${EXAMPLE_LIBS})
-    if (RIFT_DEBUG)
-        set_property(TARGET ${EXECUTABLE} PROPERTY DEBUG_OUTPUT_NAME ${EXECUTABLE}_d)
-    endif()
     set_target_properties(${EXECUTABLE} PROPERTIES FOLDER ${PROJECT_FOLDER})
+
+    add_example_dependencies(${EXECUTABLE})
+    add_dependencies(${EXECUTABLE} ExampleCommon)
+    target_link_libraries(${EXECUTABLE} ${EXAMPLE_LIBS})
+    target_link_libraries(${EXECUTABLE} ExampleCommon)
+    copy_dlls_beside_windows_executable()
+    
 endfunction()
 
 function(make_example FILE PROJECT_FOLDER)
@@ -44,12 +47,6 @@ function(make_example FILE PROJECT_FOLDER)
     string(REGEX REPLACE "^([^_]+(_[0-9]+)+).*\\.cpp$" "\\1" ROOT ${FILE} )
 
     make_example2(${PROJECT_FOLDER} ${NAME} ${SOURCE_FILES} )
-#    file(GLOB EXAMPLE_SHADERS "../resources/shaders/${ROOT}*.vs" "../resources/shaders/${ROOT}*.fs")
-#    list(APPEND SOURCE_FILES ${EXAMPLE_SHADERS})
-#    source_group("Shaders" FILES ${EXAMPLE_SHADERS})
-#    file(GLOB_RECURSE COMMON_SHADERS "../resources/shaders/*.vs" "../resources/shaders/*.fs")
-#    list(APPEND SOURCE_FILES ${COMMON_SHADERS})
-#    source_group("Common Shaders" FILES ${COMMON_SHADERS})
 endfunction()
 
 function(make_examples GLOB PROJECT_FOLDER)
@@ -66,16 +63,3 @@ if (OpenCV_FOUND)
     message(STATUS "Creating OpenCV examples")
     make_examples(opencv/*.cpp "Examples/OpenCV")
 endif()
-
-if (EXPERIMENTAL)
-    make_examples(experimental/*.cpp "Examples/Experimental")
-endif()
-
-if (HAVE_QT)
-    message(STATUS "Creating Qt examples")
-    add_subdirectory(qt)
-endif()
-
-
-
-
