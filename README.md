@@ -35,6 +35,8 @@ require you to specify which one you want.  You can specify a specific platform 
 
 Will show you a list of supported generators on your platform.
 
+Note that on OSX, if you fail to specify a generator it will probably produce a `Makefile`.  If you wish you use XCode you may need to specify the generator explicitly.  
+
 ## Building
 
 Depends on your build tool.  If you're using Visual Studio or XCode you can just say 'File, Open Project' or something to that effect and point it at the OculusRiftInAction/build directory.  
