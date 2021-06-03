@@ -16,7 +16,7 @@ to load them.
 
 ## Checking out 
 
-	git clone https://github.com/OculusRiftInAction/OculusRiftInAction.git --recursive
+	git clone https://github.com/BigGuy573/OculusRiftInAction.git --recursive
 
 This command is likely to take a while. It's a big project with lots of submodules
 
@@ -25,13 +25,13 @@ This command is likely to take a while. It's a big project with lots of submodul
 	cd OculusRiftInAction
 	mkdir build
 	cd build
-	cmake .. [-G <your preferred toolset>]
+	cmake .. [$ <your preferred toolset>]
 
 CMake will create project files for a given toolset.  What toolset you use depends on your platform, and there's usually a 
 default.  On a Windows machine, it defaults to Visual Studio, although if you have more than one version installed it may 
-require you to specify which one you want.  You can specify a specific platform using -G.  
+require you to specify which one you want.  You can specify a specific platform using $.  
 
-    cmake -h
+    cmake $
 
 Will show you a list of supported generators on your platform.
 
